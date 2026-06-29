@@ -1,0 +1,127 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/UIToolkit/HomeScreen.uss?fileID=7433441132597879392&amp;guid=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6&amp;type=3#HomeScreen"/>
+    <ui:VisualElement name="root" class="home-root role-mahasiswa">
+        <ui:VisualElement name="header" class="header">
+            <ui:VisualElement name="avatar" class="avatar">
+                <ui:Label name="avatar-initials" text="AK" class="avatar-initials"/>
+            </ui:VisualElement>
+            <ui:VisualElement class="greeting-col">
+                <ui:Label name="greeting-name" text="Halo, Andi" class="greeting-name"/>
+                <ui:Label name="role-badge" text="Mahasiswa" class="role-badge"/>
+            </ui:VisualElement>
+            <ui:Button name="btn-bell" class="bell-btn"/>
+        </ui:VisualElement>
+        <ui:VisualElement name="search-bar" class="search-bar">
+            <ui:VisualElement class="search-icon"/>
+            <ui:Label name="search-placeholder" text="Cari ruangan, gedung..." class="search-placeholder"/>
+            <ui:Button name="btn-mic" class="mic-btn"/>
+        </ui:VisualElement>
+        <ui:VisualElement name="guest-banner" class="guest-banner">
+            <ui:VisualElement class="guest-banner-icon"/>
+            <ui:Label text="Daftar akun untuk akses jadwal, riwayat &amp; notifikasi." class="guest-banner-text"/>
+            <ui:Button name="btn-guest-daftar" text="Daftar »" class="guest-banner-link"/>
+        </ui:VisualElement>
+        <ui:ScrollView name="scroll" class="scroll">
+            <ui:VisualElement class="scroll-content">
+                <ui:VisualElement class="section-head">
+                    <ui:Label text="Aksi cepat" class="section-title"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="quick-grid">
+                    <ui:VisualElement class="quick-row">
+                        <ui:Button name="qa-ar" class="quick-card">
+                            <ui:VisualElement class="quick-icon icon-ar"/>
+                            <ui:Label text="Navigasi AR" class="quick-label"/>
+                            <ui:VisualElement class="lock-badge"/>
+                        </ui:Button>
+                        <ui:Button name="qa-room" class="quick-card">
+                            <ui:VisualElement class="quick-icon icon-room"/>
+                            <ui:Label text="Cari Ruangan" class="quick-label"/>
+                            <ui:VisualElement class="lock-badge"/>
+                        </ui:Button>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="quick-row">
+                        <ui:Button name="qa-3" class="quick-card">
+                            <ui:VisualElement name="qa-3-icon" class="quick-icon icon-calendar"/>
+                            <ui:Label name="qa-3-label" text="Jadwal Hari Ini" class="quick-label"/>
+                            <ui:VisualElement class="lock-badge"/>
+                        </ui:Button>
+                        <ui:Button name="qa-4" class="quick-card">
+                            <ui:VisualElement name="qa-4-icon" class="quick-icon icon-star"/>
+                            <ui:Label name="qa-4-label" text="Rute Favorit" class="quick-label"/>
+                            <ui:VisualElement class="lock-badge"/>
+                        </ui:Button>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="section-head">
+                    <ui:Label text="Destinasi populer" class="section-title"/>
+                    <ui:Button name="btn-dest-all" text="Lihat semua" class="section-link"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="dest-row">
+                    <ui:VisualElement class="dest-card">
+                        <ui:VisualElement class="dest-thumb"/>
+                        <ui:Label text="Perpustakaan" class="dest-name"/>
+                        <ui:Label text="Gedung A · Lt.1" class="dest-sub"/>
+                        <ui:Label text="120m" class="dest-pill"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="dest-card">
+                        <ui:VisualElement class="dest-thumb"/>
+                        <ui:Label text="BAAK" class="dest-name"/>
+                        <ui:Label text="Gedung B · Lt.2" class="dest-sub"/>
+                        <ui:Label text="85m" class="dest-pill"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="dest-card">
+                        <ui:VisualElement class="dest-thumb"/>
+                        <ui:Label text="Kantin" class="dest-name"/>
+                        <ui:Label text="Gedung C · Lt.1" class="dest-sub"/>
+                        <ui:Label text="40m" class="dest-pill"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="section-head">
+                    <ui:Label text="Riwayat navigasi" class="section-title"/>
+                </ui:VisualElement>
+                <ui:VisualElement name="history-list" class="history-list">
+                    <ui:VisualElement class="history-item">
+                        <ui:VisualElement class="history-icon" style="background-size: 32px 48%;"/>
+                        <ui:VisualElement class="history-texts">
+                            <ui:Label text="Ruang 301" class="history-title"/>
+                            <ui:Label text="10 menit lalu" class="history-time"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="history-chevron"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="history-item">
+                        <ui:VisualElement class="history-icon" style="background-size: 32px 48%;"/>
+                        <ui:VisualElement class="history-texts">
+                            <ui:Label text="Laboratorium Komputer" class="history-title"/>
+                            <ui:Label text="Kemarin, 14:30" class="history-time"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="history-chevron"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement name="history-empty" class="history-empty">
+                    <ui:VisualElement class="empty-icon"/>
+                    <ui:Label text="Riwayat tidak tersedia" class="empty-title"/>
+                    <ui:Label text="Masuk atau daftar untuk melihat riwayat navigasimu." class="empty-sub"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:ScrollView>
+        <ui:VisualElement name="bottom-nav" class="bottom-nav">
+            <ui:Button name="nav-home" class="nav-item active">
+                <ui:VisualElement class="nav-icon icon-home"/>
+                <ui:Label text="Beranda" class="nav-label"/>
+            </ui:Button>
+            <ui:Button name="nav-map" class="nav-item">
+                <ui:VisualElement class="nav-icon icon-map"/>
+                <ui:Label text="Peta" class="nav-label"/>
+            </ui:Button>
+            <ui:Button name="nav-fab" text="" class="fab" style="background-size: 60px 46%; border-top-left-radius: 24px; border-top-right-radius: 24px; border-bottom-right-radius: 24px; border-bottom-left-radius: 24px; width: 120px; height: 120px; align-self: flex-end; color: rgb(0, 0, 0); -unity-text-outline-color: rgb(0, 0, 0); -unity-text-outline-width: 68px; -unity-text-align: middle-center; align-content: flex-start; justify-content: center; align-items: center; border-top-width: 8px; border-right-width: 8px; border-bottom-width: 8px; border-left-width: 8px; border-left-color: rgb(26, 58, 143); border-right-color: rgb(26, 58, 143); border-top-color: rgb(26, 58, 143); border-bottom-color: rgb(26, 58, 143);"/>
+            <ui:Button name="nav-history" class="nav-item nav-history">
+                <ui:VisualElement class="nav-icon icon-history"/>
+                <ui:Label text="Riwayat" class="nav-label"/>
+            </ui:Button>
+            <ui:Button name="nav-profile" class="nav-item nav-profile">
+                <ui:VisualElement class="nav-icon icon-profile"/>
+                <ui:Label text="Profil" class="nav-label"/>
+            </ui:Button>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

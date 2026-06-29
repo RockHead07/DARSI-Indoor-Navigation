@@ -1,0 +1,292 @@
+/* ══════════════════════════════════════════════
+   Login Screen — MultiSetNav
+   Reference: 1080 × 1920  (sizes tuned for this scale)
+   States toggled by controller via root classes:
+     (default) · .is-error · .is-loading
+   ══════════════════════════════════════════════ */
+
+/* ─── Root ─── */
+.login-root {
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    background-color: rgb(255, 255, 255);
+}
+
+/* ─── Top Bar ─── */
+.topbar {
+    flex-direction: row;
+    align-items: center;
+    height: 112px;
+    padding-left: 28px;
+    padding-right: 28px;
+    background-color: rgb(255, 255, 255);
+}
+
+.back-btn {
+    width: 60px;
+    height: 60px;
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    background-image: url("project://database/Assets/Icon/weui--back-filled.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+.back-btn:hover { background-color: rgba(0,0,0,0); border-width: 0; }
+
+.topbar-title {
+    flex-grow: 1;
+    font-size: 40px;
+    color: rgb(15, 23, 60);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-right: 60px;
+}
+
+/* ─── Hero Strip ─── */
+.hero {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgb(213, 232, 255);
+    padding-top: 28px;
+    padding-bottom: 28px;
+    padding-left: 48px;
+    padding-right: 48px;
+}
+
+.hero-icon {
+    width: 96px;
+    height: 96px;
+    border-radius: 26px;
+    background-color: rgb(26, 58, 143);
+    background-image: url("project://database/Assets/UI/Images/Voice-Logo.png");
+    -unity-background-scale-mode: scale-to-fit;
+    margin-right: 28px;
+}
+
+.hero-texts { flex-direction: column; flex-grow: 1; }
+
+.hero-title {
+    font-size: 36px;
+    color: rgb(15, 23, 60);
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+
+.hero-sub {
+    font-size: 28px;
+    color: rgb(70, 90, 130);
+}
+
+/* ─── Form Container ─── */
+.form {
+    flex-direction: column;
+    padding-left: 48px;
+    padding-right: 48px;
+    padding-top: 40px;
+}
+
+/* ─── Error Banner (hidden by default) ─── */
+.error-banner {
+    display: none;
+    flex-direction: row;
+    align-items: flex-start;
+    background-color: rgb(254, 242, 242);
+    border-radius: 20px;
+    border-width: 2px;
+    border-color: rgb(248, 200, 200);
+    padding: 24px;
+    margin-bottom: 32px;
+}
+.is-error .error-banner { display: flex; }
+
+.error-icon {
+    font-size: 32px;
+    color: rgb(220, 38, 38);
+    margin-right: 16px;
+    flex-shrink: 0;
+}
+.error-banner-text {
+    font-size: 26px;
+    color: rgb(200, 30, 30);
+    white-space: normal;
+    flex-grow: 1;
+}
+
+/* ─── Field Group ─── */
+.field-group { flex-direction: column; margin-bottom: 30px; }
+
+.field-label {
+    font-size: 26px;
+    color: rgb(90, 100, 115);
+    margin-bottom: 12px;
+}
+
+.field-box {
+    flex-direction: row;
+    align-items: center;
+    height: 108px;
+    background-color: rgb(255, 255, 255);
+    border-width: 3px;
+    border-color: rgb(214, 220, 228);
+    border-radius: 22px;
+    padding-left: 28px;
+    padding-right: 28px;
+}
+.field-box.focused { border-color: rgb(26, 58, 143); }
+.is-error .field-box { border-color: rgb(232, 90, 90); }
+.is-loading .field-box { opacity: 0.55; }
+
+.field-icon {
+    width: 40px;
+    height: 40px;
+    -unity-background-scale-mode: scale-to-fit;
+    flex-shrink: 0;
+    margin-right: 20px;
+}
+.icon-mail { background-image: url("project://database/Assets/Icon/icon-email.png"); -unity-background-image-tint-color: rgb(26, 58, 143); }
+.icon-lock { background-image: url("project://database/Assets/Icon/icon-lock.png"); -unity-background-image-tint-color: rgb(26, 58, 143); }
+
+/* TextField fills the box, no inner chrome */
+.field-input {
+    flex-grow: 1;
+    margin: 0;
+    background-color: rgba(0,0,0,0);
+}
+.field-input .unity-base-text-field__input {
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    font-size: 30px;
+    color: rgb(20, 30, 55);
+    padding: 0;
+    -unity-text-align: middle-left;
+}
+.field-input .unity-base-field__input { border-width: 0; }
+
+/* trailing element (eye) */
+.field-trail {
+    width: 44px;
+    height: 44px;
+    -unity-background-scale-mode: scale-to-fit;
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    flex-shrink: 0;
+    margin-left: 16px;
+}
+.field-trail:hover { background-color: rgba(0,0,0,0); border-width: 0; }
+.icon-eye     { background-image: url("project://database/Assets/Icon/icon-eye-inactive.png"); -unity-background-image-tint-color: rgb(160, 168, 180); }
+.icon-eye-on  { background-image: url("project://database/Assets/Icon/icon-eye-active.png");  -unity-background-image-tint-color: rgb(26, 58, 143); }
+
+/* green check — hidden unless email valid */
+.check-icon {
+    display: none;
+    width: 44px;
+    height: 44px;
+    margin-left: 16px;
+    flex-shrink: 0;
+    -unity-background-scale-mode: scale-to-fit;
+    background-image: url("project://database/Assets/Icon/icon-check.png");
+    -unity-background-image-tint-color: rgb(34, 180, 90);
+}
+.check-icon.visible { display: flex; }
+
+/* ─── Forgot link ─── */
+.forgot-link {
+    align-self: flex-end;
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    color: rgb(40, 110, 220);
+    font-size: 26px;
+    margin-top: 4px;
+    margin-bottom: 32px;
+    padding: 8px;
+}
+.forgot-link:hover { background-color: rgba(0,0,0,0); border-width: 0; color: rgb(26, 58, 143); }
+
+/* ─── Submit Button ─── */
+.btn-submit {
+    height: 112px;
+    border-width: 0;
+    border-radius: 56px;
+    color: rgb(255, 255, 255);
+    font-size: 36px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    background-color: rgb(147, 180, 230); /* default / disabled look */
+}
+.btn-submit:hover { border-width: 0; }
+.btn-submit.enabled { background-color: rgb(26, 58, 143); }
+.btn-submit.enabled:hover { background-color: rgb(20, 46, 115); }
+
+/* ─── Loading progress (hidden by default) ─── */
+.loading-progress {
+    display: none;
+    font-size: 26px;
+    color: rgb(110, 120, 135);
+    -unity-text-align: middle-center;
+    margin-top: 24px;
+    white-space: normal;
+}
+.is-loading .loading-progress { display: flex; }
+
+/* ─── Info Box ─── */
+.info-box {
+    flex-direction: row;
+    align-items: flex-start;
+    background-color: rgb(232, 240, 255);
+    border-radius: 22px;
+    padding: 28px;
+    margin-top: 32px;
+}
+
+.info-icon {
+    width: 44px;
+    height: 44px;
+    -unity-background-scale-mode: scale-to-fit;
+    margin-right: 20px;
+    flex-shrink: 0;
+}
+
+.info-icon-shield {
+    background-image: url("project://database/Assets/Icon/icon-shield.png");
+    -unity-background-image-tint-color: rgb(26, 58, 143);
+}
+
+.info-texts { flex-direction: column; flex-grow: 1; }
+
+.info-title {
+    font-size: 26px;
+    color: rgb(26, 58, 143);
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+
+.info-desc {
+    font-size: 24px;
+    color: rgb(60, 80, 130);
+    white-space: normal;
+}
+
+/* ─── Spacer + Footer ─── */
+.spacer { flex-grow: 1; }
+
+.footer {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    padding-bottom: 50px;
+    padding-top: 20px;
+}
+.footer-text {
+    font-size: 28px;
+    color: rgb(90, 100, 115);
+}
+.footer-link {
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    color: rgb(255, 170, 0);
+    font-size: 28px;
+    -unity-font-style: bold;
+    padding: 0;
+    margin-left: 8px;
+}
+.footer-link:hover { background-color: rgba(0,0,0,0); border-width: 0; }

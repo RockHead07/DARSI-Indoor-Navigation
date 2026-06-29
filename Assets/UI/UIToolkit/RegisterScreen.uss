@@ -1,0 +1,326 @@
+/* ══════════════════════════════════════════════
+   Register Screen — MultiSetNav
+   Reference: 1080 × 1920  (sizes tuned for this scale)
+   States toggled by controller via root classes:
+     (default) · .is-error
+   Password strength on .strength-bar: .weak · .medium · .strong
+   ══════════════════════════════════════════════ */
+
+/* ─── Root ─── */
+.register-root {
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    background-color: rgb(255, 255, 255);
+}
+
+/* ─── Top Bar ─── */
+.topbar {
+    flex-direction: row;
+    align-items: center;
+    height: 112px;
+    padding-left: 28px;
+    padding-right: 28px;
+    background-color: rgb(255, 255, 255);
+}
+.back-btn {
+    width: 60px;
+    height: 60px;
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    background-image: url("project://database/Assets/Icon/weui--back-filled.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+.back-btn:hover { background-color: rgba(0,0,0,0); border-width: 0; }
+.topbar-title {
+    flex-grow: 1;
+    font-size: 40px;
+    color: rgb(15, 23, 60);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-right: 60px;
+}
+
+/* ─── Hero Strip ─── */
+.hero {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgb(213, 232, 255);
+    padding-top: 28px;
+    padding-bottom: 28px;
+    padding-left: 48px;
+    padding-right: 48px;
+}
+.hero-icon {
+    width: 96px;
+    height: 96px;
+    border-radius: 26px;
+    background-color: rgb(26, 58, 143);
+    background-image: url("project://database/Assets/Icon/icon-send-plane.png");
+    -unity-background-image-tint-color: rgb(255, 255, 255);
+    -unity-background-scale-mode: scale-to-fit;
+    margin-right: 28px;
+}
+.hero-texts { flex-direction: column; flex-grow: 1; }
+.hero-title {
+    font-size: 36px;
+    color: rgb(15, 23, 60);
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+.hero-sub { font-size: 28px; color: rgb(70, 90, 130); }
+
+/* ─── Scroll / Form ─── */
+.scroll { flex-grow: 1; }
+.form {
+    flex-direction: column;
+    padding-left: 48px;
+    padding-right: 48px;
+    padding-top: 36px;
+    padding-bottom: 48px;
+}
+
+/* ─── Error Banner (hidden by default) ─── */
+.error-banner {
+    display: none;
+    flex-direction: row;
+    align-items: flex-start;
+    background-color: rgb(254, 242, 242);
+    border-radius: 20px;
+    border-width: 2px;
+    border-color: rgb(248, 200, 200);
+    padding: 24px;
+    margin-bottom: 32px;
+}
+.is-error .error-banner { display: flex; }
+.error-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    margin-right: 16px;
+    -unity-background-scale-mode: scale-to-fit;
+    background-image: url("project://database/Assets/Icon/info.png");
+    -unity-background-image-tint-color: rgb(220, 38, 38);
+}
+.error-banner-text {
+    font-size: 26px;
+    color: rgb(200, 30, 30);
+    white-space: normal;
+    flex-grow: 1;
+}
+
+/* ─── Field Group ─── */
+.field-group { flex-direction: column; margin-bottom: 28px; }
+.field-label {
+    font-size: 26px;
+    color: rgb(90, 100, 115);
+    margin-bottom: 12px;
+}
+.field-box {
+    flex-direction: row;
+    align-items: center;
+    height: 108px;
+    background-color: rgb(255, 255, 255);
+    border-width: 3px;
+    border-color: rgb(214, 220, 228);
+    border-radius: 22px;
+    padding-left: 28px;
+    padding-right: 28px;
+}
+.field-box.focused { border-color: rgb(26, 58, 143); }
+.is-error .field-box.error-field { border-color: rgb(232, 90, 90); }
+
+.field-icon {
+    width: 40px;
+    height: 40px;
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(26, 58, 143);
+    flex-shrink: 0;
+    margin-right: 20px;
+}
+.is-error .field-box.error-field .field-icon { -unity-background-image-tint-color: rgb(232, 90, 90); }
+.icon-user { background-image: url("project://database/Assets/Icon/icon-profile.png"); }
+.icon-mail { background-image: url("project://database/Assets/Icon/icon-email.png"); }
+.icon-lock { background-image: url("project://database/Assets/Icon/icon-lock.png"); }
+
+.field-input { flex-grow: 1; margin: 0; background-color: rgba(0,0,0,0); }
+.field-input .unity-base-text-field__input {
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    font-size: 30px;
+    color: rgb(20, 30, 55);
+    padding: 0;
+    -unity-text-align: middle-left;
+}
+.field-input .unity-base-field__input { border-width: 0; }
+
+/* trailing eye */
+.field-trail {
+    width: 44px;
+    height: 44px;
+    -unity-background-scale-mode: scale-to-fit;
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    flex-shrink: 0;
+    margin-left: 16px;
+}
+.field-trail:hover { background-color: rgba(0,0,0,0); border-width: 0; }
+.icon-eye    { background-image: url("project://database/Assets/Icon/icon-eye-inactive.png"); -unity-background-image-tint-color: rgb(160, 168, 180); }
+.icon-eye-on { background-image: url("project://database/Assets/Icon/icon-eye-active.png");  -unity-background-image-tint-color: rgb(26, 58, 143); }
+
+/* green check on valid email */
+.check-icon {
+    display: none;
+    width: 44px;
+    height: 44px;
+    margin-left: 16px;
+    flex-shrink: 0;
+    -unity-background-scale-mode: scale-to-fit;
+    background-image: url("project://database/Assets/Icon/icon-check.png");
+    -unity-background-image-tint-color: rgb(34, 180, 90);
+}
+.check-icon.visible { display: flex; }
+
+/* ─── Password Strength ─── */
+.strength-wrap {
+    display: none;
+    flex-direction: row;
+    align-items: center;
+    margin-top: 14px;
+}
+.strength-wrap.visible { display: flex; }
+.strength-bar { flex-direction: row; flex-grow: 1; margin-right: 18px; }
+.strength-seg {
+    flex-grow: 1;
+    height: 10px;
+    border-radius: 5px;
+    background-color: rgb(228, 232, 238);
+    margin-right: 10px;
+}
+.strength-bar.weak   .strength-seg.on { background-color: rgb(232, 90, 90); }
+.strength-bar.medium .strength-seg.on { background-color: rgb(240, 160, 40); }
+.strength-bar.strong .strength-seg.on { background-color: rgb(34, 170, 90); }
+.strength-label {
+    font-size: 22px;
+    -unity-font-style: bold;
+    flex-shrink: 0;
+}
+.strength-wrap.lvl-weak   .strength-label { color: rgb(232, 90, 90); }
+.strength-wrap.lvl-medium .strength-label { color: rgb(220, 150, 30); }
+.strength-wrap.lvl-strong .strength-label { color: rgb(34, 170, 90); }
+
+/* ─── Daftar sebagai (role selector) ─── */
+.section-label {
+    font-size: 28px;
+    color: rgb(15, 23, 60);
+    -unity-font-style: bold;
+    margin-top: 12px;
+    margin-bottom: 18px;
+}
+.role-card {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgb(248, 250, 252);
+    border-width: 3px;
+    border-color: rgb(228, 233, 240);
+    border-radius: 22px;
+    padding: 24px;
+    margin-bottom: 18px;
+}
+.role-card.selected {
+    background-color: rgb(232, 240, 255);
+    border-color: rgb(26, 58, 143);
+}
+.role-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background-color: rgb(214, 222, 235);
+    flex-shrink: 0;
+    margin-right: 22px;
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(120, 132, 150);
+}
+.role-card.selected .role-icon {
+    background-color: rgb(26, 58, 143);
+    -unity-background-image-tint-color: rgb(255, 255, 255);
+}
+.icon-student { background-image: url("project://database/Assets/Icon/icon-building.png"); }
+.icon-guest   { background-image: url("project://database/Assets/Icon/rivet-icons--user-group-solid.png"); }
+
+.role-texts { flex-direction: column; flex-grow: 1; }
+.role-title {
+    font-size: 28px;
+    color: rgb(20, 30, 55);
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+.role-card.selected .role-title { color: rgb(26, 58, 143); }
+.role-sub { font-size: 22px; color: rgb(130, 140, 155); }
+
+.role-check {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: none;
+    -unity-background-scale-mode: scale-to-fit;
+    background-image: url("project://database/Assets/Icon/icon-check.png");
+    -unity-background-image-tint-color: rgb(26, 58, 143);
+}
+.role-card.selected .role-check { display: flex; }
+
+/* admin note */
+.admin-note {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgb(247, 248, 250);
+    border-radius: 16px;
+    padding: 18px;
+    margin-top: 4px;
+    margin-bottom: 28px;
+}
+.admin-note-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    margin-right: 14px;
+    -unity-background-scale-mode: scale-to-fit;
+    background-image: url("project://database/Assets/Icon/info.png");
+    -unity-background-image-tint-color: rgb(150, 160, 175);
+}
+.admin-note-text { font-size: 22px; color: rgb(140, 150, 165); flex-grow: 1; white-space: normal; }
+
+/* ─── Submit ─── */
+.btn-submit {
+    height: 112px;
+    border-width: 0;
+    border-radius: 56px;
+    color: rgb(255, 255, 255);
+    font-size: 36px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    background-color: rgb(147, 180, 230);
+    margin-top: 8px;
+}
+.btn-submit:hover { border-width: 0; }
+.btn-submit.enabled { background-color: rgb(26, 58, 143); }
+.btn-submit.enabled:hover { background-color: rgb(20, 46, 115); }
+
+/* ─── Footer ─── */
+.footer {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    margin-top: 36px;
+}
+.footer-text { font-size: 26px; color: rgb(90, 100, 115); }
+.footer-link {
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    color: rgb(255, 170, 0);
+    font-size: 26px;
+    -unity-font-style: bold;
+    padding: 0;
+    margin-left: 8px;
+}
+.footer-link:hover { background-color: rgba(0,0,0,0); border-width: 0; }

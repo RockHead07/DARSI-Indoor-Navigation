@@ -1,0 +1,81 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/UIToolkit/RegisterScreen.uss?fileID=7433441132597879392&amp;guid=b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7&amp;type=3#RegisterScreen"/>
+    <ui:VisualElement name="root" class="register-root">
+        <ui:VisualElement name="topbar" class="topbar">
+            <ui:Button name="btn-back" class="back-btn"/>
+            <ui:Label text="Daftar akun" class="topbar-title"/>
+        </ui:VisualElement>
+        <ui:VisualElement name="hero" class="hero">
+            <ui:VisualElement class="hero-icon"/>
+            <ui:VisualElement class="hero-texts">
+                <ui:Label text="Buat akun baru" class="hero-title"/>
+                <ui:Label text="Bergabung dengan komunitas kampus" class="hero-sub"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:ScrollView name="scroll" class="scroll">
+            <ui:VisualElement name="form" class="form">
+                <ui:VisualElement name="error-banner" class="error-banner">
+                    <ui:VisualElement class="error-icon"/>
+                    <ui:Label name="error-text" text="Email ini sudah terdaftar. Gunakan email lain atau masuk dengan akun yang ada." class="error-banner-text"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="field-group">
+                    <ui:Label text="Nama lengkap" class="field-label"/>
+                    <ui:VisualElement name="name-box" class="field-box">
+                        <ui:VisualElement class="field-icon icon-user"/>
+                        <ui:TextField name="name-input" class="field-input"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="field-group">
+                    <ui:Label text="Email kampus" class="field-label"/>
+                    <ui:VisualElement name="email-box" class="field-box error-field">
+                        <ui:VisualElement class="field-icon icon-mail"/>
+                        <ui:TextField name="email-input" class="field-input"/>
+                        <ui:VisualElement name="email-check" class="check-icon"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="field-group">
+                    <ui:Label text="Password" class="field-label"/>
+                    <ui:VisualElement name="pass-box" class="field-box">
+                        <ui:VisualElement class="field-icon icon-lock"/>
+                        <ui:TextField name="pass-input" password="true" class="field-input"/>
+                        <ui:Button name="btn-eye" class="field-trail icon-eye"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="strength-wrap" class="strength-wrap">
+                        <ui:VisualElement name="strength-bar" class="strength-bar">
+                            <ui:VisualElement name="seg-1" class="strength-seg"/>
+                            <ui:VisualElement name="seg-2" class="strength-seg"/>
+                            <ui:VisualElement name="seg-3" class="strength-seg"/>
+                        </ui:VisualElement>
+                        <ui:Label name="strength-label" text="Kuat" class="strength-label"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:Label text="Daftar sebagai" class="section-label"/>
+                <ui:Button name="role-student" class="role-card selected">
+                    <ui:VisualElement class="role-icon icon-student" style="background-image: url(&quot;project://database/Assets/Icon/icon-building2.png?fileID=21300000&amp;guid=9462f2f28b330a2449b476deee007c6b&amp;type=3#icon-building2&quot;); background-size: 38px 38px;"/>
+                    <ui:VisualElement class="role-texts">
+                        <ui:Label text="Mahasiswa" class="role-title"/>
+                        <ui:Label text="Default untuk email student" class="role-sub"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="role-check"/>
+                </ui:Button>
+                <ui:Button name="role-guest" class="role-card">
+                    <ui:VisualElement class="role-icon icon-guest" style="background-size: 38px 63%;"/>
+                    <ui:VisualElement class="role-texts">
+                        <ui:Label text="Pengunjung" class="role-title"/>
+                        <ui:Label text="Untuk tamu kampus" class="role-sub"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="role-check"/>
+                </ui:Button>
+                <ui:VisualElement class="admin-note">
+                    <ui:VisualElement class="admin-note-icon"/>
+                    <ui:Label text="Akun Dosen dan Staff hanya bisa dibuat oleh Admin." class="admin-note-text"/>
+                </ui:VisualElement>
+                <ui:Button name="btn-submit" text="Buat akun" class="btn-submit"/>
+                <ui:VisualElement class="footer">
+                    <ui:Label text="Sudah punya akun?" class="footer-text"/>
+                    <ui:Button name="btn-login" text="Masuk di sini" class="footer-link"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:ScrollView>
+    </ui:VisualElement>
+</ui:UXML>
