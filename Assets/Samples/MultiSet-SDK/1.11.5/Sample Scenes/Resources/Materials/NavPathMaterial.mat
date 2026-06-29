@@ -79,7 +79,7 @@ Material:
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.02
-    - _PathLength: 8
+    - _PathLength: 2
     - _ScrollSpeed: -1.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -88,7 +88,7 @@ Material:
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
-    - _Color: {r: 0.078431375, g: 0.27058825, b: 0.47843137, a: 1}
+    - _Color: {r: 0.5764706, g: 0.73333335, b: 0.14117648, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _Tint: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
