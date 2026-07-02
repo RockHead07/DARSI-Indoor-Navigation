@@ -52,32 +52,41 @@ Nggak boleh mulai coding fitur sebelum fase ini clear — kontrak yang masih ber
 Satu-satunya pintu masuk data dari Flutter. Semua fitur AR hilir dari sini.
 
 ### T1.1 — `UaaLEntryPoint.cs` skeleton + GameObject di scene
-- `TODO` · Unity · Depends: Fase 0
+- `DONE` · Unity · Depends: Fase 0
 - **Done when:** GameObject `UaaLEntryPoint` (persistent) ada di scene WholePSDKU, script attached, `ReceiveLaunchPayload(string json)` bisa dipanggil & nge-log payload.
+- Implemented: `Assets/Scripts/UaaLEntryPoint.cs`, GameObject wired in `WholePSDKU.unity`, `DontDestroyOnLoad` singleton.
 
 ### T1.2 — Struct payload + parse JSON
-- `TODO` · Unity · Depends: T1.1
+- `DONE` · Unity · Depends: T1.1
 - **Done when:** JSON valid (`action, mode, poiId, poiName, floor, building, connectionId?`) → struct; JSON invalid → log error, tidak crash.
+- Verified live in Play Mode: malformed JSON logs error and does not throw.
 
 ### T1.3 — Buffer payload sampai `localizationSuccess`
-- `TODO` · Unity · Depends: T1.2, T0.2
+- `DONE` · Unity · Depends: T1.2, T0.2
 - **Done when:** payload yang masuk sebelum localize disimpan, lalu diterapkan otomatis begitu localize sukses (tujuan hanya valid pasca-localize — ADR-007).
+- Wired `MapLocalizationManager`'s `LocalizationSuccess` UnityEvent → `UaaLEntryPoint.OnLocalizationSuccess` (4th persistent listener, alongside existing `PhotonManager.OnLocalizationSuccess`). Verified: payload sent before localize does not route until `OnLocalizationSuccess` fires.
 
 ### T1.4 — Route `mode: navigate` → NavigationAdapter
-- `TODO` · Unity · Depends: T1.3
+- `DONE` · Unity · Depends: T1.3
 - **Done when:** `poiId` valid → `NavigationAdapter` mulai navigasi; `poiId` invalid → toast (ID), tidak crash.
+- Verified live: exact `poiId` match → `POIManager.FindBestMatchWithContext` → `NavigationAdapter.NavigateToPOI` fires real navigation. Invalid `poiId` → `ToastManager.Instance.ShowAlert(...)` + warning log, no crash.
+- **Known gap (flag to Bagus):** `POIData` has no stable ID field distinct from display name — `poiId` from Flutter must match `POIData.poiName`/GameObject name exactly. `FindBestMatchWithContext` is fuzzy-match, not strict-ID lookup. Fine for now (exact match resolves first), but worth a real `id` field on `POIData` before Flutter integration if names can ever drift from IDs.
 
 ### T1.5 — Route `mode: freeExplore` → UI pilih tujuan di AR
-- `TODO` · Unity · Depends: T1.3
+- `DONE` · Unity · Depends: T1.3
 - **Done when:** payload tanpa `poiId` → panel pilih tujuan di dalam AR muncul.
+- **Correction:** panel pilih tujuan TERNYATA sudah ada bawaan MultiSet SDK sample (`NavigationUIController.DestinationSelectUI`, toggle via `ToggleDestinationSelectUI()`, list POI searchable lewat `SelectList`) — bukan perlu dibangun baru seperti dugaan awal. `RouteFreeExplore()` di `UaaLEntryPoint.cs` sekarang memanggil `navigationUIController.ToggleDestinationSelectUI()`. Diverifikasi live di Play Mode: panel `False → True` setelah payload `mode:freeExplore` dikirim pasca-localize.
 
 ### T1.6 — Emit event Unity → Flutter (`UnitySendMessage`)
-- `TODO` · Unity · Depends: T1.1, T0.2
+- `DONE` (with one flagged gap) · Unity · Depends: T1.1, T0.2
 - **Done when:** `arSessionReady`, `localizationSuccess` (reuse `PhotonManager.NotifyLocalizationSucceeded`), `navigationArrived`, `arSessionClosed` terkirim di titik yang benar.
+- All 4 events implemented and firing at correct points (verified `arSessionReady` + `localizationSuccess` live). `navigationArrived`/`arSessionClosed` exposed as public methods (`NotifyNavigationArrived`, `CloseArSession`) ready to be called once arrival-detection and a back-button hook exist elsewhere.
+- **⚠️ NEEDS DECISION (flag to Bagus):** the actual outbound Android bridge call uses a placeholder native method name (`activity.Call("onUnityMessage", ...)` via `AndroidJavaObject` on `UnityPlayer.currentActivity`). This must match whatever host Activity method `My-eRSIy-CopyCat` implements to receive Unity callbacks — confirm when building ROADMAP T4.5 (Flutter bridge), update both sides together.
 
 ### T1.7 — Debug harness (tes tanpa Flutter)
-- `TODO` · Unity · Depends: T1.2
+- `DONE` · Unity · Depends: T1.2
 - **Done when:** ada tombol/inspector yang manggil `ReceiveLaunchPayload` dgn payload contoh — bisa tes `navigate` & `freeExplore` di Editor tanpa Flutter.
+- 4 `[ContextMenu]` entries on the `UaaLEntryPoint` component (right-click header in Inspector): simulate navigate (valid/invalid poiId), freeExplore, localizationSuccess.
 
 ---
 

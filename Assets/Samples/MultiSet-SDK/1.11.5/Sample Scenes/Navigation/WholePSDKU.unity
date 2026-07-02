@@ -1053,6 +1053,53 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 225284612}
   m_CullTransparentMesh: 1
+--- !u!1 &277745319
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 277745321}
+  - component: {fileID: 277745320}
+  m_Layer: 0
+  m_Name: UaaLEntryPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &277745320
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 277745319}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 70cd0246960b10d479cd22fe87eff663, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UaaLEntryPoint
+  poiManager: {fileID: 1877688121}
+  navigationAdapter: {fileID: 762189161}
+  navigationUIController: {fileID: 798593630}
+--- !u!4 &277745321
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 277745319}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &282727322
 GameObject:
   m_ObjectHideFlags: 0
@@ -7430,7 +7477,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
       propertyPath: LocalizationSuccess.m_PersistentCalls.m_Calls.Array.size
-      value: 3
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
       propertyPath: LocalizationInit.m_PersistentCalls.m_Calls.Array.data[0].m_Target
@@ -7465,7 +7512,15 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 575802540}
     - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
+      propertyPath: LocalizationSuccess.m_PersistentCalls.m_Calls.Array.data[3].m_Target
+      value: 
+      objectReference: {fileID: 277745320}
+    - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
       propertyPath: LocalizationSuccess.m_PersistentCalls.m_Calls.Array.data[2].m_CallState
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
+      propertyPath: LocalizationSuccess.m_PersistentCalls.m_Calls.Array.data[3].m_CallState
       value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
@@ -7473,8 +7528,16 @@ PrefabInstance:
       value: OnLocalizationSuccess
       objectReference: {fileID: 0}
     - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
+      propertyPath: LocalizationSuccess.m_PersistentCalls.m_Calls.Array.data[3].m_MethodName
+      value: OnLocalizationSuccess
+      objectReference: {fileID: 0}
+    - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
       propertyPath: LocalizationSuccess.m_PersistentCalls.m_Calls.Array.data[2].m_TargetAssemblyTypeName
       value: PhotonManager, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
+      propertyPath: LocalizationSuccess.m_PersistentCalls.m_Calls.Array.data[3].m_TargetAssemblyTypeName
+      value: UaaLEntryPoint, Assembly-CSharp
       objectReference: {fileID: 0}
     - target: {fileID: 4164677170919121941, guid: d27ef900e515242458c5368b1b0eadb3, type: 3}
       propertyPath: LocalizationSuccess.m_PersistentCalls.m_Calls.Array.data[2].m_Arguments.m_BoolArgument
@@ -10296,7 +10359,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4286203156
-  m_fontColor: {r: 0.078431375, g: 0.27058825, b: 0.47843137, a: 1}
+  m_fontColor: {r: 0.5764706, g: 0.73333335, b: 0.14117648, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -13196,3 +13259,4 @@ SceneRoots:
   - {fileID: 1877688122}
   - {fileID: 575802541}
   - {fileID: 1301637803}
+  - {fileID: 277745321}
