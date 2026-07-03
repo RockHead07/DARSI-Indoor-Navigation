@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "darsi-webview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "D:/Dev/Projects/darsi-indoor-navigation-ui-webview"
+      ],
+      "port": 3000
+    }
+  ]
+}

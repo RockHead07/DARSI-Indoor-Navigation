@@ -87,3 +87,16 @@
 **Hard blocker (lihat `ROADMAP.md` T0.8):** friend-request butuh identitas user yang stabil (user ID + handle) dari MyRSIy lewat bridge. Kalau MyRSIy tidak bisa menyediakan itu, fitur ini tidak bisa dibangun sama sekali dan harus mundur ke model pairing-code (ADR-010/011 versi asli). Menunggu konfirmasi Pak Farris.
 
 **Dampak ke dokumen lain:** `FLOWS.md` bagian 5 ditulis ulang mengikuti model ini. `INTEGRATION.md`/`API_CONTRACT.md` payload `launchAR` pakai field `connectionId` (bukan lagi `pairingSessionId`). Endpoint backend jadi `/api/friends/request|respond|{id}` + `GET /api/friends` (bukan lagi `/api/pairing/create|join|confirm`).
+
+---
+
+### ADR-014 — Kepemilikan field POI: gedung/lantai di Unity (POIData), status di backend
+**Keputusan:** Data per-POI dibagi berdasarkan **volatilitas & kepemilikan**:
+- **Statis-struktural** (`building`, `floor`) → milik **`POIData` di Unity**. Ikut ke-sync ke backend, Unity jadi sumber kebenaran. `POIData.cs` ditambah 2 field string `building` + `floor` (aditif, tidak menyentuh logika existing — ditandai eksplisit karena `POIData.cs` ada di daftar "jangan diubah tanpa alasan kuat"; ini alasan kuatnya).
+- **Operasional-volatile** (`status`: Buka/Antre/Penuh) → milik **backend**. Berubah sering, idealnya dari sistem antrean RS, dan bisa diedit orang non-teknis lewat admin panel — jadi tidak masuk akal di Unity.
+
+**Alasan:** POI secara fisik memang diauthoring di Unity (harus, biar bisa dinavigasi), jadi gedung/lantai wajar ditag di situ juga — sekali kerja, satu sumber kebenaran, tidak ada risiko baris yatim akibat matching nama. Menaruh gedung/lantai di backend = 2 sumber kebenaran untuk 1 POI + logika partial-upsert + risiko drift. Kunci prinsip: **"sering berubah & diedit non-teknis?" → backend. "nyaris tak berubah & melekat ke fisik POI?" → Unity.** Catatan OTA: ngedit gedung/lantai di Unity Editor tetap OTA (sync ke backend → WebView fetch), TIDAK perlu reupload APK — Unity di sini alat authoring, bukan penyimpan data runtime.
+
+**Fasing implementasi:** untuk sekarang (T3.4) backend di-**seed manual** (gedung/lantai/status diketik langsung di SQL). Model Unity-sumber-kebenaran baru aktif penuh saat Unity Editor sync tool dibangun (ROADMAP T3.4-L2). Jadi ADR ini mengunci *keputusan*-nya sekarang; implementasi field `POIData` + sync menyusul agar tidak memblok WebView.
+
+**Prinsip portability (turunan ADR-001):** WebView → FastAPI → Postgres SQL standar; jangan cantol dalam ke fitur proprietary Supabase (Auth/Realtime/PostgREST langsung) supaya migrasi ke Postgres RS-hosted tetap mulus (`pg_dump`/`pg_restore` + repoint connection string).

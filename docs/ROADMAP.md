@@ -45,6 +45,15 @@ Nggak boleh mulai coding fitur sebelum fase ini clear — kontrak yang masih ber
 - `BLOCKED` · Backend/Flutter · Depends: T0.7 · **Blocker untuk seluruh Fase 2**
 - **Done when:** Pak Farris/IT RSI konfirmasi MyRSIy menyediakan **user ID stabil + handle** yang bisa jadi target friend-request lewat bridge. Friend-request TIDAK bisa dibangun tanpa ini. Jawaban dicatat sebagai ADR.
 
+**Catatan penting (2026-07-02):** Jawaban Pak Farris "Postgresql + Mysql" itu menjawab *"database apa yang dipakai **My eRSIy**"* — itu info stack internal MyRSIy, BUKAN arahan agar DARSI pakai/akses DB itu. Tidak ada arahan mengubah backend DARSI. Keputusan tetap: backend DARSI = Supabase sendiri, integrasi ke MyRSIy lewat bridge (bukan shared DB). Lihat ADR-001/ADR-012. Best-practice: Supabase = managed Postgres, jadi keputusan reversible (bisa migrasi ke Postgres self-hosted kalau produksi RS mewajibkan) — aman diambil sekarang.
+
+**Draft pertanyaan lanjutan buat Pak Farris (kirim nanti — arah: dapat identitas user tanpa akses DB):**
+1. Apakah MyRSIy bisa **mengoper ID user + nama tampilan** yang sedang login ke modul DARSI saat di-launch (lewat bridge/session)? Ini yang paling menentukan — kalau "bisa", friendlist (Fase 2) langsung ter-unblock tanpa DARSI menyentuh DB MyRSIy.
+2. Format ID user itu apa (mis. UUID, integer, string)? Apakah stabil/permanen per user?
+3. Apakah tersedia nama tampilan/handle yang aman ditunjukkan ke user lain (bukan data sensitif)?
+4. Apakah MyRSIy punya endpoint/API yang bisa DARSI panggil, atau semua data harus lewat bridge saat launch?
+5. (Opsional, jangka panjang) Kalau nanti produksi butuh data POI/lokasi dari sisi RS, apakah ada API-nya, atau DARSI kelola sendiri?
+
 ---
 
 ## Fase 1 — UaaL Entry Point (Unity)  *(prioritas #1)*
@@ -127,24 +136,50 @@ Model final (ADR-013): friend-request persisten. Data-entry & manajemen teman di
 ## Fase 3 — WebView UI (Home + Cari Lokasi)
 
 ### T3.1 — Setup Next.js dasar
-- `TODO` · WebView · Depends: —
-- **Done when:** project jalan sesuai `AGENTS.md` (baca guide Next.js versi repo dulu).
+- `DONE` · WebView · Depends: —
+- **Done when:** project jalan sesuai `AGENTS.md`. Next.js 16 + React 19 + Tailwind v4, `npx next build` hijau (routes `/` + `/cari-lokasi`).
 
 ### T3.2 — Home screen
-- `TODO` · WebView · Depends: T3.1
+- `DONE` (UI) · WebView · Depends: T3.1
 - **Done when:** sesuai `DESIGN_SYSTEM` + `FLOWS §2` — no header, no jarak, no kata "POI", FAB kamera + quick action.
+- Sudah: search bar, quick action (Cari Lokasi), Destinasi Populer, Layanan Lainnya, FAB kamera. Data masih mock (real data nunggu T3.4). Quick-action grid dirapikan jadi 1 kolom (kartu "Lihat Peta" sudah dihapus per ADR-006; slot ke-2 nanti diisi "Cari Teman" saat Fase 2 unblocked).
 
 ### T3.3 — Cari Lokasi screen
-- `TODO` · WebView · Depends: T3.1
+- `DONE` (UI) · WebView · Depends: T3.1
 - **Done when:** search + filter chip + confirmation card + CTA "Mulai Navigasi AR", tanpa meter.
+- Sudah: search + clear, filter chip kategori, hasil (nama+gedung+lantai+badge, tanpa meter), empty state, recent searches, confirmation card, CTA. Data masih mock.
 
-### T3.4 — Integrasi API POI
-- `TODO` · WebView+Backend · Depends: T3.2, T3.3
-- **Done when:** `/api/poi/popular`, `/api/poi/search`, `/api/poi/categories` konsumsi jalan; response tanpa field jarak.
+### T3.a — Bridge helper tunggal (sesuai kontrak terkunci)  *(pass 2026-07-02)*
+- `DONE` · WebView · Depends: T0.3, T0.4
+- **Done when:** `app/lib/bridge.ts` — satu `launchAR()` encode kontrak `API_CONTRACT.md` (channel `DarsiBridge`, payload `{action, mode, poiId, poiName, floor, building, connectionId}`), stub `console.log` kalau tanpa Flutter host. Dua helper inline yang lama (bentuknya beda + pakai nama channel salah `DarsiChannel`) dihapus. Field-set diverifikasi identik dengan `API_CONTRACT.md`.
+
+### T3.b — Wire mode `launchAR` benar di kedua screen  *(pass 2026-07-02)*
+- `DONE` · WebView · Depends: T3.a
+- **Done when:** FAB Home → `freeExplore`; tap kartu Populer/Layanan + CTA Cari Lokasi → `navigate` + `poiId` (=poiName untuk sekarang, sesuai gap T1.4). Sebelumnya payload nggak ada field `mode` → Unity jatuh ke "Unknown mode"; sekarang cocok dengan `UaaLEntryPoint`.
+
+### T3.4 — Integrasi API POI  *(breakdown 2026-07-02)*
+Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi ke Postgres RS-hosted gampang, lihat ADR-001 catatan): WebView → FastAPI → Postgres SQL standar; jangan cantol dalam ke fitur proprietary Supabase (Auth/Realtime/PostgREST langsung). Data seed: **11 POI kampus** dari scene Unity (biar navigate bisa dites end-to-end). Field ownership per **ADR-014**: gedung/lantai milik POIData (Unity), status milik backend.
+
+**Fasing:** untuk sekarang backend di-**seed manual** (SQL insert 11 POI + gedung/lantai/status/kategori diketik langsung). Model "Unity = sumber kebenaran" (ADR-014) baru aktif penuh pas sync tool dibangun (T3.4-L2, task terpisah nanti) — jangan blok WebView nunggu itu.
+
+**⚠️ Butuh keputusan/eksternal sebelum backend jalan end-to-end:** (a) akun Supabase (provisioning project), (b) lokasi + nama repo backend baru (belum ada). Kode (schema, seed, FastAPI, WebView client) bisa ditulis duluan tanpa nunggu ini.
+
+- **T3.4.0 — ADR-014** (`DECISIONS.md` dua repo): gedung/lantai di POIData, status di backend + alasan (data statis vs operasional). Bisa dikerjakan sekarang. `TODO`
+- **T3.4.1 — Skema `pois`** (SQL standar): `id`, `name` (unik, = poiId untuk sekarang), `category`, `building`, `floor`, `status`, `is_popular`, `synonyms`, timestamps. `TODO` · Backend
+- **T3.4.2 — Seed 11 POI kampus** (SQL insert): nama persis dari scene Unity (Perpustakaan, BAAK, Lab Teori 201/202/203, Lab Mikrotik, Mushola, Lab 102/103, Ruang Dosen, MMB Studio) + gedung/lantai/status/kategori manual. `TODO` · Backend
+- **T3.4.3 — FastAPI read endpoints:** `GET /api/poi/popular`, `GET /api/poi/search?q=&category=`, `GET /api/poi/categories`. Read-only, **tanpa field jarak** (ADR-007). `TODO` · Backend
+- **T3.4.4 — WebView API client + ganti mock Home** (popular + layanan) jadi fetch; loading/error state. `TODO` · WebView · Depends: T3.4.3
+- **T3.4.5 — Ganti mock Cari Lokasi** (search + kategori) jadi fetch; loading/error/empty state; `poiId` yang dikirim ke `launchAR` pakai nama kanonik dari backend. `TODO` · WebView · Depends: T3.4.3
+- **Done when:** ketiga endpoint dikonsumsi WebView, data 11 POI kampus tampil dari backend (bukan mock), response tanpa jarak, dan navigate end-to-end resolve di Unity.
+
+### T3.4-L (later) — Unity jadi sumber kebenaran otomatis  *(task terpisah, "kedepannya")*
+- **T3.4-L1 — Tambah `building`/`floor` ke `POIData.cs`** (aditif, di-flag karena file protected; per ADR-014). `TODO` · Unity
+- **T3.4-L2 — Unity Editor "Sync POIs → Backend"** (tombol menu) + endpoint tulis FastAPI (`POST /api/poi/sync`, auth admin, upsert). Menggantikan seed manual → Unity jadi sumber tunggal. `TODO` · Unity+Backend · Depends: T3.4-L1, T3.4.3
 
 ### T3.5 — Resume state (bukan reload) saat AR selesai
-- `TODO` · WebView · Depends: T0.2
+- `DONE` · WebView · Depends: T0.2
 - **Done when:** `onARSessionClosed` → balik ke state Home/Cari Lokasi terakhir tanpa reload.
+- `app/lib/bridge.ts` expose `onArSessionClosed(handler)` yang men-set `window.onARSessionClosed` (dipanggil Flutter). `app/ArSessionResume.tsx` (mount di layout) nampilin banner konfirmasi ("Kamu telah tiba di X" saat `arrived`), auto-dismiss 4s. State React kejaga karena WebView tidak reload. Diverifikasi live di preview: panggil `window.onARSessionClosed({arrived:true,poiId:'Perpustakaan'})` → banner muncul.
 
 ---
 

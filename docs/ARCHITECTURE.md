@@ -52,7 +52,7 @@ MyRSIy (Flutter, native — sudah di Play Store)
 | `My-eRSIy-CopyCat` (Flutter dummy, nanti prod di repo MyRSIy asli milik KKSoft) | Flutter | Parent app, shell, AppBar native, session/auth, launcher UaaL | KKSoft/Farris (prod) |
 | `DARSI-WebView` | Next.js (atau HTML/CSS/JS statis) | UI pre-AR: Home, Cari Lokasi, friendlist | Bagus |
 | `DARSI-Indoor-Navigation` | Unity 6000.3.14f1 + MultiSet SDK v1.11.5 + ARCore + Photon PUN 2 | AR Navigation, Cari Teman (render posisi), Voice input | Bagus |
-| **Backend DARSI** (belum ada repo terpisah — endpoint dikonsumsi WebView, lihat `API_CONTRACT.md`) | Supabase + FastAPI (Python) | Data POI, friendlist/friend-request, presence, business logic | Bagus |
+| `DARSI-Indoor-Navigation-Backend` (repo terpisah, di GitHub; folder lokal `darsi-backend`; endpoint dikonsumsi WebView, lihat `API_CONTRACT.md`) | FastAPI (Python) + Postgres via `DATABASE_URL` (Supabase atau self-hosted) | Data POI, friendlist/friend-request, presence, business logic | Bagus |
 
 ## Backend
 
