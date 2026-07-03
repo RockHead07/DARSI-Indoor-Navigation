@@ -185,27 +185,31 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 
 ## Fase 4 — Flutter bridge (`My-eRSIy-CopyCat`)
 
-> Di luar dua repo utama; jadwalkan setelah kontrak (Fase 0) + minimal Fase 1 siap dites.
+> Repo Flutter dummy: `D:\Dev\Projects\Internship\My-eRSIy-CopyCat-` (GitHub `RockHead07/My-eRSIy-CopyCat-`). Ternyata SHELL-nya sudah sebagian besar jadi (dicek 2026-07-02). `webview_flutter: ^4.10.0` confirmed.
 
 ### T4.1 — Menu item "Navigasi Indoor"
-- `TODO` · Flutter · Depends: Fase 0
-- **Done when:** item ditambah ke `menu_items.dart`, action `webview` → `DarsiNavigationScreen`.
+- `DONE` · Flutter · Depends: Fase 0
+- Sudah ada di `menu_items.dart` (`navigasi-indoor`, `actionType: native`, `routeName: darsi-navigation`); `MenuNavigator.handle` route ke `DarsiNavigationScreen`.
 
 ### T4.2 — DarsiNavigationScreen + AppBar hijau native
-- `TODO` · Flutter · Depends: T4.1
-- **Done when:** AppBar native (back, judul, subtitle, ornamen) sesuai ADR-004; body kosong siap WebView.
+- `DONE` · Flutter · Depends: T4.1
+- `lib/features/darsi/darsi_navigation_screen.dart` — header hijau native (back, "Navigasi Indoor", subtitle, ornamen stadium) sesuai ADR-004; body = WebView card dengan loading/error + `PopScope` back.
 
-### T4.3 — Embed WebView + channel `launchAR`
-- `TODO` · Flutter · Depends: T4.2, T0.3
-- **Done when:** `webview_flutter` load URL Next.js; `JavaScriptChannel` nerima `launchAR`.
+### T4.3 — Embed WebView + channel bridge
+- `DONE` (channel name difix 2026-07-02) · Flutter · Depends: T4.2, T0.3
+- `webview_flutter` load `http://10.0.2.2:3000/` (emulator → localhost PC). `JavaScriptChannel` nerima pesan, parse JSON, switch `action`. **Channel name difix `DarsiChannel` → `DarsiBridge`** biar cocok kontrak terkunci + WebView (sebelumnya bentrok → pesan nggak nyambung).
 
 ### T4.4 — Launcher UaaL + teruskan payload
-- `TODO` · Flutter · Depends: T4.3, T1.1
-- **Done when:** terima `launchAR` → launch Unity (UaaL) → `UnitySendMessage("UaaLEntryPoint", "ReceiveLaunchPayload", json)`.
+- `TODO` (STUB ADA) · Flutter · Depends: T4.3, T1.1
+- **Sekarang:** `_launchAr` cuma nampilin SnackBar (stub, ada komentar `ponytail:`). **Belum:** launch Unity (UaaL) beneran + `UnitySendMessage("UaaLEntryPoint", "ReceiveLaunchPayload", json)`, dan belum konsumsi `mode`/`poiId`/`connectionId`. **Butuh Unity di-export ke Android library (.aar) dulu** — ini bagian native paling berat.
 
 ### T4.5 — Relay event Unity → WebView + return flow
 - `TODO` · Flutter · Depends: T4.4, T1.6
-- **Done when:** event Unity (`arSessionClosed` dll) di-inject balik ke WebView (JS); tutup Unity → balik ke `DarsiNavigationScreen` → WebView resume (ADR return flow).
+- **Belum:** Flutter inject `window.onARSessionClosed(payload)` balik ke WebView (sisi WebView sudah siap terima — T3.5). Tutup Unity → balik ke `DarsiNavigationScreen` → WebView resume. Butuh T4.4 (UaaL) dulu.
+
+### T4.6 — Native method name Unity → host Activity
+- `TODO` · Flutter+Unity · Depends: T4.4
+- Selaraskan nama method native yang Unity panggil (`UaaLEntryPoint.SendEventToFlutter` sekarang placeholder `activity.Call("onUnityMessage", ...)`) dengan yang host Activity `My-eRSIy-CopyCat` implement. Update dua sisi sekaligus.
 
 ---
 
@@ -214,4 +218,4 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 - **Fase 0 adalah gate mutlak.** T0.8 (identitas MyRSIy) mem-blok seluruh Fase 2 — kejar konfirmasi Pak Farris lebih awal biar tidak jadi bottleneck.
 - **Fase 1 bisa jalan penuh** hanya bergantung Fase 0 (dokumen), tidak nunggu backend — kerjakan duluan.
 - **Fase 3** (WebView UI POI) independen dari Fase 2 (friendlist) — bisa paralel.
-- **Fase 4** butuh Fase 1 minimal untuk end-to-end test bridge.
+- **Fase 4** shell-nya (menu, DarsiNavigationScreen, WebView embed, bridge receiver) ternyata sudah jadi (T4.1–T4.3 DONE). Sisa yang berat: **T4.4 launcher UaaL** — butuh Unity di-export ke Android library (.aar) dulu. Leg WebView↔Flutter (tanpa Unity) sudah bisa dites end-to-end sekarang.
