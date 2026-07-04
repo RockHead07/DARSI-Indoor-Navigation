@@ -200,16 +200,16 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 - `webview_flutter` load `http://10.0.2.2:3000/` (emulator → localhost PC). `JavaScriptChannel` nerima pesan, parse JSON, switch `action`. **Channel name difix `DarsiChannel` → `DarsiBridge`** biar cocok kontrak terkunci + WebView (sebelumnya bentrok → pesan nggak nyambung).
 
 ### T4.4 — Launcher UaaL + teruskan payload
-- `TODO` (STUB ADA) · Flutter · Depends: T4.3, T1.1
-- **Sekarang:** `_launchAr` cuma nampilin SnackBar (stub, ada komentar `ponytail:`). **Belum:** launch Unity (UaaL) beneran + `UnitySendMessage("UaaLEntryPoint", "ReceiveLaunchPayload", json)`, dan belum konsumsi `mode`/`poiId`/`connectionId`. **Butuh Unity di-export ke Android library (.aar) dulu** — ini bagian native paling berat.
+- `DONE` (2026-07-04, verified di device) · Flutter · Depends: T4.3, T1.1
+- Unity di-export ke Android library, di-embed ke `My-eRSIy-CopyCat-/android/` (modul `:unityLibrary`). `_launchAr` bukan stub lagi: MethodChannel `darsi/unity` method `launchAr` → `MainActivity` launch `DarsiUnityActivity` (subclass `UnityPlayerGameActivity`) dgn payload sebagai **intent-extra** (bukan `UnitySendMessage` — hindari race saat cold-launch); `UaaLEntryPoint.Start()` baca extra `darsiPayload`. Empat gotcha AGP-9 didokumentasi di memory + `tool/reintegrate-unity.ps1`.
 
 ### T4.5 — Relay event Unity → WebView + return flow
-- `TODO` · Flutter · Depends: T4.4, T1.6
-- **Belum:** Flutter inject `window.onARSessionClosed(payload)` balik ke WebView (sisi WebView sudah siap terima — T3.5). Tutup Unity → balik ke `DarsiNavigationScreen` → WebView resume. Butuh T4.4 (UaaL) dulu.
+- `DONE` (2026-07-04) · Flutter · Depends: T4.4, T1.6
+- Jalur balik: Unity C# `SendEventToFlutter` → `UnityBridge` (Kotlin static, hop ke platform thread) → MethodChannel → Dart handler → inject `window.onARSessionClosed(payload)` ke WebView. Back dari AR: `DarsiUnityActivity` **tidak destroy Unity** (destroy = crash native di JNI_OnUnload) — pakai `moveTaskToBack()` (Unity di task terpisah) balik ke `DarsiNavigationScreen` yang masih utuh; `excludeFromRecents` sembunyikan task Unity dari recent apps.
 
 ### T4.6 — Native method name Unity → host Activity
-- `TODO` · Flutter+Unity · Depends: T4.4
-- Selaraskan nama method native yang Unity panggil (`UaaLEntryPoint.SendEventToFlutter` sekarang placeholder `activity.Call("onUnityMessage", ...)`) dengan yang host Activity `My-eRSIy-CopyCat` implement. Update dua sisi sekaligus.
+- `DONE` (2026-07-04) · Flutter+Unity · Depends: T4.4
+- Placeholder `onUnityMessage` diganti: `SendEventToFlutter` sekarang panggil `com.rsislam.surabaya.rs_islam_app.UnityBridge.send(event, json)` (CallStatic), yang forward ke MethodChannel. Dua sisi selaras.
 
 ---
 
@@ -219,3 +219,14 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 - **Fase 1 bisa jalan penuh** hanya bergantung Fase 0 (dokumen), tidak nunggu backend — kerjakan duluan.
 - **Fase 3** (WebView UI POI) independen dari Fase 2 (friendlist) — bisa paralel.
 - **Fase 4** shell-nya (menu, DarsiNavigationScreen, WebView embed, bridge receiver) ternyata sudah jadi (T4.1–T4.3 DONE). Sisa yang berat: **T4.4 launcher UaaL** — butuh Unity di-export ke Android library (.aar) dulu. Leg WebView↔Flutter (tanpa Unity) sudah bisa dites end-to-end sekarang.
+- **UPDATE 2026-07-04:** Fase 4 (T4.4–T4.6) SELESAI & terverifikasi di device. Stack produksi berdiri: WebView → Vercel (`darsi-indoor-navigation.vercel.app`), backend+Postgres → Railway. APK default `_darsiUrl` → Vercel. Tes lapangan cukup HP + internet.
+
+---
+
+## Backlog / Known Issues (ditunda sadar — bukan bug yang harus segera)
+
+- **PERF-1 — Navigasi Indoor terasa berat.** Ditemukan 2026-07-04 saat tes device. Dugaan penyebab (urut dampak, BELUM diukur): (1) **debug build** — semua APK sejauh ini `--debug` (JIT, no AOT, debug asserts) → bukan performa asli; validasi harus di `--profile`/`--release` dulu. (2) **Unity residency** — desain T4.5 sengaja TIDAK destroy Unity (destroy = crash), jadi setelah masuk AR sekali engine Unity+IL2CPP+ARCore tetap di RAM (ratusan MB) → bikin WebView & app sluggish di HP mid-range. (3) **animasi `.darsi-pulse`** di WebView nge-animate `box-shadow` infinite (bukan GPU-composited → repaint tiap frame). **Best-practice sebelum eksekusi: ukur dulu** — build `--profile`, kalau ringan berarti cuma debug-overhead (fix lain jadi YAGNI); kalau masih berat, `dumpsys meminfo` buktikan Unity residency sebelum sentuh arsitektur (langkah berisiko). Fix (3) aman dikerjakan kapan saja (ganti box-shadow → `transform: scale`+`opacity`).
+- **POI stable-ID (T3.4-L / gap T1.4).** `poiId` masih = nama POI (exact-match `FindBestMatchWithContext`). Fragile kalau nama berubah. Rencana: tambah id stabil ke `POIData.cs` + Unity Editor sync tool yang upsert ke backend (ADR-014).
+- **Foto POI asli.** Kolom `photos` masih kosong → UI render placeholder. Isi URL setelah foto kampus ada.
+- **Release build + kecilin APK.** Ganti `--debug` → `--release` (~300MB → ~150-180MB, strip symbol + R8). Untuk demo/distribusi.
+- **Re-entry AR dgn POI berbeda.** Setelah balik dari AR (Unity paused), masuk lagi dgn POI lain: `DarsiUnityActivity` singleTask → `onNewIntent`, tapi `UaaLEntryPoint` baca intent cuma di `Start()`. Perlu handle intent baru saat resume kalau mau ganti tujuan tanpa restart Unity.
