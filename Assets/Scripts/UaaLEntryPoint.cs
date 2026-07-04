@@ -78,6 +78,30 @@ public class UaaLEntryPoint : MonoBehaviour
     {
         // AR Canvas is active immediately on launch (ADR-003) — no splash/login gate before this.
         SendEventToFlutter("arSessionReady", "{}");
+
+        // Cold-launch path: the Flutter host (MainActivity.kt) starts UnityPlayerGameActivity
+        // with the launchAR payload as an intent extra. Read it here instead of relying on
+        // UnitySendMessage, which would race the not-yet-loaded player on a fresh activity.
+        ReadLaunchIntent();
+    }
+
+    private void ReadLaunchIntent()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        try
+        {
+            using var jc = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+            using var activity = jc.GetStatic<AndroidJavaObject>("currentActivity");
+            using var intent = activity.Call<AndroidJavaObject>("getIntent");
+            string json = intent.Call<string>("getStringExtra", "darsiPayload");
+            if (!string.IsNullOrEmpty(json))
+                ReceiveLaunchPayload(json);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[UaaLEntryPoint] Failed to read launch intent: {e.Message}");
+        }
+#endif
     }
 
     /// <summary>Called by Flutter via UnitySendMessage(gameObjectName, "ReceiveLaunchPayload", json).</summary>
@@ -201,14 +225,30 @@ public class UaaLEntryPoint : MonoBehaviour
     private void SendEventToFlutter(string eventName, string jsonPayload)
     {
 #if UNITY_ANDROID && !UNITY_EDITOR
-        // NOTE: "onUnityMessage" is a placeholder native method name — must match whatever
-        // host Activity method My-eRSIy-CopyCat implements to receive Unity callbacks (ROADMAP.md T4.5).
-        using var jc = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
-        using var activity = jc.GetStatic<AndroidJavaObject>("currentActivity");
-        activity.Call("onUnityMessage", eventName, jsonPayload);
+        // Route to the host's UnityBridge (Kotlin static), which hops to the platform
+        // thread and calls the "darsi/unity" MethodChannel (T4.5). Class name is the
+        // host app package — only exists when embedded in My-eRSIy-CopyCat.
+        try
+        {
+            using var bridge = new AndroidJavaClass("com.rsislam.surabaya.rs_islam_app.UnityBridge");
+            bridge.CallStatic("send", eventName, jsonPayload);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[UaaLEntryPoint] SendEventToFlutter('{eventName}') failed: {e.Message}");
+        }
 #else
         Debug.Log($"[UaaLEntryPoint] (editor stub) -> Flutter event '{eventName}': {jsonPayload}");
 #endif
+    }
+
+    // AR is tearing down (user backed out of the activity). Report the session result so
+    // the WebView can resume (T4.5). DarsiUnityActivity.onUnityPlayerUnloaded() then
+    // finish()es back to the Flutter host. The main-thread post in UnityBridge survives
+    // this teardown, so the event still reaches Dart after MainActivity resumes.
+    private void OnApplicationQuit()
+    {
+        CloseArSession();
     }
 
     // --- Debug harness (ROADMAP.md T1.7) — right-click the component header to test without Flutter ---
