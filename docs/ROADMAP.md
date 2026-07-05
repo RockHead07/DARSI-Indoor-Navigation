@@ -173,8 +173,10 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 - **Done when:** ketiga endpoint dikonsumsi WebView, data 11 POI kampus tampil dari backend (bukan mock), response tanpa jarak, dan navigate end-to-end resolve di Unity.
 
 ### T3.4-L (later) — Unity jadi sumber kebenaran otomatis  *(task terpisah, "kedepannya")*
-- **T3.4-L1 — Tambah `building`/`floor` ke `POIData.cs`** (aditif, di-flag karena file protected; per ADR-014). `TODO` · Unity
-- **T3.4-L2 — Unity Editor "Sync POIs → Backend"** (tombol menu) + endpoint tulis FastAPI (`POST /api/poi/sync`, auth admin, upsert). Menggantikan seed manual → Unity jadi sumber tunggal. `TODO` · Unity+Backend · Depends: T3.4-L1, T3.4.3
+- **T3.4-L1 — Tambah `poiId` (GUID stabil, auto-generate via `Reset()`), `building`/`floor` ke `POIData.cs`** (aditif, file protected; per ADR-014). `DONE` (2026-07-05) · Unity
+- **T3.4-L2 — Unity Editor "Sync POIs → Backend"** (`DARSI > Sync POIs to Backend`, `Assets/Editor/POISyncWindow.cs`) + endpoint tulis FastAPI (`POST /api/poi/sync`, header `X-Admin-Token`, upsert keyed by `unity_id` dengan fallback match by `name` untuk adopsi baris lama). Backend: kolom `unity_id text UNIQUE` ditambahkan ke `pois`. `DONE` (2026-07-05, belum di-test live — Unity Editor belum dibuka sesi ini, lihat catatan verifikasi) · Unity+Backend · Depends: T3.4-L1, T3.4.3
+  - **Belum diverifikasi live:** compile-check `POISyncWindow.cs` di Unity Editor (Editor sedang tidak jalan saat implementasi), dan migrasi kolom `unity_id` di DB Railway yang sudah ter-provision (schema.sql pakai `CREATE TABLE IF NOT EXISTS` — tidak otomatis nambah kolom ke tabel yang sudah ada; perlu `ALTER TABLE pois ADD COLUMN IF NOT EXISTS unity_id text UNIQUE;` manual sekali di Railway).
+  - `status` sengaja tidak pernah ikut ter-overwrite oleh sync (tetap backend-owned, ADR-014).
 
 ### T3.5 — Resume state (bukan reload) saat AR selesai
 - `DONE` · WebView · Depends: T0.2
