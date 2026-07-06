@@ -100,3 +100,18 @@
 **Fasing implementasi:** untuk sekarang (T3.4) backend di-**seed manual** (gedung/lantai/status diketik langsung di SQL). Model Unity-sumber-kebenaran baru aktif penuh saat Unity Editor sync tool dibangun (ROADMAP T3.4-L2). Jadi ADR ini mengunci *keputusan*-nya sekarang; implementasi field `POIData` + sync menyusul agar tidak memblok WebView.
 
 **Prinsip portability (turunan ADR-001):** WebView → FastAPI → Postgres SQL standar; jangan cantol dalam ke fitur proprietary Supabase (Auth/Realtime/PostgREST langsung) supaya migrasi ke Postgres RS-hosted tetap mulus (`pg_dump`/`pg_restore` + repoint connection string).
+
+---
+
+> Catatan: ADR-015 (Cari Teman "request-to-meet") dicatat di `DECISIONS.md` repo WebView — murni keputusan flow UI 2D, tidak menyentuh kerja Unity. Repo Unity lompat ke ADR-016 yang memang menyentuh authoring POI di sini.
+
+### ADR-016 — Kategori POI kanonik = satu sumber kebenaran, divalidasi di boundary sync
+
+**Keputusan:** Kategori POI adalah **himpunan tertutup kanonik**, bukan string bebas. Di Unity, `POIData.kategori` yang diketik saat authoring POI HARUS salah satu dari daftar kanonik. Alur penegakan:
+1. **SSOT di backend:** konstanta `POI_CATEGORIES` (`darsi-backend/app/main.py`) = daftar kategori kanonik.
+2. **Validasi fail-loud saat sync:** window `DARSI > Sync POIs to Backend` push ke `POST /api/poi/sync`; kalau ada POI dengan `kategori` di luar daftar → **seluruh sync ditolak (HTTP 422)** dengan pesan menyebut kategori salah + daftar valid. Muncul langsung di window POI Sync ("Gagal (422): kategori tidak dikenal: ...").
+3. **WebView:** `categoryIcon()` (`app/lib/api.ts`) memetakan kategori → ikon (`/icons/<segmen>/<nama>.svg`); key-nya mirror `POI_CATEGORIES` (case-sensitive). Kategori tak dikenal jatuh ke ikon `pin` (jaring pengaman, bukan pengganti validasi).
+
+**Alasan:** `category` menentukan ikon POI di WebView (turunan ADR-014: category itu field milik Unity). String bebas yang diketik di Unity gampang typo/beda kapital, dan gejalanya diam-diam (ikon default). Validasi di endpoint sync = chokepoint natural → typo ketahuan **saat klik Sync**, bukan berminggu kemudian. Tabel `categories` + API sendiri sengaja tidak dibuat (over-engineering untuk skala ~20 POI).
+
+**Konsekuensi:** menambah/rename kategori = edit **dua tempat** (`POI_CATEGORIES` backend + `categoryIcon()` WebView) + taruh file ikon di `public/icons/<segmen>/`. Pencegahan di hulu (jadikan `POIData.kategori` dropdown/enum, bukan string bebas) menyusul saat daftar kategori RS fix — sekarang masih `string` + guardrail validasi di boundary. Daftar kategori final RS wajib divalidasi ke IT/manajemen RSI.

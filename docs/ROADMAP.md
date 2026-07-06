@@ -179,6 +179,14 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
   - Dua gotcha yang ketemu pas verifikasi (dicatat biar gak keulang): (1) admin token env var (`POI_SYNC_TOKEN`) sempat ke-set di service **Postgres** dengan nama salah ketik (`POI_SYCN_TOKEN`) — harus di service **backend**, key persis `POI_SYNC_TOKEN`. (2) Pool koneksi Postgres yang idle lama sempat diputus Railway (`SSL error: unexpected eof`) → fixed dengan `check=ConnectionPool.check_connection` di `app/main.py` lifespan, supaya koneksi mati di-deteksi & diganti sebelum dipakai, bukan gagal di tengah query.
   - `status` sengaja tidak pernah ikut ter-overwrite oleh sync (tetap backend-owned, ADR-014).
 
+### T3.6 — Ikon POI per-kategori + taksonomi RS + guardrail kategori  *(2026-07-06)*
+- `DONE` (WebView+Backend) · Depends: T3.4-L2
+- **Done when:** ikon POI diturunkan dari `category` (bukan hardcode `pin`); taksonomi ikon rumah sakit siap; kategori divalidasi di boundary sync.
+- Ikon WebView ditata per-segmen `public/icons/{ui,klinis,administrasi,fasilitas,sirkulasi}/`; `app/icons.tsx` pakai `FILE_ICON_DIR` (map nama→segmen) → URL `/icons/<segmen>/<nama>.svg`. ~22 ikon RS ditambah. `categoryIcon()` (`app/lib/api.ts`) memetakan kategori→ikon.
+- **ADR-016** (dua repo): kategori POI = closed-set kanonik (`POI_CATEGORIES` di backend = SSOT), `POST /api/poi/sync` tolak 422 kalau ada kategori asing (fail-loud saat klik Sync di Unity), key `categoryIcon()` WebView mirror case-sensitive. Backend↔WebView terbukti identik (26 kategori).
+- **Limiter demo kampus (bukan bug):** seed 11 POI cuma punya kategori `Umum`/`Administrasi`/`Laboratorium`, jadi Perpustakaan & Mushola sama-sama `Umum` → sama-sama ikon `pin`. Ikon RS variatif (mosque, cross, dll) baru nyala saat data kategori RS masuk. Daftar kategori final wajib divalidasi ke IT RSI. `POIData.kategori` masih `string` bebas + guardrail validasi; upgrade ke dropdown/enum ditunda sampai daftar RS fix.
+- **⚠️ Pending push (Bagus):** 2 perubahan `darsi-backend/app/main.py` belum di-commit — `check=ConnectionPool.check_connection` + `POI_CATEGORIES`/validasi sync. Sudah `py_compile` OK, belum live-test (butuh redeploy Railway).
+
 ### T3.5 — Resume state (bukan reload) saat AR selesai
 - `DONE` · WebView · Depends: T0.2
 - **Done when:** `onARSessionClosed` → balik ke state Home/Cari Lokasi terakhir tanpa reload.
