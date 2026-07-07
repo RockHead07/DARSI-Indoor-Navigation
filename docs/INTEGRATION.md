@@ -27,6 +27,18 @@ Unity (C#) --UnitySendMessage callback--> Flutter (Dart) --JS injection--> WebVi
 
 `mode: 'findFriend'` — trigger dari WebView saat user tap "Navigasi ke [teman]" pada teman yang sudah berstatus `ar-active` di friendlist (lihat ADR-013, `FLOWS.md` bagian 5). Payload wajib sertakan `connectionId` (ID koneksi friendlist yang sudah `accepted`, BUKAN kode sekali-pakai). Unity TIDAK menampilkan UI friendlist/add-friend sama sekali — itu murni tanggung jawab WebView. Begitu localize, Unity langsung render posisi teman + jarak, tanpa modal/keyboard apapun (lihat ADR-013 — panduan Google ARCore soal menghindari full-screen takeover di dalam AR).
 
+## Identitas user (host MyRSIy → WebView, BUKAN lewat Unity) — ADR-017
+
+Fitur **Cari Teman = login-only**; navigasi lokasi tetap boleh tamu. Identitas user
+**tidak** lewat Unity dan **tidak** ikut payload `launchAR` — ia disuntik host (MyRSIy via
+Flutter) langsung ke WebView saat load: `window.__DARSI_USER__ = { userId, handle? }`
+(atau `null` untuk tamu). Detail kontrak ada di `API_CONTRACT.md` (repo WebView).
+
+Yang WAJIB dari MyRSIy cuma **`userId`** stabil + **tidak didaur ulang** (UUID/PK).
+`handle` opsional — DARSI mint sendiri kalau tak ada (tak perlu MyRSIy expose PII). Unity
+tak menyentuh identitas ini sama sekali; ia cuma terima `connectionId` yang sudah
+`accepted` lewat payload `launchAR` seperti biasa.
+
 ## Endpoint friendlist (dipanggil dari WebView, BUKAN dari Unity langsung)
 
 | Endpoint | Fungsi |

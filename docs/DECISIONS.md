@@ -115,3 +115,32 @@
 **Alasan:** `category` menentukan ikon POI di WebView (turunan ADR-014: category itu field milik Unity). String bebas yang diketik di Unity gampang typo/beda kapital, dan gejalanya diam-diam (ikon default). Validasi di endpoint sync = chokepoint natural → typo ketahuan **saat klik Sync**, bukan berminggu kemudian. Tabel `categories` + API sendiri sengaja tidak dibuat (over-engineering untuk skala ~20 POI).
 
 **Konsekuensi:** menambah/rename kategori = edit **dua tempat** (`POI_CATEGORIES` backend + `categoryIcon()` WebView) + taruh file ikon di `public/icons/<segmen>/`. Pencegahan di hulu (jadikan `POIData.kategori` dropdown/enum, bukan string bebas) menyusul saat daftar kategori RS fix — sekarang masih `string` + guardrail validasi di boundary. Daftar kategori final RS wajib divalidasi ke IT/manajemen RSI.
+
+---
+
+### ADR-017 — Gating login MyRSIy + identitas via injeksi host + DARSI mint handle sendiri
+
+**Keputusan:** Identitas user (Fase 2 friendlist) = **seam** yang dibangun sekarang tanpa nunggu MyRSIy:
+1. **Gating ikut login MyRSIy:** navigasi lokasi = boleh **tamu**; Cari Teman = **login-only**.
+2. **Identitas disuntik host→WebView** (`window.__DARSI_USER__`), **BUKAN lewat Unity dan bukan lewat `launchAR`**. Unity tak menyentuh identitas — cuma terima `connectionId` yang sudah `accepted` seperti biasa. Yang wajib dari MyRSIy cuma `userId` stabil + tak didaur ulang (UUID/PK).
+3. **DARSI mint handle sendiri** kalau MyRSIy tak kasih — tak perlu MyRSIy expose PII.
+
+**Relevansi ke repo Unity:** ADR ini sebagian besar keputusan WebView/host, tapi dicatat di sini karena (a) menegaskan Unity **tetap tidak punya konsep login/identitas** (konsisten ADR-003) dan tidak boleh menerima/menyimpan `userId`, dan (b) menurunkan T0.8 dari blocker keras jadi wiring terakhir — Fase 2 (termasuk T2.6/T2.7 render posisi teman di Unity) bisa dibangun di atas identitas suntikan (dev/copycat). Detail kontrak `window.__DARSI_USER__` ada di `INTEGRATION.md` + `API_CONTRACT.md` (WebView). Refine ADR-013 (identifier friend-request = handle buatan DARSI); posisi tetap AR-only (ADR-011/015).
+
+---
+
+### ADR-018 — Visibilitas POI per-lantai: cluster-derived, bukan band ketinggian hardcode
+
+**Keputusan:** POI hanya tampil di AR kalau berada di **lantai yang sama dengan posisi kamera user saat ini** (mengurangi clutter marker lintas-lantai pada map multi-lantai bertumpuk vertikal). Lantai ditentukan lewat **clustering otomatis dari posisi Y POI**, BUKAN band ketinggian hardcode (mis. "0-3m = lantai 1, 3-6m = lantai 2"):
+
+1. **Derive lantai dari data:** saat localize, kelompokkan semua `POIData` aktif berdasarkan Y — klaster yang terbentuk = lantai-lantai yang ada. Tidak ada angka ketinggian di-hardcode di kode.
+2. **Lantai aktif = klaster terdekat** dari posisi kamera (pose MultiSet yang sudah ter-localize, BUKAN Y ARCore mentah yang drift), di-smooth ~0.5 detik untuk meredam jitter.
+3. **Hysteresis:** pindah lantai aktif hanya setelah kamera melewati titik tengah antar-klaster + margin, dan stabil beberapa frame — mencegah POI berkedip nyala-mati di dekat tangga/batas lantai.
+4. **Target navigasi aktif selalu tampil**, walau berbeda lantai dari lantai user sekarang — filter ini murni untuk decluttering marker, BUKAN untuk memutus rute. NavMesh tetap menyambungkan lintas lantai lewat node tangga/lift seperti biasa; POI tujuan baru "senyap" visual sampai user tiba di lantainya.
+5. **`POIData.floor` (string "Lantai 1/2", ADR-014) tetap murni label tampilan** — keputusan visibilitas AR sepenuhnya dari geometri Y, supaya tidak ada risiko mismatch antara label string dan posisi fisik asli.
+
+**Alasan:** band hardcode mengharuskan menebak tinggi lantai gedung RSI sebelum data/scan asli ada — tebakan yang salah (lantai lebih tinggi/rendah dari asumsi, lobi RS yang biasanya lebih tinggi) bikin POI kepotong salah lantai secara diam-diam. Clustering menghindari ini sepenuhnya: ia menemukan tinggi lantai dari **scan fisik asli** (posisi Y hasil authoring POI di scene MultiSet), jadi otomatis benar untuk gedung RSI berapa pun tinggi lantainya nanti — tidak perlu tahu angkanya sekarang. Keputusan ini reversible & aman diambil sebelum data RSI ada: cuma 2 knob (jendela smoothing, margin hysteresis) yang perlu di-tune ulang saat scan asli masuk, logika inti tidak perlu ditulis ulang.
+
+**Risiko residual (diakui, bukan diabaikan):** lantai yang berdekatan tipis (mis. mezzanine ~1.5-2m di atas lantai dasar) bisa ambigu kalau jaraknya kurang jauh dari tinggi HP dipegang (~1.4m); POI per lantai yang sangat sedikit (1-2 titik) bikin klaster kurang stabil secara statistik. Keduanya spesifik-gedung RSI, belum diketahui sampai scan asli ada — ditangani nanti kalau benar-benar muncul (YAGNI), bukan diantisipasi sekarang dengan kompleksitas tambahan.
+
+**Bentuk implementasi:** komponen aditif baru `FloorVisibilityManager` (belum dibuat) — reuse list POI dari `POIManager` yang sudah ada, tidak menyentuh script protected. Validasi awal pakai data kampus (11 POI, 2 lantai) sebagai testbed sebelum data RSI asli tersedia.

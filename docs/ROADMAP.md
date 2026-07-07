@@ -41,9 +41,15 @@ Nggak boleh mulai coding fitur sebelum fase ini clear — kontrak yang masih ber
 - `TODO` · Docs(all) · Depends: —
 - **Done when:** ADR-013 ditulis di `DECISIONS.md` + `FLOWS.md §5` di-update. Isi: friendlist persisten via **friend-request add-by-exact-identifier (bukan direktori terbuka) + mutual accept**; presence **status-only** (online/AR-active/offline, tanpa lokasi); posisi live tetap **AR-only**; user bisa **opt-out (tampil offline)**; rate-limit + block. ADR-013 me-refine ADR-011 (bukan mencabut — posisi tetap AR-only).
 
-### T0.8 — ⚠️ NEEDS DECISION: identitas user stabil dari MyRSIy
-- `BLOCKED` · Backend/Flutter · Depends: T0.7 · **Blocker untuk seluruh Fase 2**
-- **Done when:** Pak Farris/IT RSI konfirmasi MyRSIy menyediakan **user ID stabil + handle** yang bisa jadi target friend-request lewat bridge. Friend-request TIDAK bisa dibangun tanpa ini. Jawaban dicatat sebagai ADR.
+### T0.8 — identitas user stabil dari MyRSIy  *(diturunkan dari blocker keras → wiring terakhir, 2026-07-06)*
+- `WIP` (seam DONE, final wiring pending) · Backend/Flutter · Depends: T0.7
+- **Update 2026-07-06 (ADR-017):** dibangun **seam identitas** supaya T0.8 TIDAK lagi nge-block pembangunan Fase 2. WebView `app/lib/user.ts` (`getCurrentUser()`) + kontrak `window.__DARSI_USER__` (host→WebView, lihat `INTEGRATION.md`/`API_CONTRACT.md`) + guest-gate Cari Teman (login-only). Di copycat kita pegang launch sendiri → `userId` bisa disuntik nilai dev sekarang, jadi seluruh Fase 2 bisa dibangun & didemoin tanpa MyRSIy. `handle` di-mint DARSI sendiri (tak perlu MyRSIy expose PII).
+- **Done when (yang tersisa):** dev MyRSIy konfirmasi bisa oper **satu field `userId`** (UUID/PK, TIDAK didaur ulang) saat launch modul DARSI. Cuma itu. Bisa dijawab async, tak harus Pak Farris.
+
+**Pertanyaan yang sudah menyempit (kirim ke dev MyRSIy — bukan questionnaire):**
+> "Saat MyRSIy nge-launch modul DARSI (UaaL/WebView), bisa nggak oper **1 field: `userId`** user yang lagi login — berupa UUID atau primary key yang **tidak pernah didaur ulang**? Cuma itu yang DARSI butuh; nama/handle DARSI bikin sendiri."
+- Handle & lifecycle hapus-akun sudah kejawab dari sisi desain DARSI (ADR-017), tidak perlu ditanyakan lagi.
+- Poin lama #4/#5 (endpoint API MyRSIy, data POI dari RS) tetap relevan jangka panjang tapi tidak nge-block Fase 2.
 
 **Catatan penting (2026-07-02):** Jawaban Pak Farris "Postgresql + Mysql" itu menjawab *"database apa yang dipakai **My eRSIy**"* — itu info stack internal MyRSIy, BUKAN arahan agar DARSI pakai/akses DB itu. Tidak ada arahan mengubah backend DARSI. Keputusan tetap: backend DARSI = Supabase sendiri, integrasi ke MyRSIy lewat bridge (bukan shared DB). Lihat ADR-001/ADR-012. Best-practice: Supabase = managed Postgres, jadi keputusan reversible (bisa migrasi ke Postgres self-hosted kalau produksi RS mewajibkan) — aman diambil sekarang.
 
@@ -99,9 +105,11 @@ Satu-satunya pintu masuk data dari Flutter. Semua fitur AR hilir dari sini.
 
 ---
 
-## Fase 2 — Friendlist + Cari Teman  *(BLOCKED oleh T0.8)*
+## Fase 2 — Friendlist + Cari Teman  *(bisa dibangun di atas identity seam — ADR-017; final wiring MyRSIy = T0.8)*
 
 Model final (ADR-013): friend-request persisten. Data-entry & manajemen teman di **WebView**; posisi live cuma di **AR**.
+
+**Update 2026-07-06 (ADR-017):** tidak lagi "BLOCKED keras". Identity seam (`app/lib/user.ts` + `window.__DARSI_USER__`) sudah ada → T2.1–T2.7 bisa dibangun & dites di atas `userId` suntikan (dev/copycat). `Depends: T0.8` di bawah sekarang berarti "butuh final wiring MyRSIy untuk PRODUKSI", bukan "tak bisa mulai". UI Cari Teman (tab, add-by-handle, request, request-to-meet, guest-gate) sudah jadi di atas mock (`lib/friends.ts`).
 
 ### T2.1 — Skema Supabase (identity + friend graph)
 - `TODO` · Backend · Depends: T0.8
