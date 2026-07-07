@@ -25,6 +25,8 @@ Unity (C#) --UnitySendMessage callback--> Flutter (Dart) --JS injection--> WebVi
 }
 ```
 
+`poiId` (mode `navigate`) = GUID stabil `POIData.poiId` (kolom `unity_id` di backend), BUKAN nama tampilan — supaya rename POI tak mematahkan navigasi. Unity resolve GUID dulu (`UaaLEntryPoint.ResolvePoi`), fallback fuzzy-match `poiName` untuk POI legacy tanpa GUID ter-sync. `poiName` tetap dikirim sebagai label + fallback.
+
 `mode: 'findFriend'` — trigger dari WebView saat user tap "Navigasi ke [teman]" pada teman yang sudah berstatus `ar-active` di friendlist (lihat ADR-013, `FLOWS.md` bagian 5). Payload wajib sertakan `connectionId` (ID koneksi friendlist yang sudah `accepted`, BUKAN kode sekali-pakai). Unity TIDAK menampilkan UI friendlist/add-friend sama sekali — itu murni tanggung jawab WebView. Begitu localize, Unity langsung render posisi teman + jarak, tanpa modal/keyboard apapun (lihat ADR-013 — panduan Google ARCore soal menghindari full-screen takeover di dalam AR).
 
 ## Identitas user (host MyRSIy → WebView, BUKAN lewat Unity) — ADR-017
@@ -68,7 +70,7 @@ Di sisi Unity, method penerima (perlu dibuat — belum ada di repo per hasil cle
 | `arSessionReady` | Setelah AR Canvas aktif, sebelum localize | `{}` |
 | `localizationSuccess` | MultiSet berhasil localize | `{ building, floor }` — bisa reuse `PhotonManager.NotifyLocalizationSucceeded` |
 | `navigationArrived` | User sampai tujuan | `{ poiId }` |
-| `arSessionClosed` | User tap back / keluar AR | `{ arrived, poiId }` — `arrived` = `true` jika `navigationArrived` sempat terkirim sebelum sesi ditutup, `poiId` diambil dari payload `launchAR` yang aktif (null kalau free explore). Flutter yang menggabungkan (tracking state `navigationArrived` terakhir), Unity TIDAK perlu tahu soal ini — Unity cukup kirim `arSessionClosed` dengan `poiId` dari tujuan aktif + `arrived` dari flag internal `NavigationAdapter`. Flutter pakai event ini untuk kembali ke `DarsiNavigationScreen` dan meneruskan payload yang sama ke WebView (`onARSessionClosed`, lihat `API_CONTRACT.md`). |
+| `arSessionClosed` | User tap back / keluar AR | `{ arrived, poiId, poiName }` — `arrived` = `true` jika `navigationArrived` sempat terkirim sebelum sesi ditutup, `poiId` (GUID) diambil dari payload `launchAR` yang aktif (null kalau free explore), `poiName` = nama tampilan POI yang di-resolve (dipakai WebView untuk banner "Kamu telah tiba di …", karena `poiId` kini GUID). Flutter yang menggabungkan (tracking state `navigationArrived` terakhir), Unity TIDAK perlu tahu soal ini — Unity cukup kirim `arSessionClosed` dengan `poiId` dari tujuan aktif + `arrived` dari flag internal `NavigationAdapter`. Flutter pakai event ini untuk kembali ke `DarsiNavigationScreen` dan meneruskan payload yang sama ke WebView (`onARSessionClosed`, lihat `API_CONTRACT.md`). |
 
 ## Message: Cari Teman (friend-request — lihat ADR-013)
 

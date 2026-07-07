@@ -85,7 +85,7 @@ Satu-satunya pintu masuk data dari Flutter. Semua fitur AR hilir dari sini.
 - `DONE` · Unity · Depends: T1.3
 - **Done when:** `poiId` valid → `NavigationAdapter` mulai navigasi; `poiId` invalid → toast (ID), tidak crash.
 - Verified live: exact `poiId` match → `POIManager.FindBestMatchWithContext` → `NavigationAdapter.NavigateToPOI` fires real navigation. Invalid `poiId` → `ToastManager.Instance.ShowAlert(...)` + warning log, no crash.
-- **Known gap (flag to Bagus):** `POIData` has no stable ID field distinct from display name — `poiId` from Flutter must match `POIData.poiName`/GameObject name exactly. `FindBestMatchWithContext` is fuzzy-match, not strict-ID lookup. Fine for now (exact match resolves first), but worth a real `id` field on `POIData` before Flutter integration if names can ever drift from IDs.
+- **Gap ditutup (2026-07-07):** stable-ID kini end-to-end. Backend expose `unity_id` sebagai `id` di response POI → WebView kirim balik sebagai `launchAR.poiId` → `UaaLEntryPoint.ResolvePoi` resolve by GUID dulu (`POIData.poiId`), fallback fuzzy-match `poiName` untuk POI legacy tanpa GUID. Rename nama tampilan tak lagi mematahkan navigasi. `arSessionClosed` juga bawa `poiName` untuk banner WebView. (Sebelumnya `poiId` = nama, rapuh terhadap rename.)
 
 ### T1.5 — Route `mode: freeExplore` → UI pilih tujuan di AR
 - `DONE` · Unity · Depends: T1.3

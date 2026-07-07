@@ -44,6 +44,7 @@ public class UaaLEntryPoint : MonoBehaviour
     {
         public bool arrived;
         public string poiId;
+        public string poiName; // display name for the WebView banner (poiId is a GUID now)
     }
 
     private LaunchPayload _pendingPayload;
@@ -53,6 +54,7 @@ public class UaaLEntryPoint : MonoBehaviour
     // ("poiId dari tujuan aktif + arrived dari flag internal") since NavigationAdapter
     // itself has no arrival/active-destination concept.
     private string _activePoiId;
+    private string _activePoiName;
     private bool _arrived;
 
     /// <summary>Resolved POI currently being navigated to, or null outside mode:navigate.
@@ -185,7 +187,7 @@ public class UaaLEntryPoint : MonoBehaviour
             return;
         }
 
-        var poi = poiManager != null ? poiManager.FindBestMatchWithContext(payload.poiId, null) : null;
+        var poi = ResolvePoi(payload);
         if (poi == null)
         {
             ToastManager.Instance?.ShowAlert($"Lokasi \"{payload.poiName ?? payload.poiId}\" tidak ditemukan.");
@@ -194,14 +196,32 @@ public class UaaLEntryPoint : MonoBehaviour
         }
 
         _activePoiId = payload.poiId;
+        _activePoiName = poi.EffectiveName;
         _arrived = false;
         ActiveNavTarget = poi;
         navigationAdapter.NavigateToPOI(poi);
     }
 
+    /// <summary>Resolve an incoming launch payload to a POIData. Stable GUID (POIData.poiId)
+    /// wins so a display-name rename never breaks navigation; falls back to fuzzy name match
+    /// for legacy POIs without a synced GUID.</summary>
+    private POIData ResolvePoi(LaunchPayload payload)
+    {
+        if (poiManager == null) return null;
+
+        if (!string.IsNullOrEmpty(payload.poiId))
+        {
+            foreach (var poi in poiManager.GetAllPOIs())
+                if (poi.poiId == payload.poiId) return poi;
+        }
+
+        return poiManager.FindBestMatchWithContext(payload.poiName ?? payload.poiId, null);
+    }
+
     private void RouteFreeExplore()
     {
         _activePoiId = null;
+        _activePoiName = null;
         _arrived = false;
         ActiveNavTarget = null;
 
@@ -225,7 +245,7 @@ public class UaaLEntryPoint : MonoBehaviour
     /// <summary>Call when the user backs out of / closes the AR session.</summary>
     public void CloseArSession()
     {
-        var payload = new ArSessionClosedPayload { arrived = _arrived, poiId = _activePoiId };
+        var payload = new ArSessionClosedPayload { arrived = _arrived, poiId = _activePoiId, poiName = _activePoiName };
         SendEventToFlutter("arSessionClosed", JsonUtility.ToJson(payload));
     }
 
