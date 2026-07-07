@@ -1,6 +1,14 @@
-# MultiSetNav
+<div align="center">
+
+<img width="240" alt="Image" src="https://github.com/user-attachments/assets/0bb9636b-0e53-4ba7-bfd9-85e1d6d59429" />
+
+# DARSI Indoor Navigation
+
+// Bagian ini berikan shield.io
 
 Proyek Unity ini berisi eksplorasi MultiSet SDK dengan sample scene (multiplayer dan on-device localization). Repo ini cocok sebagai basis belajar, percobaan, dan kolaborasi.
+
+</div>
 
 ## Ringkas
 <div align="center">
