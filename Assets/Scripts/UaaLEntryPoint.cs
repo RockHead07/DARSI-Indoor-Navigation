@@ -55,6 +55,11 @@ public class UaaLEntryPoint : MonoBehaviour
     private string _activePoiId;
     private bool _arrived;
 
+    /// <summary>Resolved POI currently being navigated to, or null outside mode:navigate.
+    /// Read by FloorVisibilityManager (ADR-018) so the active target stays visible even on
+    /// a floor different from the user's current one.</summary>
+    public POIData ActiveNavTarget { get; private set; }
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -190,6 +195,7 @@ public class UaaLEntryPoint : MonoBehaviour
 
         _activePoiId = payload.poiId;
         _arrived = false;
+        ActiveNavTarget = poi;
         navigationAdapter.NavigateToPOI(poi);
     }
 
@@ -197,6 +203,7 @@ public class UaaLEntryPoint : MonoBehaviour
     {
         _activePoiId = null;
         _arrived = false;
+        ActiveNavTarget = null;
 
         if (navigationUIController == null)
         {
