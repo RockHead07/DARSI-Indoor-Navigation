@@ -71,7 +71,7 @@ My eRSIy CopyCat 🐈‍⬛ (Flutter, native — sudah di Play Store)
     Kembali ke WebView (resume, tidak reload)
 ```
 
->[!DISCLAIMER]
+>[!NOTE]
 >**Ingat** penggunaan implementasi fitur **DARSI Indoor Navigation** masih diterapkan pada aplikasi tiruan My eRSIy!
 
 | Repo | Tech stack | Peran | Kepemilikan |
@@ -135,7 +135,7 @@ jembatan UaaL (`postMessage` / intent extra), bukan query database bersama
 Langkah yang **harus dilakukan sebelum menjalankan demo**, terutama kalau environment
 berubah (misalnya pindah jaringan WiFi).
 
-### 1. Mengubah IP Ollama
+### A. Mengubah IP Ollama
 
 File: `Assets/Speech Recognition/OllamaConnector.cs`
 Field: `ollamaHost` (bisa diubah via Inspector atau langsung di script)
@@ -145,13 +145,29 @@ berkomunikasi ke Ollama lewat WiFi. Karena kebanyakan jaringan pakai **DHCP** (I
 berubah-ubah), IP laptop bisa berubah tiap kali konek ulang ke WiFi.
 
 **Langkah:**
-1. Cek IP laptop saat ini: `ipconfig` (Windows) atau `ifconfig` (Mac/Linux)
-2. Cari alamat IPv4 di adapter WiFi (contoh: `192.168.18.150`)
-3. Di Unity Inspector, pilih GameObject yang punya komponen `OllamaConnector`
-4. Ubah field **Ollama Host** ke IP terbaru
-5. Pastikan HP dan laptop berada di **jaringan WiFi yang sama**
 
-### 2. Menjalankan Server Ollama
+#### 1. Cek IP device kamu:
+
+Windows:
+```bash
+ipconfig
+```
+Mac/Linux:
+```bash
+ifconfig
+```
+
+#### 2. Cari alamat IPv4 di adapter WiFi (contoh: `192.168.18.150`):
+
+<img width="480" alt="Image" src="https://github.com/user-attachments/assets/c88212cc-8ba4-4e36-ab6f-14a80789d3cf" />
+
+#### 3. Di Unity Inspector, pilih GameObject yang punya komponen `OllamaConnector` & ubah field **Ollama Host** ke IP terbaru (contoh: '192.168.18.150):
+
+<img width="480" alt="Image" src="https://github.com/user-attachments/assets/b4bad216-de6d-4c42-910d-e5f6e9432cb2" />
+
+#### 4. Pastikan HP dan laptop berada di **jaringan WiFi yang sama**:
+
+### B. Menjalankan Server Ollama
 
 ```bash
 # Jalankan model qwen3:8b (otomatis download kalau belum ada)
@@ -166,18 +182,30 @@ Pastikan port default `11434` tidak terblokir firewall. Testing cepat:
 curl http://localhost:11434/api/generate -d '{"model":"qwen3:8b","prompt":"test","stream":false}'
 ```
 
-### 3. Menggunakan Tool Auto Attach POIData
+### D. Menggunakan Tool Auto Attach POIData
 
 Unity Editor punya tool otomatis untuk menempelkan komponen `POIData` ke semua child
 GameObject di bawah root POI.
 
 **Langkah:**
-1. Buka Unity Editor
-2. Klik menu **Tools > POI > Auto Attach POIData**
-3. Tool scan semua children di bawah root POI dan menambahkan `POIData` jika belum ada
-4. Isi field `poiName`, `kategori`, dan `sinonim` di tiap `POIData` via Inspector
 
-### 4. Menambahkan POI Baru ke Scene
+#### 1. Buka Unity Editor
+
+
+
+#### 2. Klik menu **Tools > POI > Auto Attach POIData**
+
+<img width="480" alt="Image" src="https://github.com/user-attachments/assets/ccca7bfc-fc1e-45db-a347-7b1f7612e2ba" />
+
+#### 3. Tool scan semua children di bawah root POI dan menambahkan `POIData` jika belum ada
+
+<img width="240" alt="Image" src="https://github.com/user-attachments/assets/dee5e5cd-8b2f-42f2-8399-6af042035d9e" />
+
+#### 4. Isi field `poiName`, `kategori`, dan `sinonim` di tiap `POIData` via Inspector
+
+<img width="720" alt="Image" src="https://github.com/user-attachments/assets/40f67310-949e-4721-91af-fc8d3473dfa8" />
+
+### E. Menambahkan POI Baru ke Scene
 
 1. Di Hierarchy, cari/buat GameObject parent **"POIs"** (sesuai `poiRoot` di `POIManager`)
 2. Klik kanan "POIs" > **Create Empty** untuk child GameObject baru
@@ -233,7 +261,7 @@ akan diintegrasikan dengan deteksi kerumunan dari backend YOLO (`/api/human`).
 - Payload dari WebView tidak terbaca / POI tidak ketemu → cek `docs/INTEGRATION.md`,
   pastikan field payload sama persis dengan `API_CONTRACT.md` di repo WebView.
 
-## Kontak
+### Kontak
 
 Ada pertanyaan? Buat issue di repo ini atau diskusikan lewat chat tim.
 
