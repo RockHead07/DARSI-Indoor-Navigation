@@ -11,6 +11,21 @@
         "D:/Dev/Projects/darsi-indoor-navigation-ui-webview"
       ],
       "port": 3000
+    },
+    {
+      "name": "darsi-backend",
+      "runtimeExecutable": "D:/Dev/Projects/darsi-backend/.venv/Scripts/uvicorn.exe",
+      "runtimeArgs": [
+        "app.main:app",
+        "--port",
+        "8000",
+        "--app-dir",
+        "D:/Dev/Projects/darsi-backend"
+      ],
+      "port": 8000,
+      "env": {
+        "DATABASE_URL": "postgresql://postgres:darsi@localhost:5433/darsi"
+      }
     }
   ]
 }
