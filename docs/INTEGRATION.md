@@ -61,16 +61,18 @@ Di sisi Unity, method penerima (perlu dibuat — belum ada di repo per hasil cle
 // setelah localize sukses. Jika "freeExplore", buka UI pilih tujuan di dalam AR.
 ```
 
-**Status implementasi:** belum ada. Ini task berikutnya setelah dokumentasi ini dikunci — buat `UaaLEntryPoint.cs` sebagai satu-satunya pintu masuk data dari Flutter.
+**Status implementasi:** ✅ SUDAH ADA. `Assets/Scripts/UaaLEntryPoint.cs` live di scene `WholePSDKU` (singleton `Instance`, `DontDestroyOnLoad`). Payload masuk lewat **intent extra** `darsiPayload` (bukan `UnitySendMessage` — AR launch sebagai activity baru, player belum load saat Flutter fire), di-buffer sampai localize sukses (ADR-007), lalu di-route: `navigate` → `NavigationAdapter.NavigateToPOI` (resolve GUID-first, fallback fuzzy name), `freeExplore` → `NavigationUIController.ToggleDestinationSelectUI`, `findFriend` → **stub** (toast "belum tersedia", blocked ROADMAP T0.8).
 
 ## Message: Unity → Flutter → WebView (AR session events)
+
+**Mekanisme (✅ tersambung end-to-end):** `UaaLEntryPoint.SendEventToFlutter` → `UnityBridge.send` (Kotlin static, `com.rsislam.surabaya.rs_islam_app.UnityBridge`) → hop ke platform thread → `MethodChannel("darsi/unity").invokeMethod` → Dart `_onUnityEvent` (`darsi_navigation_screen.dart`) → untuk `arSessionClosed`, teruskan ke WebView via `window.onARSessionClosed(payload)`.
 
 | Event | Kapan dikirim | Payload |
 |---|---|---|
 | `arSessionReady` | Setelah AR Canvas aktif, sebelum localize | `{}` |
-| `localizationSuccess` | MultiSet berhasil localize | `{ building, floor }` — bisa reuse `PhotonManager.NotifyLocalizationSucceeded` |
-| `navigationArrived` | User sampai tujuan | `{ poiId }` |
-| `arSessionClosed` | User tap back / keluar AR | `{ arrived, poiId, poiName }` — `arrived` = `true` jika `navigationArrived` sempat terkirim sebelum sesi ditutup, `poiId` (GUID) diambil dari payload `launchAR` yang aktif (null kalau free explore), `poiName` = nama tampilan POI yang di-resolve (dipakai WebView untuk banner "Kamu telah tiba di …", karena `poiId` kini GUID). Flutter yang menggabungkan (tracking state `navigationArrived` terakhir), Unity TIDAK perlu tahu soal ini — Unity cukup kirim `arSessionClosed` dengan `poiId` dari tujuan aktif + `arrived` dari flag internal `NavigationAdapter`. Flutter pakai event ini untuk kembali ke `DarsiNavigationScreen` dan meneruskan payload yang sama ke WebView (`onARSessionClosed`, lihat `API_CONTRACT.md`). |
+| `localizationSuccess` | MultiSet berhasil localize | `{ building, floor }` — di-fire dari `OnLocalizationSuccess` (wired ke MultiSet `LocalizationSuccess` UnityEvent). Sampai ke Dart tapi **belum ada aksi host** (no consumer). |
+| `navigationArrived` | User sampai tujuan POI | `{ poiId }`. **Deteksi arrival ada di `MultiSetSDK.dll` (privat)** — di-hook lewat toast SDK "You arrived at the destination!" yang dicegat `ToastTranslator`, lalu memanggil `UaaLEntryPoint.ReportArrivalAtActiveTarget()` (ter-guard: hanya sesi `navigate` aktif, sekali). Sampai ke Dart tapi belum ada aksi host. |
+| `arSessionClosed` | User tap back / keluar AR | `{ arrived, poiId, poiName }` — `arrived` = flag internal `_arrived` (jadi `true` hanya kalau arrival POI sempat terdeteksi, lihat baris `navigationArrived`), `poiId` (GUID) dari payload `launchAR` aktif (null kalau freeExplore), `poiName` = nama tampilan POI yang di-resolve (dipakai WebView untuk banner "Kamu telah tiba di …", karena `poiId` kini GUID). Dari `OnApplicationQuit`. Flutter teruskan ke WebView (`onARSessionClosed`, lihat `API_CONTRACT.md`). |
 
 ## Message: Cari Teman (friend-request — lihat ADR-013)
 
@@ -81,5 +83,6 @@ Manajemen teman (kirim/accept request, lihat presence) sepenuhnya di WebView + b
 ## Catatan penting untuk siapapun yang lanjutkan development
 
 - Jangan bikin Unity terima data langsung dari WebView tanpa lewat Flutter — WebView tidak punya akses `UnitySendMessage` langsung, harus lewat native bridge Flutter.
-- `PhotonManager.NotifyLocalizationSucceeded(building, floor)` sudah ada di codebase — ini titik integrasi yang paling masuk akal untuk event `localizationSuccess` di atas.
-- Belum ada `UaaLEntryPoint.cs` — ini yang paling prioritas dibuat sebelum fitur apapun di atas bisa jalan end-to-end.
+- Deteksi arrival POI **tidak** ada di `NavigationAdapter` (script itu tak punya konsep arrival) — ada di `MultiSetSDK.dll`, di-observasi lewat toast di `ToastTranslator`. Kalau string toast SDK berubah di update, samakan `ToastTranslator.ArrivalKeyEn`.
+- `localizationSuccess` & `navigationArrived` sudah mengalir ke Dart tapi belum dikonsumsi host (no-op by design, tambah handler kalau butuh). Hanya `arSessionClosed` yang diteruskan ke WebView.
+- Gap terbuka: `mode:findFriend` masih stub (blocked ROADMAP T0.8 — butuh friend graph + identity + Photon render), dan outbound `localizationSuccess/navigationArrived` belum ada consumer di WebView.

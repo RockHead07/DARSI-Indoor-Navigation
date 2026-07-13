@@ -28,11 +28,17 @@ public class ToastTranslator : MonoBehaviour
     [Tooltip("Log pesan toast yang BELUM punya terjemahan, agar mudah ditambahkan ke kamus.")]
     [SerializeField] private bool logUntranslated = true;
 
+    // Toast SDK yang menandai user sampai di tujuan POI. Deteksi arrival ada di
+    // MultiSetSDK.dll (privat), jadi toast ini satu-satunya titik arrival yang terlihat
+    // di kode editable — dipakai UaaLEntryPoint buat men-trigger event bridge (navigationArrived
+    // / arrived:true di arSessionClosed). Harus sama persis dengan kunci di ExactMap.
+    private const string ArrivalKeyEn = "You arrived at the destination!";
+
     // Pesan yang dicocokkan persis (sesudah di-trim). Kunci = Inggris, nilai = Indonesia.
     private static readonly Dictionary<string, string> ExactMap = new Dictionary<string, string>
     {
         // Navigasi
-        { "You arrived at the destination!", "Anda telah tiba di tujuan!" },
+        { ArrivalKeyEn, "Anda telah tiba di tujuan!" },
         { "Problem calculating route",       "Gagal menghitung rute" },
 
         // Lokalisasi (umumnya dari DLL)
@@ -99,6 +105,11 @@ public class ToastTranslator : MonoBehaviour
 
         // Sudah sama dengan output kita / tidak berubah -> lewati.
         if (current == _lastApplied) return;
+
+        // Toast berubah = toast baru muncul. Kalau ini toast "sampai tujuan", beri tahu
+        // UaaLEntryPoint (guard-nya yang memastikan hanya sesi navigate aktif yang terpicu).
+        if (current.Trim() == ArrivalKeyEn)
+            UaaLEntryPoint.Instance?.ReportArrivalAtActiveTarget();
 
         string translated = Translate(current);
         _lastApplied = translated;

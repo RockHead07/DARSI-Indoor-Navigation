@@ -170,7 +170,10 @@ public class UaaLEntryPoint : MonoBehaviour
                 RouteFreeExplore();
                 break;
             case "findFriend":
-                // Fase 2 (blocked on ROADMAP.md T0.8) — not implemented yet.
+                // Fase 2 (blocked on ROADMAP.md T0.8) — friend positions need Photon + real
+                // identity + 2 co-located devices. Until then don't strand the user in a blank
+                // AR view (the WebView already fires launchAR for this): tell them explicitly.
+                ToastManager.Instance?.ShowAlert("Fitur Cari Teman di AR belum tersedia.");
                 Debug.Log($"[UaaLEntryPoint] mode:findFriend not implemented yet, connectionId={payload.connectionId}");
                 break;
             default:
@@ -240,6 +243,19 @@ public class UaaLEntryPoint : MonoBehaviour
         _arrived = true;
         var payload = new NavigationArrivedPayload { poiId = poiId };
         SendEventToFlutter("navigationArrived", JsonUtility.ToJson(payload));
+    }
+
+    /// <summary>Signalled when the MultiSet SDK reports POI arrival. Detection lives in
+    /// MultiSetSDK.dll, so its "You arrived at the destination!" toast (observed via
+    /// ToastTranslator) is the one point arrival surfaces in editable code — hooking it
+    /// reuses the SDK's own decision instead of running a second distance detector that
+    /// could disagree. Guarded: fires the bridge event only for an active mode:navigate
+    /// target, once. Without this, _arrived stays false forever and arSessionClosed always
+    /// reports arrived:false (the WebView arrival banner never shows).</summary>
+    public void ReportArrivalAtActiveTarget()
+    {
+        if (ActiveNavTarget == null || _arrived) return;
+        NotifyNavigationArrived(_activePoiId);
     }
 
     /// <summary>Call when the user backs out of / closes the AR session.</summary>
