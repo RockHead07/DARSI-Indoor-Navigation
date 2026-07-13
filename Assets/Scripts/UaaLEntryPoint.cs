@@ -269,6 +269,30 @@ public class UaaLEntryPoint : MonoBehaviour
         SendEventToFlutter("arSessionClosed", JsonUtility.ToJson(payload));
     }
 
+    /// <summary>Keluar AR dari tombol back di dalam Unity — mirror DarsiUnityActivity.leaveAr():
+    /// emit arSessionClosed lalu moveTaskToBack (host Flutter muncul lagi). SENGAJA tidak
+    /// destroy/quit Unity: UaaL tak bisa di-unload dalam satu proses (JNI crash) — Unity tetap
+    /// loaded/paused untuk re-entry cepat. Wire tombol back UI ke method ini, BUKAN ke
+    /// CloseArSession (itu cuma ngirim event, tidak balik ke host).</summary>
+    public void ExitArSession()
+    {
+        CloseArSession();
+#if UNITY_ANDROID && !UNITY_EDITOR
+        try
+        {
+            using var jc = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+            using var activity = jc.GetStatic<AndroidJavaObject>("currentActivity");
+            activity.Call<bool>("moveTaskToBack", true);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[UaaLEntryPoint] ExitArSession moveTaskToBack failed: {e.Message}");
+        }
+#else
+        Debug.Log("[UaaLEntryPoint] (editor stub) ExitArSession -> moveTaskToBack");
+#endif
+    }
+
     private void SendEventToFlutter(string eventName, string jsonPayload)
     {
 #if UNITY_ANDROID && !UNITY_EDITOR
