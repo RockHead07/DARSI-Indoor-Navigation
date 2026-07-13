@@ -50,6 +50,10 @@ public class UaaLEntryPoint : MonoBehaviour
     private LaunchPayload _pendingPayload;
     private bool _isLocalized;
 
+    /// <summary>True setelah MultiSet localize sukses. Posisi/jarak baru valid setelah ini
+    /// (ADR-007) — dipakai NavBoundaryNotifier (ADR-019) untuk gating deteksi out-of-bounds.</summary>
+    public bool IsLocalized => _isLocalized;
+
     // Tracks state needed to build arSessionClosed's payload per docs/INTEGRATION.md
     // ("poiId dari tujuan aktif + arrived dari flag internal") since NavigationAdapter
     // itself has no arrival/active-destination concept.

@@ -931,6 +931,8 @@ GameObject:
   - component: {fileID: 225284616}
   - component: {fileID: 225284615}
   - component: {fileID: 225284614}
+  - component: {fileID: 225284618}
+  - component: {fileID: 225284617}
   m_Layer: 5
   m_Name: PlayerListButton
   m_TagString: Untagged
@@ -1052,6 +1054,30 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 225284612}
   m_CullTransparentMesh: 1
+--- !u!114 &225284617
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 225284612}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b5d996299d3a5449bd17761908fbb46, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideWhilePanelOpen
+--- !u!225 &225284618
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 225284612}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &277745319
 GameObject:
   m_ObjectHideFlags: 0
@@ -2415,6 +2441,7 @@ GameObject:
   - component: {fileID: 593472355}
   - component: {fileID: 593472354}
   - component: {fileID: 593472353}
+  - component: {fileID: 593472356}
   m_Layer: 5
   m_Name: FriendListPanel
   m_TagString: Untagged
@@ -2500,6 +2527,18 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 593472351}
   m_CullTransparentMesh: 1
+--- !u!114 &593472356
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 593472351}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d93a06fd81d059045834d6f21493ae2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ExclusivePanel
 --- !u!1 &602994875
 GameObject:
   m_ObjectHideFlags: 0
@@ -6062,12 +6101,12 @@ RectTransform:
   - {fileID: 5868207700219070426}
   - {fileID: 73784734}
   - {fileID: 874806253}
-  - {fileID: 225284613}
-  - {fileID: 1837145367}
-  - {fileID: 2072348118}
-  - {fileID: 593472352}
-  - {fileID: 919867801}
   - {fileID: 1753833117}
+  - {fileID: 1837145367}
+  - {fileID: 593472352}
+  - {fileID: 2072348118}
+  - {fileID: 225284613}
+  - {fileID: 919867801}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -7966,6 +8005,8 @@ GameObject:
   - component: {fileID: 1753833120}
   - component: {fileID: 1753833119}
   - component: {fileID: 1753833118}
+  - component: {fileID: 1753833122}
+  - component: {fileID: 1753833121}
   m_Layer: 5
   m_Name: Mic
   m_TagString: Untagged
@@ -8087,6 +8128,30 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1753833116}
   m_CullTransparentMesh: 1
+--- !u!114 &1753833121
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1753833116}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b5d996299d3a5449bd17761908fbb46, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideWhilePanelOpen
+--- !u!225 &1753833122
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1753833116}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1001 &1759844295
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8626,6 +8691,8 @@ GameObject:
   - component: {fileID: 1849515176}
   - component: {fileID: 1849515175}
   - component: {fileID: 1849515174}
+  - component: {fileID: 1849515178}
+  - component: {fileID: 1849515177}
   m_Layer: 5
   m_Name: CaptureButton
   m_TagString: Untagged
@@ -8747,6 +8814,30 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1849515172}
   m_CullTransparentMesh: 1
+--- !u!114 &1849515177
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1849515172}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b5d996299d3a5449bd17761908fbb46, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideWhilePanelOpen
+--- !u!225 &1849515178
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1849515172}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &1850085526
 GameObject:
   m_ObjectHideFlags: 0
@@ -9447,6 +9538,7 @@ GameObject:
   - component: {fileID: 2072348120}
   - component: {fileID: 2072348119}
   - component: {fileID: 2072348121}
+  - component: {fileID: 2072348122}
   m_Layer: 0
   m_Name: VoicePanel
   m_TagString: Untagged
@@ -9548,6 +9640,18 @@ MonoBehaviour:
   processingColor: {r: 1, g: 1, b: 1, a: 0}
   errorColor: {r: 0.9, g: 0.3, b: 0.3, a: 1}
   transcriptAutoHideSecondsDefault: 4
+--- !u!114 &2072348122
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2072348117}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d93a06fd81d059045834d6f21493ae2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ExclusivePanel
 --- !u!1 &2092845605
 GameObject:
   m_ObjectHideFlags: 0
@@ -10001,6 +10105,8 @@ GameObject:
   - component: {fileID: 5495149136621670014}
   - component: {fileID: 2648699779254443611}
   - component: {fileID: 8127672870056316567}
+  - component: {fileID: 8127672870056316569}
+  - component: {fileID: 8127672870056316568}
   m_Layer: 5
   m_Name: ShowDestinationsButton
   m_TagString: Untagged
@@ -12955,6 +13061,7 @@ GameObject:
   - component: {fileID: 7969823068010794823}
   - component: {fileID: 2341788700567970506}
   - component: {fileID: 1404199381775966429}
+  - component: {fileID: 8018052396222816297}
   m_Layer: 5
   m_Name: Destination Select
   m_TagString: Untagged
@@ -12962,6 +13069,18 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 0
+--- !u!114 &8018052396222816297
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8018052396222816296}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d93a06fd81d059045834d6f21493ae2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ExclusivePanel
 --- !u!114 &8116812128990854495
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -13048,6 +13167,30 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+--- !u!114 &8127672870056316568
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 46480849849769043}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b5d996299d3a5449bd17761908fbb46, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideWhilePanelOpen
+--- !u!225 &8127672870056316569
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 46480849849769043}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!224 &8196575014539167753
 RectTransform:
   m_ObjectHideFlags: 0

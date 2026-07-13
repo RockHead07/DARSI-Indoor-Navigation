@@ -144,3 +144,26 @@
 **Risiko residual (diakui, bukan diabaikan):** lantai yang berdekatan tipis (mis. mezzanine ~1.5-2m di atas lantai dasar) bisa ambigu kalau jaraknya kurang jauh dari tinggi HP dipegang (~1.4m); POI per lantai yang sangat sedikit (1-2 titik) bikin klaster kurang stabil secara statistik. Keduanya spesifik-gedung RSI, belum diketahui sampai scan asli ada — ditangani nanti kalau benar-benar muncul (YAGNI), bukan diantisipasi sekarang dengan kompleksitas tambahan.
 
 **Bentuk implementasi:** komponen aditif baru `FloorVisibilityManager` (belum dibuat) — reuse list POI dari `POIManager` yang sudah ada, tidak menyentuh script protected. Validasi awal pakai data kampus (11 POI, 2 lantai) sebagai testbed sebelum data RSI asli tersedia.
+
+---
+
+### ADR-019 — Out-of-bounds = *coverage notice* (bukan barrier), auto-derive dari tepi NavMesh
+
+**Keputusan:** Saat kamera user keluar area ter-scan (di luar NavMesh, > threshold), tampilkan penanda AR — TAPI framing-nya **jangkauan navigasi**, bukan larangan fisik:
+
+1. **Copy = coverage, bukan prohibition.** Pesan: **"Di luar jangkauan navigasi"** / "Navigasi tidak tersedia di area ini" — BUKAN "Area tidak bisa dilewati". Alasan di bawah. Area yang beneran restricted (ICU, OK, staff-only) itu ranah signage fisik RS, bukan tugas fitur ini.
+2. **Deteksi auto-derive dari tepi NavMesh** (`NavMesh.SamplePosition`, API yang sudah dipakai `NavigationControllerExtension`). Nol authoring — jalan di map manapun. Cek di-throttle (~0.15s), hanya aktif **setelah localize** (ADR-007).
+3. **Hysteresis dua threshold** (`showAt` > `hideAt`) untuk meredam localization drift — tanpa ini penanda kedip-kedip pas user berdiri di tepi.
+4. **Panah "kembali ke jalur" masuk MVP.** `SamplePosition` sudah mengembalikan `hit.position` (titik NavMesh terdekat) → arahkan panah dari user ke situ. Nyaris gratis, mengubah notice buntu jadi panduan.
+5. **Billboard menghadap user, BUKAN tembok sepanjang tepi.** Tepi NavMesh poligon tak beraturan; render tembok penuh = ribet. Satu papan melayang menghadap user = info sama, kerja seperlima.
+
+**Alasan:** metafora out-of-bounds game itu **jujur di game** (dunia virtual, beneran tak bisa lewat) tapi **bohong di AR** — "area out of bounds" itu lorong fisik nyata yang user bisa jalani. Maka klaim "tidak bisa dilewati" menyesatkan; yang benar "kami tidak bisa memandu di sini" (batas coverage, bukan larangan). Auto-derive dari NavMesh menghindari sistem authoring per-zona yang harus diulang tiap re-scan (YAGNI) — cukup untuk MVP.
+
+**Risiko residual / caveat WAJIB-CEK saat scan RSI asli:**
+- **NavMesh multi-lantai (nyambung ADR-018):** kalau mesh gabungan semua lantai, `SamplePosition` bisa cocok titik di lantai lain (tepat di bawah/atas user) → false "in bounds". Wajib pastikan mesh per-lantai ATAU deteksi ikut hitung jarak vertikal. Belum bisa dipastikan sampai scan asli.
+- **Localization loss di tengah sesi** → posisi kamera stale → deteksi ngaco. Gating `IsLocalized` cuma nutup kasus "belum pernah localize", bukan loss di tengah.
+- **Angka threshold** cuma valid setelah scan RSI (tepi map dummy kampus ≠ tepi RSI) → tune di lapangan, logika inti tak perlu ditulis ulang.
+
+**Ditunda (future, bukan MVP):** cue audio/getar saat lewat batas (aksesibilitas — segmen lansia/literasi rendah, sejalan riset wayfinding); perbedaan perilaku `navigate` (dorong "balik ke jalur") vs `freeExplore` (murni coverage notice); zona manual ber-tag (diam/restricted/pesan custom) kalau auto-derive terbukti kurang — masuk Sprint 2 re-placement.
+
+**Bentuk implementasi:** komponen aditif `NavBoundaryNotifier` + world-space Canvas sign (uGUI, konsisten ADR-003 — bukan UI Toolkit) — tidak menyentuh script protected. Perlu expose `UaaLEntryPoint.IsLocalized` (public getter, sebelumnya `_isLocalized` privat). Reversible & aman dibangun sebelum data RSI ada: cuma knob threshold + zona yang perlu di-tune saat scan masuk.

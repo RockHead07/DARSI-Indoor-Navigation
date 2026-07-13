@@ -232,6 +232,18 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 
 ---
 
+## Fase 5 — Polish AR UX  *(aditif, tidak nge-block fase lain)*
+
+### T5.1 — Tombol back di dalam AR (kanan-atas)
+- `TODO` · Unity · Depends: Fase 1
+- Sekarang scene AR tidak punya affordance keluar yang terlihat — user cuma andalkan tombol back Android. Tambah tombol back uGUI di kanan-atas, wired ke `UaaLEntryPoint.CloseArSession` (jalur exit yang sudah ada → `arSessionClosed`). Sengaja **bukan** topbar Flutter asli: AR = Activity full-screen, overlay Flutter di atas AR butuh `flutter_unity_widget` (platform-view) yang rewel dgn ARCore — uGUI yang di-render Unity sendiri jauh lebih stabil (lihat pembahasan host/guest UaaL).
+
+### T5.2 — Out-of-bounds coverage notice (ADR-019)
+- `TODO` · Unity · Depends: Fase 1; tuning depends: scan RSI (Sprint 2)
+- Komponen `NavBoundaryNotifier`: deteksi kamera keluar tepi NavMesh (auto-derive, hysteresis) → billboard AR menghadap user "Di luar jangkauan navigasi" + panah balik ke titik NavMesh terdekat. Framing = **coverage**, bukan larangan fisik (lorongnya nyata & bisa dijalani — lihat ADR-019). MVP dibangun sekarang (murni editor, tak butuh device); angka threshold & caveat NavMesh multi-lantai (ADR-018) di-tune saat scan RSI asli masuk. Butuh expose `UaaLEntryPoint.IsLocalized`.
+
+---
+
 ## Catatan sequencing
 
 - **Fase 0 adalah gate mutlak.** T0.8 (identitas MyRSIy) mem-blok seluruh Fase 2 — kejar konfirmasi Pak Farris lebih awal biar tidak jadi bottleneck.
