@@ -115,6 +115,17 @@ public class NavBoundaryNotifier : MonoBehaviour
         }
     }
 
+    // 1-klik cek visual (style/posisi/teks sign) — tanpa perlu play mode, localize, atau
+    // geser kamera. Klik-kanan header komponen di editor. Bukan tes deteksi NavMesh
+    // (itu sudah dibuktikan lewat self-check + simulasi editor, lihat memory).
+    [ContextMenu("Debug/Toggle sign (visual test)")]
+    private void DebugToggleSign()
+    {
+        if (sign == null) { Debug.LogError("[NavBoundaryNotifier] field 'sign' belum di-wire."); return; }
+        sign.SetActive(!sign.activeSelf);
+        Debug.Log($"[NavBoundaryNotifier] sign toggled -> active={sign.activeSelf}");
+    }
+
     // ponytail: self-check hysteresis tanpa scene/AR. Klik-kanan header komponen di editor.
     [ContextMenu("Debug/Self-check hysteresis")]
     private void DebugSelfCheck()
