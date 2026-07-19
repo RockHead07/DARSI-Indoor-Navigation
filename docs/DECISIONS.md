@@ -191,6 +191,34 @@
 
 **Bentuk implementasi:** aditif, tidak menyentuh script protected. Deteksi lintas-lantai membaca `FloorVisibilityManager` (lantai user) + `POIData.floor` (lantai tujuan). Instruksi/handoff pakai pola toast + panel uGUI yang sudah ada (ADR-003); panel transisi mengikuti aturan `ExclusivePanel` supaya tidak menumpuk dengan page lain. Lift diberi `NavMeshLink` per pasangan lantai. Semua angka (jarak "sampai di lift", timeout relocalize) belum di-tune — menyusul validasi di lokasi, pola yang sama dengan ADR-019.
 
+#### Amandemen 020-A (2026-07-19) — POI yang berulang tiap lantai: konektor vs amenity
+
+**Pemicu:** setelah `name UNIQUE` dicabut (ADR-021), scene RSI menghasilkan **dua baris `Lift`** — satu per lantai. Muncul pertanyaan: apakah dua POI ini sebaiknya digabung jadi satu supaya user tidak melihat dua tombol untuk lokasi yang sama?
+
+**Keputusan:** jangan digabung di data — pisahkan **dua kelas POI yang selama ini tercampur**, dan perlakukan berbeda. Aturannya digerakkan `kategori` (kanonik sejak ADR-016), bukan kesamaan nama.
+
+| Kelas | Kategori | Muncul di daftar Cari Lokasi? | Pemilihan instance |
+|---|---|---|---|
+| **Konektor vertikal** | `Lift`, `Tangga` | **Tidak** (di daftar browse default) | Otomatis oleh sistem, bagian dari rute tersegmentasi di atas |
+| **Amenity multi-instance** | `Toilet`, `Musholla`, `ATM`, `Ruang Tunggu`, … | Ya — **satu kartu**, dikelompokkan per nama | Instance terdekat dari posisi user |
+| **Destinasi tunggal** | `IGD`, `Farmasi`, `Radiologi`, … | Ya, apa adanya | Tidak relevan (cuma satu) |
+
+**Alasan:** tidak ada orang yang tujuannya "lift" — tujuannya Farmasi di lantai 1, dan lift cuma cara sampai ke sana. Ini bukan preferensi gaya: standar pemodelan indoor (IMDF, IndoorGML) memisahkan **ruang yang dituju** dari **penghubung yang dilewati**, dan sirkulasi vertikal dimodelkan sebagai konektivitas di graf navigasi, bukan sebagai destinasi. Keputusan pokok ADR-020 sudah mengandung ini secara implisit ("konektor vertikal terdekat/valid dari posisi user") — amandemen ini cuma membuatnya eksplisit sampai ke lapisan daftar.
+
+Konsekuensinya, masalah "dua tombol Lift" **tidak ditambal, tapi hilang** — Lift berhenti menjadi entri daftar. Itu sebabnya pendekatan ini dipilih di atas alternatif yang cuma merapikan tampilannya.
+
+**Alternatif yang DITOLAK:**
+- **Gabung jadi satu baris DB.** Menghapus posisi lift kedua — tidak bisa dipulihkan, dan Unity butuh keduanya untuk merender marker & menghitung konektor terdekat.
+- **Bikin nama unik: `"Lift Lantai 1"`.** Menjejalkan `floor` ke dalam `name` — satu data di dua tempat, anti-pattern yang persis dicabut ADR-021.
+- **Tambah kolom `group_key`.** Mesin baru untuk sesuatu yang `kategori` + `name` + `floor` sudah cukup menjawab (YAGNI). Baru perlu kalau muncul dua POI bernama sama yang BUKAN fasilitas serupa.
+- **Terapkan pengelompokan "pilih yang selantai" ke semua nama kembar, termasuk Lift.** Ini usulan pertama yang dibuat lalu ditolak sendiri: memperlakukan konektor sebagai destinasi, jadi merapikan gejala sambil membiarkan model datanya keliru.
+
+**Risiko residual (diakui):**
+- **"Terdekat" untuk amenity idealnya diukur panjang jalur, bukan lantai.** Untuk sekarang dipakai "instance selantai dengan user" — plafonnya jelas: toilet yang sebenarnya paling dekat bisa berada di lantai atas persis di sebelah lift, dan aturan ini akan memilih yang salah. Ini membaik sendiri begitu `NavMeshLink` terpasang dan jalur lintas-lantai bisa dihitung; jadi utang sementara, bukan permanen.
+- **Menyembunyikan Lift dari daftar bisa merugikan sebagian user** — pengguna kursi roda, pendorong brankar, atau yang tidak kuat naik tangga kadang memang mencari lift secara sadar. Mitigasi: keluarkan dari daftar *browse* default tapi tetap dapat ditemukan lewat pencarian. Apakah ini cukup **belum divalidasi** — masuk daftar pertanyaan observasi lapangan, jangan diputuskan dari belakang meja.
+
+**Urutan kerja:** amandemen ini **tidak bisa** dikerjakan mendahului T5.3. Baik penyembunyian konektor maupun pemilihan instance bergantung pada state machine rute tersegmentasi; dikerjakan duluan berarti menulis logika yang harus dibongkar lagi.
+
 ---
 
 ### ADR-021 — `POIData` hanya menyimpan yang dimilikinya; nama/lantai/gedung DITURUNKAN, bukan disalin

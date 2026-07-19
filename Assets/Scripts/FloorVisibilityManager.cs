@@ -111,6 +111,20 @@ public class FloorVisibilityManager : MonoBehaviour
 
         if (logChanges)
             Debug.Log($"[FloorVisibilityManager] {_floorPois.Count} lantai terdeteksi dari {pois.Count} POI.");
+
+        // JANGAN keluar dari sini dengan _currentFloor = -1 selama cluster-nya sudah ada.
+        // Method ini dipanggil dari listener LocalizationSuccess, dan listener LAIN pada event
+        // yang sama membaca lantai aktif tepat sesudahnya. Kalau lantai baru diisi ulang
+        // beberapa frame kemudian oleh Update(), pembaca di celah itu dapat -1 dan bisa salah
+        // menyimpulkan "lantai sama" (mis. FloorTransitionController menyambung segmen 2 tanpa
+        // verifikasi). Hitung sekarang juga supaya objek ini tidak pernah terlihat setengah jadi.
+        if (_floorPois.Count > 0 && arCamera != null)
+        {
+            _smoothedY = arCamera.transform.position.y;
+            _hasSmoothedY = true;
+            _currentFloor = NearestFloor(_smoothedY);
+            ApplyVisibility();
+        }
     }
 
     /// <summary>Centroid Y lantai dihitung LIVE dari posisi POI saat ini (bukan cache).</summary>
@@ -243,6 +257,35 @@ public class FloorVisibilityManager : MonoBehaviour
             if (_markerOf.TryGetValue(poi, out var marker) && marker != null)
                 marker.gameObject.SetActive(visible);
         }
+    }
+
+    // --- API untuk konsumen lain (T5.3 / ADR-020) ---
+
+    /// <summary>
+    /// Indeks lantai user saat ini, -1 kalau clustering belum siap. Sengaja indeks, BUKAN
+    /// label string: perbandingan lintas-lantai harus memakai hasil clustering geometri yang
+    /// sama, bukan pencocokan teks yang bisa meleset karena beda spasi/ejaan.
+    /// </summary>
+    public int CurrentFloorIndex => _currentFloor;
+
+    /// <summary>Indeks lantai sebuah POI, false kalau POI itu tidak ikut ter-cluster.</summary>
+    public bool TryGetFloorIndex(POIData poi, out int floorIndex)
+    {
+        if (poi != null && _floorOfPoi.TryGetValue(poi, out floorIndex))
+            return true;
+        floorIndex = -1;
+        return false;
+    }
+
+    /// <summary>
+    /// True kalau POI berada di lantai yang BERBEDA dari user. False juga saat status belum
+    /// bisa ditentukan (clustering belum siap / POI tak dikenal) — pemanggil harus memilih
+    /// perilaku netral saat ragu, jangan mengklaim beda lantai tanpa dasar.
+    /// </summary>
+    public bool IsOnDifferentFloor(POIData poi)
+    {
+        if (_currentFloor < 0) return false;
+        return TryGetFloorIndex(poi, out int f) && f != _currentFloor;
     }
 
     // --- Debug harness (konsisten dengan pola UaaLEntryPoint T1.7) ---
