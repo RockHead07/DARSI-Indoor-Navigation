@@ -3009,8 +3009,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: b328d86f-541a-4148-b82c-e4fc2a5939ea
-  poiName: Ruang Dosen
-  kategori: Room
+  kategori: Administrasi
   sinonim:
   - 
   - 
@@ -3023,8 +3022,6 @@ MonoBehaviour:
   - 
   - 
   - 
-  building: 
-  floor: 
 --- !u!1 &663862123 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8098377307223922034, guid: b847b09ad8ad3402eae3aa183a511d93, type: 3}
@@ -6905,8 +6902,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: de030876-deb4-427e-92af-382a38a2d669
-  poiName: Farmasi
-  kategori: Room
+  kategori: Farmasi
   sinonim:
   - 
   - 
@@ -6914,8 +6910,6 @@ MonoBehaviour:
   - 
   - 
   - 
-  building: 
-  floor: 
 --- !u!1 &1337900381
 GameObject:
   m_ObjectHideFlags: 0
@@ -7227,16 +7221,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: d52a7a82-ce07-47d3-a5ba-d2b07c678a0c
-  poiName: Lift
-  kategori: Room
+  kategori: Lift
   sinonim:
   - 
   - 
   - 
   - 
   - 
-  building: 
-  floor: 
 --- !u!1 &1393868194
 GameObject:
   m_ObjectHideFlags: 0
@@ -7677,8 +7668,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: dc295a0d-434d-4c41-9728-5bd9f8a0fb0b
-  poiName: Toilet
-  kategori: Room
+  kategori: Toilet
   sinonim:
   - 
   - 
@@ -7688,8 +7678,6 @@ MonoBehaviour:
   - 
   - 
   - 
-  building: 
-  floor: 
 --- !u!1 &1505451497
 GameObject:
   m_ObjectHideFlags: 0
@@ -8349,15 +8337,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: 58139f04-3ca8-4f9c-87b7-f0a9887ed0de
-  poiName: Parkir Mobil
-  kategori: Room
+  kategori: Parkir
   sinonim:
   - 
   - 
   - 
   - 
-  building: 
-  floor: 
 --- !u!1 &1618177402 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8098377307223922034, guid: b847b09ad8ad3402eae3aa183a511d93, type: 3}
@@ -8376,8 +8361,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: 033e7541-05e9-4726-bc84-0825c5d12e10
-  poiName: Perpustakaan
-  kategori: Room
+  kategori: IGD
   sinonim:
   - 
   - 
@@ -8386,8 +8370,6 @@ MonoBehaviour:
   - 
   - 
   - 
-  building: 
-  floor: 
 --- !u!1 &1644578016
 GameObject:
   m_ObjectHideFlags: 0
@@ -8693,14 +8675,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: eb8f0e33-2832-484e-862a-c123b2259b05
-  poiName: Lab Teori 202
-  kategori: Room
+  kategori: Umum
   sinonim:
   - 
   - 
   - 
-  building: 
-  floor: 
 --- !u!1 &1706292201 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 8098377307223922034, guid: b847b09ad8ad3402eae3aa183a511d93, type: 3}
@@ -8719,11 +8698,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: 207c8f68-f4ea-45de-9f0f-7d7be08cd633
-  poiName: 
-  kategori: 
+  kategori: Radiologi
   sinonim: []
-  building: 
-  floor: 
 --- !u!1 &1728653816
 GameObject:
   m_ObjectHideFlags: 0
@@ -9456,13 +9432,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: b3a375ee-9aa8-476a-bd6a-8a68b7308896
-  poiName: Lift
-  kategori: Room
+  kategori: Lift
   sinonim:
   - 
   - 
-  building: Tower
-  floor: 1
 --- !u!1 &1837145366
 GameObject:
   m_ObjectHideFlags: 0
@@ -10333,11 +10306,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: 8e3021a9-76a3-48ab-9e87-f5d832a3921c
-  poiName: Radiology
-  kategori: 
+  kategori: Radiologi
   sinonim: []
-  building: 
-  floor: 
 --- !u!1 &2013737202
 GameObject:
   m_ObjectHideFlags: 0
@@ -10792,12 +10762,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::POIData
   poiId: e42f1d1f-5b4d-45a5-93e4-07e88a6a6618
-  poiName: Parkir Motor Karyawan
-  kategori: Room
+  kategori: Parkir
   sinonim:
   - 
-  building: Tower
-  floor: 1
 --- !u!1 &2111608528
 GameObject:
   m_ObjectHideFlags: 0

@@ -199,16 +199,20 @@
 
 | Data | Pemilik sah | Perlakuan di `POIData` |
 |---|---|---|
-| Nama tampilan | `POI.listTitle` (komponen SDK MultiSet) — SDK **butuh** field ini untuk daftar Destinations, tidak bisa dihilangkan | **diturunkan** (tidak disimpan) |
+| Nama tampilan | `POI.poiName` (komponen SDK MultiSet) — SDK **butuh** field ini, tidak bisa dihilangkan | **diturunkan** (tidak disimpan) |
 | `building` | konstanta level-scene (satu gedung per map) | **diturunkan** (tidak per-POI) |
 | `floor` (label) | geometri Y — ADR-018 sudah menetapkan keputusan lantai dari clustering Y, label string murni tampilan | **diturunkan** |
 | `kategori` | `POIData` — tidak ada sumber lain, murni penilaian manusia (kategori RS kanonik ADR-016) | **disimpan** |
 | `poiId` | `POIData` — GUID stabil untuk sync backend (ADR-014) | **disimpan** |
 | `sinonim` | `POIData` — alias untuk voice matching | **disimpan** |
 
-**Alasan:** duplikasi data yang di-maintain manual **pasti** melenceng, dan ini sudah terbukti bukan hipotesis — ditemukan 2026-07-19 di scene `DARSi-Indoor Navigation`: GameObject `[Lantai1] IGD` punya `POIData.poiName = "Perpustakaan"` (sisa scene kampus lama), sementara `POI.listTitle` SDK-nya sudah benar `"IGD"`. Satu objek, tiga nilai berbeda. Konsekuensinya nyata: sync mengirim nama **salah** ke backend, voice matching mencocokkan nama kampus lama, dan `floor` kosong sehingga logika lintas-lantai (ADR-020) tidak bisa jalan.
+**Alasan:** duplikasi data yang di-maintain manual **pasti** melenceng, dan ini sudah terbukti bukan hipotesis — ditemukan 2026-07-19 di scene `DARSi-Indoor Navigation`: GameObject `[Lantai1] IGD` punya `POIData.poiName = "Perpustakaan"` (sisa scene kampus lama), sementara `POI.poiName` SDK-nya sudah benar `"IGD"`. Satu objek, dua nilai berbeda. Kasus serupa terverifikasi di dua POI lain: `[Lantai1] Resepsionis` menyimpan `"Ruang Dosen"`, `[Ground] Parkir Motor Karyawan` menyimpan `"Perpustakaan"`, `[Lantai1] Ruang X-Ray` menyimpan `"Lab Teori 202"`.
 
-**Alternatif yang DITOLAK — tombol "auto-fill" yang menyalin dari SDK ke `POIData`:** itu menyalin, bukan menurunkan. Setelah tombol ditekan datanya tetap ada di dua tempat, cuma kebetulan sedang sama; begitu `POI.listTitle` berubah, salinannya basi lagi. Itu meredakan gejala (capek mengetik) tanpa menyembuhkan penyebab struktural. Ditolak secara sadar.
+**Koreksi saat implementasi (2026-07-19):** draft awal ADR ini menyebut `POI.listTitle` sebagai pemilik nama. Itu **keliru** — sumber SDK (`POI.cs`) menunjukkan `Awake()` melakukan `base.listTitle = poiName`, jadi `listTitle` adalah turunan runtime dari `poiName`, bukan pemiliknya. Menurunkan dari `listTitle` berarti menurunkan dari cache. Pemilik sah = **`POI.poiName`**.
+
+**Kenapa `kategori` tetap DISIMPAN:** SDK punya `POI.type` (enum `POIType`, 15 nilai: Room, Toilet, Parking, Elevator, …) yang sekilas terlihat bisa jadi pemilik kategori. Tidak bisa — enum itu terlalu kasar untuk domain rumah sakit; tidak ada nilai yang mengekspresikan IGD, Farmasi, atau Radiologi. Nilai `kategori: "Room"` yang ditemukan di 7 POI justru salinan dari `POI.type`, yaitu bentuk lain dari penyakit yang sama. Jadi `kategori` benar-benar dimiliki `POIData` dan tetap disimpan (kanonik per ADR-016). Konsekuensinya nyata: sync mengirim nama **salah** ke backend, voice matching mencocokkan nama kampus lama, dan `floor` kosong sehingga logika lintas-lantai (ADR-020) tidak bisa jalan.
+
+**Alternatif yang DITOLAK — tombol "auto-fill" yang menyalin dari SDK ke `POIData`:** itu menyalin, bukan menurunkan. Setelah tombol ditekan datanya tetap ada di dua tempat, cuma kebetulan sedang sama; begitu `POI.poiName` berubah, salinannya basi lagi. Itu meredakan gejala (capek mengetik) tanpa menyembuhkan penyebab struktural. Ditolak secara sadar.
 
 **Konsekuensi:**
 - **Menyentuh `POIData.cs` yang berstatus protected di `CLAUDE.md`** — dilakukan dengan sign-off eksplisit pemilik project (2026-07-19), bukan penyimpangan diam-diam.

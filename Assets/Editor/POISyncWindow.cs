@@ -145,6 +145,18 @@ public class POISyncWindow : EditorWindow
             return;
         }
 
+        // ADR-021: `floor` diturunkan dari prefiks nama GameObject. Kalau konvensinya dilanggar
+        // hasilnya null — BLOKIR sync dan sebut POI-nya, jangan kirim lantai kosong ke backend.
+        var badFloor = pois.FindAll(p => string.IsNullOrEmpty(p.Floor));
+        if (badFloor.Count > 0)
+        {
+            var names = badFloor.ConvertAll(p => p.gameObject.name);
+            lastResult = $"{badFloor.Count} POI tanpa prefiks lantai pada namanya — rename jadi " +
+                         $"\"[Lantai1] Nama\" atau \"[Ground] Nama\":\n  " + string.Join("\n  ", names);
+            Debug.LogError($"[POISync] {lastResult}");
+            return;
+        }
+
         var entries = new PoiSyncEntry[pois.Count];
         for (int i = 0; i < pois.Count; i++)
         {
@@ -154,8 +166,8 @@ public class POISyncWindow : EditorWindow
                 id = p.poiId,
                 name = p.EffectiveName,
                 category = p.kategori,
-                building = p.building,
-                floor = p.floor,
+                building = p.Building,
+                floor = p.Floor,
                 synonyms = p.sinonim ?? Array.Empty<string>(),
             };
         }

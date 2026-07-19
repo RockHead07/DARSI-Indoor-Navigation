@@ -57,8 +57,8 @@ public class AutoAttachPOIData
                 continue;
             }
 
-            POIData newPOI = Undo.AddComponent<POIData>(child.gameObject);
-            newPOI.poiName = child.gameObject.name;
+            // ADR-021: tidak lagi mengisi nama — POIData menurunkannya dari POI.poiName milik SDK.
+            Undo.AddComponent<POIData>(child.gameObject);
             addedCount++;
         }
 

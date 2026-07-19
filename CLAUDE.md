@@ -18,7 +18,7 @@ DARSI adalah fitur AR indoor navigation untuk RS Islam A. Yani, di-embed ke app 
 
 `VoiceInputHandler.cs`, `OllamaConnector.cs`, `POIManager.cs`, `POIData.cs`, `NavigationAdapter.cs`, `VoiceUIController.cs`, `VoiceUIConfig.cs`, `PhotonManager.cs`, `PlayerSync.cs`, `FriendListPanel.cs`, `FriendListEntry.cs`, `PlayerInfoPopup.cs`, `NavMeshObstacleHelper.cs` — semua sudah jalan dan sudah divalidasi tidak ada compile error pasca cleanup UI Toolkit.
 
-**Pengecualian tercatat — `POIData.cs` (ADR-021, sign-off 2026-07-19).** Field `poiName`/`building`/`floor` diubah dari data tersimpan menjadi **diturunkan** (dari `POI.listTitle` SDK, konstanta scene, dan geometri/konvensi nama). Ini BUKAN penyimpangan diam-diam: dilakukan karena duplikasi data manual terbukti melenceng di lapangan (ditemukan `[Lantai1] IGD` menyimpan nama `"Perpustakaan"` dari scene kampus lama). `POIData` sekarang hanya menyimpan yang benar-benar dimilikinya: `poiId`, `kategori`, `sinonim`. Baca ADR-021 sebelum menyentuh file ini lagi.
+**Pengecualian tercatat — `POIData.cs` (ADR-021, sign-off 2026-07-19).** Field `poiName`/`building`/`floor` diubah dari data tersimpan menjadi **diturunkan** (dari `POI.poiName` SDK, konstanta `POIData.BuildingName`, dan prefiks nama GameObject `[Ground]`/`[Lantai1]`). Ini BUKAN penyimpangan diam-diam: dilakukan karena duplikasi data manual terbukti melenceng di lapangan (ditemukan `[Lantai1] IGD` menyimpan nama `"Perpustakaan"` dari scene kampus lama). `POIData` sekarang hanya menyimpan yang benar-benar dimilikinya: `poiId`, `kategori`, `sinonim`. Baca ADR-021 sebelum menyentuh file ini lagi.
 
 ## Alur kerja yang diharapkan
 
