@@ -3689,7 +3689,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DestinationFloorLabel
   floorVisibility: {fileID: 0}
+  poiManager: {fileID: 0}
+  connectorCategory: Lift
   rescanInterval: 0.5
+  distanceRefresh: 0.5
   logChanges: 0
 --- !u!114 &701075306
 MonoBehaviour:
