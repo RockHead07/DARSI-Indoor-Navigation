@@ -242,6 +242,12 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 - `TODO` · Unity · Depends: Fase 1; tuning depends: scan RSI (Sprint 2)
 - Komponen `NavBoundaryNotifier`: deteksi kamera keluar tepi NavMesh (auto-derive, hysteresis) → billboard AR menghadap user "Di luar jangkauan navigasi" + panah balik ke titik NavMesh terdekat. Framing = **coverage**, bukan larangan fisik (lorongnya nyata & bisa dijalani — lihat ADR-019). MVP dibangun sekarang (murni editor, tak butuh device); angka threshold & caveat NavMesh multi-lantai (ADR-018) di-tune saat scan RSI asli masuk. Butuh expose `UaaLEntryPoint.IsLocalized`.
 
+### T5.3 — Navigasi lintas-lantai: rute tersegmentasi + handoff lift (ADR-020)
+- `TODO` · Unity · Depends: Fase 1, ADR-018 (FloorVisibilityManager); tuning depends: scan RSI multi-lantai
+- Scene `DARSi-Indoor Navigation` sekarang punya **11 POI RSI 2 lantai** (4 Ground, 7 Lantai 1) + `[Ground] Lift`/`[Lantai1] Lift` sebagai penghubung vertikal → kasus lintas-lantai jadi nyata, bukan hipotetis.
+- Implementasi: deteksi beda lantai (`FloorVisibilityManager` = lantai user vs `POIData.floor` = lantai tujuan) → state machine `menuju-konektor` → `menunggu-transisi` → `menunggu-relocalize` → `menuju-tujuan`. Lift pakai `NavMeshLink` (BUKAN ramp antar-lantai — lihat ADR-020). Rute AR berhenti di lift, tidak pernah menembus plafon.
+- Wajib: setelah re-localize, tentukan ULANG lantai user dari clustering Y — jangan asumsikan user menuruti instruksi (bisa batal/salah lantai).
+
 ---
 
 ## Catatan sequencing

@@ -167,3 +167,26 @@
 **Ditunda (future, bukan MVP):** cue audio/getar saat lewat batas (aksesibilitas — segmen lansia/literasi rendah, sejalan riset wayfinding); perbedaan perilaku `navigate` (dorong "balik ke jalur") vs `freeExplore` (murni coverage notice); zona manual ber-tag (diam/restricted/pesan custom) kalau auto-derive terbukti kurang — masuk Sprint 2 re-placement.
 
 **Bentuk implementasi:** komponen aditif `NavBoundaryNotifier` + world-space Canvas sign (uGUI, konsisten ADR-003 — bukan UI Toolkit) — tidak menyentuh script protected. Perlu expose `UaaLEntryPoint.IsLocalized` (public getter, sebelumnya `_isLocalized` privat). Reversible & aman dibangun sebelum data RSI ada: cuma knob threshold + zona yang perlu di-tune saat scan masuk.
+
+---
+
+### ADR-020 — Navigasi lintas-lantai: rute TERSEGMENTASI + handoff eksplisit di lift (bukan NavMesh kontinu antar-lantai)
+
+**Keputusan:** Saat POI tujuan berada di lantai berbeda dari user, rute **dipecah per lantai**, bukan dihitung sebagai satu jalur kontinu:
+
+1. **Rute tersegmentasi.** Tahap 1 = navigasi ke **penghubung vertikal (Lift)** di lantai user — BUKAN langsung ke tujuan akhir. Setelah user pindah lantai & re-localize, tahap 2 = navigasi ke tujuan asli.
+2. **Transisi lantai = STATE aplikasi, bukan jalur geometris.** Rute AR **berhenti** di lift. Sistem TIDAK PERNAH menggambar garis rute menembus plafon.
+3. **Penghubung vertikal = `NavMeshLink`, BUKAN ramp.** Ramp sebagai penyambung antar-lantai ditolak (alasan di bawah). Ramp tetap sah untuk menyambung celah **di dalam satu lantai** (threshold/undakan) — itu kasus berbeda.
+4. **Wajib re-localize setelah ganti lantai.** Setelah keluar lift, user diminta memindai sekitar; navigasi lanjut HANYA setelah localize berhasil (konsisten ADR-007: posisi baru valid setelah localize).
+5. **Beri tahu di depan.** Begitu user memilih POI beda lantai, sampaikan SEBELUM rute dimulai: tujuan di lantai berapa + akan diarahkan ke lift dulu. Jangan biarkan user kaget saat rute "berhenti" di lift.
+6. **Sumber kebenaran lantai:** lantai user = hasil clustering Y `FloorVisibilityManager` (ADR-018); lantai tujuan = `POIData.floor`. Deteksi lintas-lantai = perbandingan keduanya.
+
+**Alasan:** kendala fisik, bukan keterbatasan yang bisa direkayasa — **AR tracking & localize MultiSet PUTUS saat ganti lantai.** Lift adalah kotak tertutup yang bergerak: tidak ada kontinuitas visual untuk visual-odometry. Maka "satu sesi AR + satu rute kontinu lintas-lantai" itu fiksi. NavMesh kontinu lewat ramp antar-lantai menghasilkan dua kebohongan visual sekaligus: garis rute ter-render **menembus plafon**, dan agent "berjalan" di ramp yang **tidak ada wujud fisiknya** — menyesatkan user di dunia nyata. Pola tersegmentasi adalah standar wayfinding indoor multi-lantai (mal, bandara, RS). `NavMeshLink` dipilih karena (a) semantiknya benar — titik A→B tanpa jalur fisik, dan (b) **terdeteksi di kode**, sehingga trigger UI handoff jadi eksplisit; ramp tidak memberi sinyal apa pun yang bisa dibaca program.
+
+**Konsekuensi:** perlu state machine navigasi minimal — `menuju-konektor` → `menunggu-transisi` → `menunggu-relocalize` → `menuju-tujuan`. Perlu menentukan konektor vertikal terdekat/valid dari posisi user (untuk sekarang: POI berkategori **Lift**). Kontrak bridge (`arSessionClosed`/`navigationArrived`) TIDAK berubah — transisi lantai murni state internal Unity sampai tujuan akhir tercapai, host tidak perlu tahu.
+
+**Selaras dengan data scan yang ada:** mapset `MSET_39LMY8E89OO6` sudah berisi **2 map dengan rentang Y berbeda** (`MAP_9UMXWR0PI7K5` lebih bawah, `MAP_PHVXJ15C2CF0` lebih atas) — konsisten dengan satu map per lantai. Re-localize setelah transisi menargetkan map lantai tujuan.
+
+**Risiko residual (diakui, bukan diabaikan):** user bisa TIDAK benar-benar naik lift (batal, atau salah lantai) — maka setelah re-localize sistem WAJIB menentukan ulang lantai user dari clustering Y, jangan pernah mengasumsikan user menuruti instruksi. Kalau localize di lantai baru gagal berulang, navigasi bisa mandek → wajib ada jalan keluar (batalkan/ulangi), bukan buntu diam. Tangga/eskalator punya karakter berbeda dari lift (tracking mungkin tidak putus total) — diputuskan nanti kalau benar-benar dipetakan (YAGNI).
+
+**Bentuk implementasi:** aditif, tidak menyentuh script protected. Deteksi lintas-lantai membaca `FloorVisibilityManager` (lantai user) + `POIData.floor` (lantai tujuan). Instruksi/handoff pakai pola toast + panel uGUI yang sudah ada (ADR-003); panel transisi mengikuti aturan `ExclusivePanel` supaya tidak menumpuk dengan page lain. Lift diberi `NavMeshLink` per pasangan lantai. Semua angka (jarak "sampai di lift", timeout relocalize) belum di-tune — menyusul validasi di lokasi, pola yang sama dengan ADR-019.
