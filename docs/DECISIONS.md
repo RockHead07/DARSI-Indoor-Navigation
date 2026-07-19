@@ -190,3 +190,30 @@
 **Risiko residual (diakui, bukan diabaikan):** user bisa TIDAK benar-benar naik lift (batal, atau salah lantai) — maka setelah re-localize sistem WAJIB menentukan ulang lantai user dari clustering Y, jangan pernah mengasumsikan user menuruti instruksi. Kalau localize di lantai baru gagal berulang, navigasi bisa mandek → wajib ada jalan keluar (batalkan/ulangi), bukan buntu diam. Tangga/eskalator punya karakter berbeda dari lift (tracking mungkin tidak putus total) — diputuskan nanti kalau benar-benar dipetakan (YAGNI).
 
 **Bentuk implementasi:** aditif, tidak menyentuh script protected. Deteksi lintas-lantai membaca `FloorVisibilityManager` (lantai user) + `POIData.floor` (lantai tujuan). Instruksi/handoff pakai pola toast + panel uGUI yang sudah ada (ADR-003); panel transisi mengikuti aturan `ExclusivePanel` supaya tidak menumpuk dengan page lain. Lift diberi `NavMeshLink` per pasangan lantai. Semua angka (jarak "sampai di lift", timeout relocalize) belum di-tune — menyusul validasi di lokasi, pola yang sama dengan ADR-019.
+
+---
+
+### ADR-021 — `POIData` hanya menyimpan yang dimilikinya; nama/lantai/gedung DITURUNKAN, bukan disalin
+
+**Keputusan:** setiap data POI punya **satu pemilik sah**, dan field lain **menurunkan** nilainya saat dibutuhkan — tidak pernah menyimpan salinan yang di-maintain manual.
+
+| Data | Pemilik sah | Perlakuan di `POIData` |
+|---|---|---|
+| Nama tampilan | `POI.listTitle` (komponen SDK MultiSet) — SDK **butuh** field ini untuk daftar Destinations, tidak bisa dihilangkan | **diturunkan** (tidak disimpan) |
+| `building` | konstanta level-scene (satu gedung per map) | **diturunkan** (tidak per-POI) |
+| `floor` (label) | geometri Y — ADR-018 sudah menetapkan keputusan lantai dari clustering Y, label string murni tampilan | **diturunkan** |
+| `kategori` | `POIData` — tidak ada sumber lain, murni penilaian manusia (kategori RS kanonik ADR-016) | **disimpan** |
+| `poiId` | `POIData` — GUID stabil untuk sync backend (ADR-014) | **disimpan** |
+| `sinonim` | `POIData` — alias untuk voice matching | **disimpan** |
+
+**Alasan:** duplikasi data yang di-maintain manual **pasti** melenceng, dan ini sudah terbukti bukan hipotesis — ditemukan 2026-07-19 di scene `DARSi-Indoor Navigation`: GameObject `[Lantai1] IGD` punya `POIData.poiName = "Perpustakaan"` (sisa scene kampus lama), sementara `POI.listTitle` SDK-nya sudah benar `"IGD"`. Satu objek, tiga nilai berbeda. Konsekuensinya nyata: sync mengirim nama **salah** ke backend, voice matching mencocokkan nama kampus lama, dan `floor` kosong sehingga logika lintas-lantai (ADR-020) tidak bisa jalan.
+
+**Alternatif yang DITOLAK — tombol "auto-fill" yang menyalin dari SDK ke `POIData`:** itu menyalin, bukan menurunkan. Setelah tombol ditekan datanya tetap ada di dua tempat, cuma kebetulan sedang sama; begitu `POI.listTitle` berubah, salinannya basi lagi. Itu meredakan gejala (capek mengetik) tanpa menyembuhkan penyebab struktural. Ditolak secara sadar.
+
+**Konsekuensi:**
+- **Menyentuh `POIData.cs` yang berstatus protected di `CLAUDE.md`** — dilakukan dengan sign-off eksplisit pemilik project (2026-07-19), bukan penyimpangan diam-diam.
+- Input manual per-POI turun dari 4 field menjadi **1** (`kategori` saja, lewat dropdown kanonik — pencegahan hulu yang memang sudah diantisipasi ADR-016).
+- Sync tetap jalan tanpa perubahan kontrak: `POISyncWindow` membaca `p.EffectiveName`/`p.kategori` **saat runtime**, bukan membaca field serialized — jadi computed property transparan bagi sync.
+- Nilai turunan tidak lagi berupa field yang bisa diketik di Inspector → **wajib ditampilkan read-only** lewat Inspector kustom, supaya tetap bisa di-spot-check.
+
+**Risiko residual (diakui):** hilangnya kemampuan meng-override nama per-POI untuk kasus khusus (mis. nama tampilan sengaja beda dari label SDK). Kalau kebutuhan itu benar-benar muncul, tambahkan field override opsional yang **kosong secara default** dan hanya dipakai bila diisi — jangan kembali menyimpan salinan penuh (YAGNI sampai terbukti perlu). Penurunan `floor` dari prefix nama GameObject (`[Ground]`/`[Lantai1]`) mengandalkan konvensi penamaan; kalau konvensi dilanggar, penurunan gagal — Inspector harus menampilkan kegagalan itu secara mencolok, bukan diam.

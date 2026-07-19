@@ -18,11 +18,23 @@ DARSI adalah fitur AR indoor navigation untuk RS Islam A. Yani, di-embed ke app 
 
 `VoiceInputHandler.cs`, `OllamaConnector.cs`, `POIManager.cs`, `POIData.cs`, `NavigationAdapter.cs`, `VoiceUIController.cs`, `VoiceUIConfig.cs`, `PhotonManager.cs`, `PlayerSync.cs`, `FriendListPanel.cs`, `FriendListEntry.cs`, `PlayerInfoPopup.cs`, `NavMeshObstacleHelper.cs` — semua sudah jalan dan sudah divalidasi tidak ada compile error pasca cleanup UI Toolkit.
 
+**Pengecualian tercatat — `POIData.cs` (ADR-021, sign-off 2026-07-19).** Field `poiName`/`building`/`floor` diubah dari data tersimpan menjadi **diturunkan** (dari `POI.listTitle` SDK, konstanta scene, dan geometri/konvensi nama). Ini BUKAN penyimpangan diam-diam: dilakukan karena duplikasi data manual terbukti melenceng di lapangan (ditemukan `[Lantai1] IGD` menyimpan nama `"Perpustakaan"` dari scene kampus lama). `POIData` sekarang hanya menyimpan yang benar-benar dimilikinya: `poiId`, `kategori`, `sinonim`. Baca ADR-021 sebelum menyentuh file ini lagi.
+
 ## Alur kerja yang diharapkan
 
 1. Setiap task besar: baca ulang `docs/DECISIONS.md` dulu — cek apakah sudah ada ADR yang relevan sebelum mengusulkan pendekatan baru.
 2. Jangan commit tanpa review dari pemilik project (Bagus).
 3. Kalau menemukan kebutuhan yang memaksa keputusan arsitektur berubah, tandai eksplisit ke pemilik project — jangan diam-diam menyimpang dari `ARCHITECTURE.md`.
+
+## Cari solusi yang BENAR, bukan yang paling gampang
+
+Saat mengusulkan solusi, **sebutkan best practice-nya lebih dulu** — baru jelaskan kompromi kalau memang perlu berkompromi. Jangan menjual jalan pintas seolah-olah itu solusi.
+
+- **Bedakan "meredakan gejala" vs "menyembuhkan penyebab".** Kalau usulanmu cuma bikin masalah lebih jarang muncul (bukan mustahil muncul), katakan itu terus terang. Contoh nyata: tombol auto-fill yang MENYALIN data antar-komponen ditolak di ADR-021, karena salinan pasti melenceng lagi — yang benar adalah MENURUNKAN dari satu pemilik sah.
+- **Duplikasi data yang di-maintain manual = anti-pattern.** Setiap data harus punya satu pemilik; sisanya diturunkan, bukan disalin.
+- **Kalau best practice-nya menuntut menyentuh file protected atau mencabut ADR**, jangan lantas menghindarinya diam-diam. Sampaikan trade-off-nya secara eksplisit dan biarkan pemilik project yang memutuskan — persis alur yang menghasilkan ADR-021.
+- **Jangan menebak saat bisa diverifikasi.** Baca kodenya, cek datanya, buktikan dulu — akar masalah yang salah didiagnosis menghasilkan perbaikan yang percaya diri tapi keliru.
+- **Akui kalau usulan sebelumnya keliru.** Lebih murah mengoreksi arah di tahap usulan daripada setelah terlanjur dibangun.
 
 ## Tech stack
 

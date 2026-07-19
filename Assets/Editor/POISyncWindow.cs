@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Net;
 using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.Networking;
 
 /// <summary>
 /// DARSI T3.4-L2 — push POI statis (id, nama, kategori, gedung, lantai, sinonim) dari
@@ -163,28 +164,63 @@ public class POISyncWindow : EditorWindow
         byte[] body = Encoding.UTF8.GetBytes(json);
 
         string url = backendUrl.TrimEnd('/') + "/api/poi/sync";
-        var request = new UnityWebRequest(url, "POST")
-        {
-            uploadHandler = new UploadHandlerRaw(body),
-            downloadHandler = new DownloadHandlerBuffer(),
-        };
-        request.SetRequestHeader("Content-Type", "application/json");
-        request.SetRequestHeader("X-Admin-Token", adminToken);
 
+        // Pakai HttpWebRequest (.NET) yang BENAR-BENAR sinkron, BUKAN UnityWebRequest.
+        // Kenapa: UnityWebRequest butuh main thread Unity untuk memompa progres request.
+        // Versi sebelumnya menunggu pakai `while (!op.isDone) {}` — busy-wait itu mengunci
+        // main thread, jadi request-nya tidak pernah maju dan selalu berakhir
+        // "Request timeout" (responseCode 0), bahkan saat backend jelas hidup.
+        // HttpWebRequest melakukan I/O blocking di thread ini sendiri, tanpa perlu pumping
+        // Unity — dan tanpa async/await, jadi tidak ada risiko deadlock SynchronizationContext.
         EditorUtility.DisplayProgressBar("POI Sync", $"Mengirim {pois.Count} POI...", 0.5f);
-        var op = request.SendWebRequest();
-        while (!op.isDone) { /* blocking wait — lihat catatan ponytail di atas */ }
-        EditorUtility.ClearProgressBar();
-
-        if (request.result != UnityWebRequest.Result.Success)
+        try
         {
-            lastResult = $"Gagal ({request.responseCode}): {request.error}\n{request.downloadHandler.text}";
-            Debug.LogError($"[POISync] {lastResult}");
-            return;
-        }
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = "application/json";
+            request.Headers["X-Admin-Token"] = adminToken;
+            // 120 detik, bukan 15: backend deploy (Railway free-tier) spin-down saat nganggur,
+            // dan cold-start-nya bisa >60 detik. Request PERTAMA setelah idle yang kena — request
+            // berikutnya cepat. Timeout pendek membunuh request justru saat server sedang bangun,
+            // dan gejalanya menipu: "timed out" padahal backend hidup.
+            request.Timeout = 120000;
+            request.ReadWriteTimeout = 120000;
+            request.ContentLength = body.Length;
 
-        var res = JsonUtility.FromJson<PoiSyncResponse>(request.downloadHandler.text);
-        lastResult = $"Sukses. Synced: {res.synced}, created: {res.created}, updated: {res.updated}.";
-        Debug.Log($"[POISync] {lastResult}");
+            using (var stream = request.GetRequestStream())
+                stream.Write(body, 0, body.Length);
+
+            using var response = (HttpWebResponse)request.GetResponse();
+            using var reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8);
+            string text = reader.ReadToEnd();
+
+            var res = JsonUtility.FromJson<PoiSyncResponse>(text);
+            lastResult = $"Sukses. Synced: {res.synced}, created: {res.created}, updated: {res.updated}.";
+            Debug.Log($"[POISync] {lastResult}");
+        }
+        catch (WebException ex)
+        {
+            // Status non-2xx (mis. 401 token salah, 422 kategori tak dikenal) masuk ke sini.
+            // Body-nya penting — di situ backend menyebut kategori mana yang salah (ADR-016).
+            int code = 0;
+            string detail = "";
+            if (ex.Response is HttpWebResponse errResponse)
+            {
+                code = (int)errResponse.StatusCode;
+                using var reader = new StreamReader(errResponse.GetResponseStream(), Encoding.UTF8);
+                detail = reader.ReadToEnd();
+            }
+            lastResult = $"Gagal ({code}): {ex.Message}\n{detail}";
+            Debug.LogError($"[POISync] {lastResult}");
+        }
+        catch (Exception ex)
+        {
+            lastResult = $"Gagal: {ex.Message}";
+            Debug.LogError($"[POISync] {lastResult}");
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
     }
 }
