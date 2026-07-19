@@ -219,6 +219,33 @@ Konsekuensinya, masalah "dua tombol Lift" **tidak ditambal, tapi hilang** — Li
 
 **Urutan kerja:** amandemen ini **tidak bisa** dikerjakan mendahului T5.3. Baik penyembunyian konektor maupun pemilihan instance bergantung pada state machine rute tersegmentasi; dikerjakan duluan berarti menulis logika yang harus dibongkar lagi.
 
+#### Amandemen 020-B (2026-07-19) — `NavMeshLink` TIDAK dipakai; jarak lintas-lantai dijumlahkan per segmen
+
+**Mencabut poin 3** dari keputusan pokok di atas ("Penghubung vertikal = `NavMeshLink`"). Poin 1, 2, 4, 5, 6 tetap berlaku.
+
+**Keputusan:** lantai TETAP dibiarkan sebagai pulau NavMesh yang terpisah. Tidak ada `NavMeshLink` antar-lantai. Jarak ke POI di lantai lain dihitung dengan **menjumlahkan dua segmen** yang masing-masing berada di dalam satu lantai:
+
+```
+jarak = path(user → lift lantai user) + path(lift lantai tujuan → POI)
+```
+
+**Alasan poin 3 gugur:** satu-satunya alasan ADR memilih `NavMeshLink` adalah supaya handoff "terdeteksi di kode". Setelah state machine dibangun, alasan itu **hilang** — `FloorTransitionController` sendiri yang mengarahkan user ke lift, jadi ia sudah tahu persis kapan handoff terjadi tanpa perlu sinyal dari NavMesh. Dan karena rutenya tersegmentasi (poin 1), jalur kontinu antar-lantai memang tidak pernah dibutuhkan untuk navigasi.
+
+**Alasan tidak memakainya sama sekali** — dua, dan yang kedua lebih penting:
+
+1. **Kontradiksi internal dengan poin 2.** Begitu dua lantai tersambung, SDK bisa menghitung rute lintas-lantai sebagai satu jalur, dan `ShowPath` akan menggambar garis rute **menembus plafon** — persis yang dilarang poin 2. Aman hanya selama `currentDestination` tidak pernah berisi POI lintas-lantai; itu jaminan yang bergantung pada kode kita tetap benar selamanya.
+2. **Radius perubahan terlalu luas.** `NavMeshLink` mengubah pathfinding secara **global**: setiap `NavMesh.CalculatePath` di proyek — termasuk kode SDK yang belum diaudit — mendadak menganggap dua lantai sebagai satu ruang berjalan. Konektivitas NavMesh sebaiknya tetap mencerminkan kenyataan fisik: tidak ada lantai yang menyambung.
+
+**Kenapa penjumlahan segmen justru lebih baik, bukan sekadar penghindaran:** angkanya lebih jujur. Yang ditampilkan persis perjalanan yang akan dilalui user — jalan ke lift, lalu jalan dari lift ke tujuan. `NavMeshLink` menghitung jarak yang melewati link, yang "panjangnya" cuma artefak dari di mana kedua ujungnya diletakkan.
+
+**Bukti (2026-07-19, Editor):** label `[Lantai1] Lift` menghasilkan **11 m**. Untuk POI itu segmen 2 panjangnya nol (lift lantai tujuan *adalah* POI-nya), jadi 11 m murni segmen 1 — dan itu sama persis dengan angka yang dihitung `PathEstimationUtils` bawaan SDK untuk lift Ground. Dua perhitungan independen, hasil identik.
+
+**Konsekuensi tampilan:** POI lintas-lantai tampil `"24 m · Lantai 1"`, bukan `"Unreachable"` (yang menyesatkan — POI-nya bisa dicapai lewat lift) dan bukan hanya `"Lantai 1"` (yang membuang informasi jarak tanpa alasan). POI **selantai** yang tetap `Unreachable` sengaja tidak disentuh: itu masalah NavMesh asli, dan justru makin menonjol sekarang karena semua POI lain punya angka.
+
+**Prasyarat data yang ditemukan saat implementasi:** `NavMesh.CalculatePath` hanya men-snap target ~1 m secara vertikal. Empat `poiCollider` berjarak 1.03–1.29 m dari permukaan NavMesh dan menghasilkan `PathInvalid` walau NavMesh-nya tersambung. Tooltip SDK sudah memperingatkan ("Collider should be near NavMesh") — jadi penempatan collider adalah **prasyarat**, bukan detail kosmetik.
+
+**Yang belum terbukti:** seluruh rantai ini terverifikasi di Editor, termasuk lewat UnityEvent `LocalizationSuccess` yang asli. Yang belum: apakah localize sungguhan berhasil di lantai baru di gedung RSI, dan apakah `LocalizeFrame()` benar-benar me-restart jendela `bgLocalizationDuration` (60 detik). Keduanya ada di dalam DLL dan hanya bisa dijawab di lapangan.
+
 ---
 
 ### ADR-021 — `POIData` hanya menyimpan yang dimilikinya; nama/lantai/gedung DITURUNKAN, bukan disalin

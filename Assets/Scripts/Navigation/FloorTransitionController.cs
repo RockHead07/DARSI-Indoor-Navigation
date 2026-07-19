@@ -1,5 +1,6 @@
 using MultiSet;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// T5.3 / ADR-020 — rute lintas-lantai TERSEGMENTASI dengan handoff eksplisit di lift.
@@ -80,12 +81,43 @@ public class FloorTransitionController : MonoBehaviour
             nav.DestinationArrived.RemoveListener(OnArrived);
             nav.DestinationArrived.AddListener(OnArrived);
         }
+
+        HookStopButton();
+    }
+
+    /// <summary>
+    /// ADR-020 mensyaratkan jalan keluar di SETIAP state — navigasi tidak boleh mandek diam.
+    /// Tombol Stop bawaan SDK dipakai ulang alih-alih membuat tombol baru: user sudah tahu
+    /// tempatnya, dan tidak perlu authoring UI di scene.
+    ///
+    /// Listener ditambahkan saat runtime, jadi listener persisten milik SDK (ClickedStopButton
+    /// -> StopNavigation) tetap jalan lebih dulu; punya kita menyusul membereskan state
+    /// transisi. Aman dipanggil untuk navigasi biasa: CancelTransition() langsung keluar
+    /// kalau phase == Idle, jadi tidak memunculkan toast "dibatalkan" di navigasi satu lantai.
+    /// </summary>
+    private void HookStopButton()
+    {
+        var ui = NavigationUIController.instance;
+        if (ui == null || ui.stopButton == null) return;
+
+        var button = ui.stopButton.GetComponent<Button>();
+        if (button == null)
+        {
+            Debug.LogWarning("[FloorTransition] stopButton tanpa komponen Button — " +
+                             "pembatalan saat menunggu localize tidak tersedia.");
+            return;
+        }
+
+        button.onClick.RemoveListener(CancelTransition);
+        button.onClick.AddListener(CancelTransition);
     }
 
     private void LateUpdate()
     {
         var nav = NavigationController.instance;
         if (nav == null || floorVisibility == null) return;
+
+        ShowWaitingStatus();
 
         POI destination = nav.currentDestination;
         if (destination == _lastSeenDestination) return;
@@ -282,6 +314,55 @@ public class FloorTransitionController : MonoBehaviour
         _relocalizeLoop = null;
     }
 
+    /// <summary>
+    /// Selama menunggu localize, layar TIDAK boleh kosong. Begitu user sampai di lift,
+    /// navigasi berhenti — dan NavigationUIController mengosongkan destinationName serta
+    /// remainingDistance karena IsCurrentlyNavigating() jadi false. Akibatnya user berdiri
+    /// di dalam lift tanpa tahu aplikasi sedang menunggu, sedang mencari, atau sudah menyerah.
+    ///
+    /// Dua label itu dipakai ulang (bukan bikin panel baru): keduanya sudah ada di layar dan
+    /// sudah di posisi yang dilihat user saat menavigasi. Ditulis di LateUpdate karena
+    /// NavigationUIController.Update() mengosongkannya lebih dulu tiap frame.
+    ///
+    /// Titik beranimasi sengaja dipakai sebagai pengganti spinner: tanpa gerakan, user tidak
+    /// bisa membedakan "sedang mencari" dari "hang".
+    /// </summary>
+    private void ShowWaitingStatus()
+    {
+        if (_phase != Phase.AwaitingRelocalize) return;
+
+        var ui = NavigationUIController.instance;
+        if (ui == null || _finalDestination == null) return;
+
+        // Menulis teks saja TIDAK cukup: saat sampai di lift, ArrivedAtDestination() memanggil
+        // ShowArrivedState() -> ShowNavigationUIElements(false), yang mematikan GameObject
+        // "Progress Slider" — INDUK dari kedua label ini. Teksnya terisi benar tapi tak terlihat.
+        // Jadi kontainernya dihidupkan lagi selama fase menunggu.
+        if (ui.navigationProgressSlider != null && !ui.navigationProgressSlider.activeSelf)
+            ui.navigationProgressSlider.SetActive(true);
+
+        // Tombol Stop juga disembunyikan oleh ShowArrivedState(). Tanpa ini, user yang batal
+        // naik lift atau salah lantai tidak punya jalan keluar selain menutup paksa aplikasi —
+        // dan itu justru skenario paling mungkin saat localize gagal di lapangan.
+        if (ui.stopButton != null && !ui.stopButton.activeSelf)
+            ui.stopButton.SetActive(true);
+
+        var data = _finalDestination.GetComponent<POIData>();
+        string floor = data != null ? data.Floor : null;
+
+        if (ui.destinationName != null)
+            ui.destinationName.SetText(_finalDestination.poiName);
+
+        if (ui.remainingDistance != null)
+        {
+            string dots = new string('.', 1 + (int)(Time.time * 2f) % 3);
+            ui.remainingDistance.SetText(
+                floor != null
+                    ? $"Naik ke {floor} — mencari lokasi{dots}"
+                    : $"Mencari lokasi{dots}");
+        }
+    }
+
     private bool IsConnector(POIData data) =>
         string.Equals(data.kategori, connectorCategory, System.StringComparison.OrdinalIgnoreCase);
 
@@ -334,6 +415,16 @@ public class FloorTransitionController : MonoBehaviour
         if (_phase == Phase.Idle) return;
         ResetState();
         NavigationController.instance?.StopNavigation();
+
+        // Kembalikan panel yang kita hidupkan sendiri selama menunggu — kalau tidak,
+        // dia tertinggal di layar berisi status yang sudah tidak berlaku.
+        var ui = NavigationUIController.instance;
+        if (ui != null)
+        {
+            if (ui.navigationProgressSlider != null) ui.navigationProgressSlider.SetActive(false);
+            if (ui.stopButton != null) ui.stopButton.SetActive(false);
+        }
+
         ToastManager.Instance?.ShowAlert("Navigasi dibatalkan.");
     }
 
