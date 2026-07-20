@@ -29,18 +29,42 @@ dan berhenti kalau diminta. Data tes tidak sepadan dengan satu keluhan privasi.
 
 ---
 
-## 1. Rekaman log
+## 1. Rekaman log — pakai ring buffer, JANGAN andalkan kabel
+
+Menyeret laptop sambil jalan keliling RS dan naik lift itu tidak realistis. Logcat menyimpan
+log di buffer **di dalam HP**, jadi tes bisa dilakukan tanpa tersambung sama sekali:
 
 ```bash
-adb logcat -c
-adb logcat -s Unity:V | tee darsi-fieldtest-$(date +%H%M).log
+# SEBELUM berangkat (HP masih colok USB)
+adb logcat -G 16M       # perbesar ring buffer
+adb logcat -c           # bersihkan
+
+# ... cabut kabel, tes keliling, naik lift, tanpa laptop ...
+
+# SETELAH pulang, colok lagi
+adb logcat -d > darsi-fieldtest-YYYYMMDD.log
 ```
+
+**⚠️ `-G` reset saat HP reboot.** Kalau HP sempat mati/restart sebelum berangkat, ulangi
+`adb logcat -G 16M`. Verifikasi dengan `adb logcat -g` (harus tertulis 16 MiB).
 
 Yang dicari saat membaca ulang: `FloorTransition`, `FloorVisibilityManager`, `MultiSet`,
 `AgentPosition`.
 
-Kalau tidak bisa colok laptop: nyalakan `logChanges` di Inspector sebelum build, dan andalkan
-toast di layar + catatan tulis tangan. Lebih baik data kasar daripada tidak ada.
+**Opsional — live monitoring (wireless adb).** Berguna kalau mau lihat langsung, tapi
+JANGAN dijadikan satu-satunya andalan:
+
+```bash
+adb tcpip 5555
+adb shell ip route            # lihat IP HP
+adb connect <ip-hp>:5555      # baru cabut kabel
+adb logcat -s Unity:V
+```
+
+Kenapa tidak bisa diandalkan sendirian di RS: WiFi tamu sering pakai **client isolation**
+(adb connect langsung gagal), pindah lantai = ganti AP = putus, dan **di dalam lift sinyal
+mati** — justru momen paling penting yang mau direkam. Ring buffer tetap merekam walau
+wireless putus, jadi pakai keduanya: buffer = jaring pengaman, wireless = bonus.
 
 ---
 
