@@ -9,6 +9,35 @@
 
 ---
 
+## STATUS TERKINI (2026-07-20) — baca ini dulu
+
+**Di mana kita:** T5.3 (navigasi lintas-lantai) selesai & terverifikasi sejauh yang bisa di Editor.
+Prinsip yang menata semuanya: **hampir seluruh logika navigasi berstatus "terbukti di Editor,
+belum terbukti di perangkat".** Sampai tes lapangan RSI, jangan bangun apa pun baru di atasnya.
+
+**Rencana pekan-pekan depan (urut dependensi, bukan kemenarikan):**
+
+1. **🔴 Railway trial hampir habis — cek/perpanjang DULUAN.** Eksternal, tak bisa diburu mendadak.
+   Kalau backend mati saat di RSI, tes batal & kunjungan (butuh izin) terbuang.
+2. **Beresin yang menggantung:** commit scene + `NavPathMaterial.mat`; commit+push+deploy
+   `app/page.tsx` (WebView "Layanan Utama"); perbaiki `BuildingName` (masih tebakan, sudah
+   nyasar ke 11 baris DB) + kategori Resepsionis; build APK, tes buka-tutup.
+3. **Tes lapangan RSI** — [FIELD-TEST-T5.3.md](FIELD-TEST-T5.3.md). Angka penentu: detik dari
+   keluar lift → navigasi menyambung (menyetel `relocalizeTimeout`, membuktikan asumsi DLL).
+4. **Setelah tes:** setel angka dari data nyata; perbaiki temuan lapangan.
+5. **Bayar utang tes otomatis** — logika clustering & keputusan lintas-lantai bisa diuji tanpa AR.
+   Sengaja SETELAH lapangan (hasil bisa mengubah logikanya dulu).
+6. **Dokumen keputusan untuk dosen** — UaaL+Feature Delivery vs WebXR vs embedding (lihat ADR-002 koreksi).
+7. **Spike `flutter_embed_unity`** — jawab: MultiSet bisa localize di dalam Unity yang di-embed?
+   Paling akhir: mengganti fondasi integrasi, jangan saat masih membuktikan navigasi.
+8. **Play Feature Delivery** (MyRSIy) — jawaban sebenarnya untuk kekhawatiran ukuran (bukan pindah web).
+
+**Utang teknis yang sudah diakui (jangan lupa):** belum ada satu pun tes otomatis; `DestinationFloorLabel`
+menempel ke internal SDK (`ListItemUI.distance`) — mati diam kalau SDK rename; asumsi `LocalizeFrame()`
+me-restart jendela 60 dtk belum terbukti. Lihat juga Backlog di bawah (PERF-1, dll).
+
+---
+
 ## Fase 0 — Foundation / Kunci Kontrak  *(BLOCKER semua fase lain)*
 
 Nggak boleh mulai coding fitur sebelum fase ini clear — kontrak yang masih bertabrakan bikin Unity & WebView di-code dari spec yang beda.
@@ -243,10 +272,13 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 - Komponen `NavBoundaryNotifier`: deteksi kamera keluar tepi NavMesh (auto-derive, hysteresis) → billboard AR menghadap user "Di luar jangkauan navigasi" + panah balik ke titik NavMesh terdekat. Framing = **coverage**, bukan larangan fisik (lorongnya nyata & bisa dijalani — lihat ADR-019). MVP dibangun sekarang (murni editor, tak butuh device); angka threshold & caveat NavMesh multi-lantai (ADR-018) di-tune saat scan RSI asli masuk. Butuh expose `UaaLEntryPoint.IsLocalized`.
 
 ### T5.3 — Navigasi lintas-lantai: rute tersegmentasi + handoff lift (ADR-020)
-- `TODO` · Unity · Depends: Fase 1, ADR-018 (FloorVisibilityManager); tuning depends: scan RSI multi-lantai
-- Scene `DARSi-Indoor Navigation` sekarang punya **11 POI RSI 2 lantai** (4 Ground, 7 Lantai 1) + `[Ground] Lift`/`[Lantai1] Lift` sebagai penghubung vertikal → kasus lintas-lantai jadi nyata, bukan hipotetis.
-- Implementasi: deteksi beda lantai (`FloorVisibilityManager` = lantai user vs `POIData.floor` = lantai tujuan) → state machine `menuju-konektor` → `menunggu-transisi` → `menunggu-relocalize` → `menuju-tujuan`. Lift pakai `NavMeshLink` (BUKAN ramp antar-lantai — lihat ADR-020). Rute AR berhenti di lift, tidak pernah menembus plafon.
-- Wajib: setelah re-localize, tentukan ULANG lantai user dari clustering Y — jangan asumsikan user menuruti instruksi (bisa batal/salah lantai).
+- `EDITOR-DONE` (2026-07-20) · Unity · **tes lapangan RSI = satu-satunya yang tersisa**
+- Scene `DARSi-Indoor Navigation` punya **11 POI RSI 2 lantai** (4 Ground, 7 Lantai 1) + `[Ground] Lift`/`[Lantai1] Lift` sebagai penghubung vertikal.
+- Terimplementasi & terverifikasi di Editor (termasuk lewat UnityEvent `LocalizationSuccess` asli, dua arah): `FloorTransitionController` state machine `Idle → ToConnector → AwaitingRelocalize → ToDestination`. Deteksi beda lantai dari `FloorVisibilityManager` (indeks cluster) vs `POIData.Floor`. Auto-relocalize diserahkan ke SDK (`SingleFrameLocalizationManager.backgroundLocalization`), bukan loop sendiri. Setelah re-localize, lantai user ditentukan ULANG dari clustering — tidak mengasumsikan user menuruti instruksi. Tombol batal wired ke `CancelTransition()` di setiap state.
+- **`NavMeshLink` TIDAK dipakai** (menyimpang dari draft ADR-020 poin 3 → dicabut oleh **ADR-020-B**). Lantai tetap pulau NavMesh terpisah; jarak lintas-lantai dijumlahkan per-segmen (`DestinationFloorLabel`, tampil "24 m · Lantai 1"). AR route tidak pernah menembus plafon karena `currentDestination` selalu di-set ke lift, bukan POI lintas-lantai.
+- Amandemen terkait: **ADR-020-A** (konektor vertikal = bukan destinasi; amenity multi-instance dikelompokkan) — belum diimplementasi di WebView, nunggu T5.3 stabil.
+- Prasyarat data yang ditemukan: 4 `poiCollider` (Ground, Resepsionis, Farmasi, IGD) berjarak >1 m dari NavMesh → `PathInvalid`. Sudah dibetulkan; ambang snap vertikal `CalculatePath` ~1 m.
+- **Belum terbukti (butuh device di RSI):** apakah localize sungguhan berhasil di lantai baru, berapa lama, apakah `LocalizeFrame()` me-restart jendela `bgLocalizationDuration` (60 dtk), apakah `AgentPosition` benar memindahkan agent ke pulau NavMesh lantai baru. Protokol: [FIELD-TEST-T5.3.md](FIELD-TEST-T5.3.md).
 
 ---
 

@@ -12,6 +12,37 @@
 **Keputusan:** AR navigation tetap native Unity, di-embed ke MyRSIy via UaaL — bukan dijalankan di WebView.
 **Alasan:** ARCore/ARFoundation tidak didukung di WebGL maupun WebView (dikonfirmasi: dokumentasi resmi Unity menyatakan WebGL tidak support publikasi AR). Tidak ada cara membuat AR navigation jalan murni di web pada 2026.
 
+#### Koreksi 002-C (2026-07-20) — alasan lama sebagian KELIRU; keputusan tetap, dasarnya diganti
+
+Kalimat *"tidak ada cara membuat AR navigation jalan murni di web pada 2026"* **salah** dan sudah diverifikasi salah. Dicatat di sini persis karena keputusannya kebetulan tetap benar — ADR dengan alasan keliru itu jebakan: orang berikutnya percaya alasannya lalu memakainya untuk keputusan lain yang tidak cocok. (Pertanyaan ini muncul dari dosen yang menyarankan "tanpa kesan Unity".)
+
+**Fakta yang benar (2026-07, terverifikasi):**
+- **MultiSet PUNYA WebXR Kit** — VPS localization berbasis browser, tanpa install, dari QR. Jadi web AR dengan localize memang ada.
+- **Tapi WebXR TIDAK jalan di WebView.** MDN browser-compat-data: `navigator.xr` → `webview_android: false` (bug Chromium 40652382, masih terbuka). Ini berlaku untuk `webview_flutter` MAUPUN `flutter_inappwebview` — keduanya membungkus `android.webkit.WebView` yang sama. Bukan soal Flutter; komponennya sendiri tidak mengekspos WebXR.
+- **WebXR jalan di Chrome asli** (Chrome Android 79+), jadi bisa dipicu dari Flutter lewat **Chrome Custom Tabs / TWA** — tapi itu "keluar ke Chrome fullscreen", bukan embed, dan pengalamannya patah.
+- **iOS Safari: WebXR nol** (Apple tak mendukung `immersive-ar`). Diputuskan **2026-07-20: iOS di-drop** dari scope — MyRSIy belum menyasar iPhone.
+- **WebXR Kit cuma memberi localization**, bukan mesin navigasi. NavMesh, pathfinding, state machine lintas-lantai tetap harus dibangun ulang di three.js.
+
+**Kenapa keputusan tetap UaaL — sekarang berbasis preseden industri, bukan "mustahil":**
+Untuk kelas masalah ini (rumah sakit, multi-lantai, presisi), native memang jalur standarnya —
+Google Maps Live View (native ARCore Geospatial), Pointr (native SDK di bandara). Framing industri
+eksplisit: *ritel sekali-pakai → WebAR; rumah sakit routing presisi multi-lantai → point cloud + ARKit/ARCore native.* DARSI = kasus kedua.
+
+**Menjawab keluhan "UaaL terasa seperti buka aplikasi Unity terpisah" (valid):**
+UaaL default = Activity fullscreen, memang terasa terpisah. Tapi **embed sebagai widget Flutter itu nyata**:
+`flutter_embed_unity` mendukung **Unity 6000.3 LTS** (= versi kita) + ARFoundation. Unity dirender ke
+surface di pohon widget Flutter, Flutter bisa overlay di atas view AR, tanpa Activity/task terpisah.
+Risiko jujur: embedding "melanggar asumsi fullscreen UaaL" (rapuh, fungsi tak terdokumentasi); ada bug
+`flutter_embed_unity` + ARFoundation crash di Android <13 sejak Flutter 3.22; dan **kompatibilitas MultiSet
+di dalam surface embed BELUM terverifikasi** — perlu spike (ROADMAP langkah 7). Untuk AR nav, view kamera
+memang seharusnya fullscreen; yang "diperbaiki" embedding adalah rasa aplikasi-terpisah, bukan ukuran view.
+
+**Kekhawatiran ukuran aplikasi ≠ alasan pindah web.** Solusi industri = **Play Feature Delivery**
+(modul on-demand): Unity baru diunduh saat user pertama tekan Navigasi AR; unduhan awal MyRSIy tak berubah.
+Preseden: Halodoc (aplikasi kesehatan Indonesia) — base size −54%, uninstall −52% dengan dynamic feature
+modules. Data scan pun tidak masuk APK (`MapMeshDownloader` unduh runtime). Ditelusuri lengkap; keputusan
+ada di sisi MyRSIy (ROADMAP langkah 8).
+
 ### ADR-003 — WebView untuk UI pre-AR, bukan Unity UI Toolkit
 **Keputusan:** Screen Home dan Cari Lokasi dibangun sebagai WebView (Next.js), bukan Unity UI Toolkit (UXML/USS).
 **Alasan:** Pembimbing meminta kemampuan update tanpa rilis ulang APK, debugging lebih mudah, dan verifikasi Play Store lebih straightforward untuk app yang sebagian besar native + WebView dibanding app WebView murni. Implementasi UI Toolkit yang sempat dibuat (Splash/Auth/Login/Register/Home — 5 UXML, 5 USS, ScreenManager, dll) sudah **dihapus sepenuhnya** dari project Unity karena scope-nya sudah tidak relevan (auth sekarang di-handle MyRSIy).
