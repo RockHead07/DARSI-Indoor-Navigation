@@ -6,8 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Samples/MultiSet-SDK/1.11.5/Sample Scenes/Navigation/WholePSDKU.unity
-    guid: 4233ab505f2e9ce45bc4d8009e4047d8
+    path: Assets/Samples/MultiSet-SDK/1.11.5/Sample Scenes/Navigation/DARSi-Indoor
+      Navigation.unity
+    guid: 6806853f05bb8c147a75312f5363b924
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: a27a0ba4984c77547ae81c067f848621, type: 2}
     UnityEditor.XR.ARKit.ARKitSettings: {fileID: 11400000, guid: 03cbbf8904f7e084e94e0523b703cc30, type: 2}

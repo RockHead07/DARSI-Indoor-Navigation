@@ -77,10 +77,16 @@ public class FloorVisibilityManager : MonoBehaviour
         _floorPois.Clear();
         _floorOfPoi.Clear();
         _markerOf.Clear();
-        _currentFloor = -1;
         _pendingFloor = -1;
-        _hasSmoothedY = false;
         _loggedFirstEval = false;
+        // _currentFloor dan _hasSmoothedY SENGAJA TIDAK direset di sini — lihat Amandemen 018-A.
+        // Method ini dipanggil dari listener LocalizationSuccess, yang menyala berkali-kali
+        // sepanjang sesi (backgroundLocalization SDK relocalize periodik di latar belakang),
+        // bukan cuma sekali di awal. Mereset _currentFloor tiap kali berarti menebak ulang
+        // status lantai dari SATU sampel Y instan setiap relocalize latar belakang — persis
+        // noise yang smoothing+hysteresis di Update() memang dirancang untuk meredam, tapi
+        // dilewati begitu saja oleh reset ini. Keanggotaan cluster (_floorPois) sendiri aman
+        // dihitung ulang tiap saat — ia invariant terhadap transform rigid Map Space.
 
         if (poiManager == null)
         {
@@ -112,19 +118,19 @@ public class FloorVisibilityManager : MonoBehaviour
         if (logChanges)
             Debug.Log($"[FloorVisibilityManager] {_floorPois.Count} lantai terdeteksi dari {pois.Count} POI.");
 
-        // JANGAN keluar dari sini dengan _currentFloor = -1 selama cluster-nya sudah ada.
-        // Method ini dipanggil dari listener LocalizationSuccess, dan listener LAIN pada event
-        // yang sama membaca lantai aktif tepat sesudahnya. Kalau lantai baru diisi ulang
-        // beberapa frame kemudian oleh Update(), pembaca di celah itu dapat -1 dan bisa salah
-        // menyimpulkan "lantai sama" (mis. FloorTransitionController menyambung segmen 2 tanpa
-        // verifikasi). Hitung sekarang juga supaya objek ini tidak pernah terlihat setengah jadi.
-        if (_floorPois.Count > 0 && arCamera != null)
+        if (_floorPois.Count == 0)
         {
-            _smoothedY = arCamera.transform.position.y;
-            _hasSmoothedY = true;
-            _currentFloor = NearestFloor(_smoothedY);
-            ApplyVisibility();
+            _currentFloor = -1;
+            return;
         }
+
+        // Localize pertama sesi ini (belum pernah ada lantai), atau jumlah cluster berubah
+        // sehingga index lama jadi tidak sah -> reset. Selain itu, _currentFloor DIPERTAHANKAN
+        // (lihat komentar di awal method) dan Update() yang menuntaskan lewat smoothing+hysteresis.
+        if (_currentFloor < 0 || _currentFloor >= _floorPois.Count)
+            _currentFloor = -1;
+        else
+            ApplyVisibility();
     }
 
     /// <summary>Centroid Y lantai dihitung LIVE dari posisi POI saat ini (bukan cache).</summary>
@@ -286,6 +292,20 @@ public class FloorVisibilityManager : MonoBehaviour
     {
         if (_currentFloor < 0) return false;
         return TryGetFloorIndex(poi, out int f) && f != _currentFloor;
+    }
+
+    /// <summary>
+    /// Amandemen 018-A/020-C: estimasi lantai SAAT INI dari posisi kamera, dihitung fresh —
+    /// TANPA smoothing, TANPA hysteresis, dan TIDAK menyentuh _currentFloor (yang menggerakkan
+    /// visibility marker dan sengaja dijaga stabil). Dipakai HANYA oleh konsumen yang butuh
+    /// jawaban seketika di satu titik keputusan (mis. FloorTransitionController mengonfirmasi
+    /// lantai lewat jendela konsistensi setelah relocalize) — bukan untuk decluttering marker.
+    /// -1 kalau clustering belum siap.
+    /// </summary>
+    public int ComputeInstantFloor()
+    {
+        if (_floorPois.Count == 0 || arCamera == null) return -1;
+        return NearestFloor(arCamera.transform.position.y);
     }
 
     // --- Debug harness (konsisten dengan pola UaaLEntryPoint T1.7) ---

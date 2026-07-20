@@ -43,6 +43,11 @@ public class FloorTransitionController : MonoBehaviour
              "sendiri lewat backgroundLocalization, bukan oleh script ini.")]
     [SerializeField] private float relocalizeTimeout = 90f;
 
+    [Tooltip("Amandemen 020-C: setelah localize sukses, ComputeInstantFloor() harus konsisten " +
+             "menunjuk lantai tujuan selama sekian detik berturut-turut sebelum navigasi " +
+             "disambung. Bukan tebakan final — perlu di-tune dari data lapangan asli.")]
+    [SerializeField] private float floorConfirmWindow = 1f;
+
     [SerializeField] private bool logChanges = true;
 
     private Phase _phase = Phase.Idle;
@@ -50,6 +55,10 @@ public class FloorTransitionController : MonoBehaviour
     private POI _connector;
     private POI _lastSeenDestination;
     private Coroutine _relocalizeLoop;
+
+    // Amandemen 020-C
+    private bool _hasRelocalizedSinceWaiting;
+    private float _floorConfirmSince = -1f;
 
     private void Awake()
     {
@@ -118,6 +127,7 @@ public class FloorTransitionController : MonoBehaviour
         if (nav == null || floorVisibility == null) return;
 
         ShowWaitingStatus();
+        ConfirmFloorProgress();
 
         POI destination = nav.currentDestination;
         if (destination == _lastSeenDestination) return;
@@ -191,6 +201,11 @@ public class FloorTransitionController : MonoBehaviour
         {
             case Phase.ToConnector:
                 _phase = Phase.AwaitingRelocalize;
+                // Amandemen 020-C: gerbang tertutup lagi. Sebelum localize sukses PERTAMA sejak
+                // titik ini, ComputeInstantFloor() tidak boleh dibaca — Map Space masih ter-align
+                // ke lantai lama, jadi angkanya bisa kebetulan cocok padahal user masih di lift.
+                _hasRelocalizedSinceWaiting = false;
+                _floorConfirmSince = -1f;
                 string floor = _finalDestination != null
                     ? _finalDestination.GetComponent<POIData>()?.Floor
                     : null;
@@ -211,33 +226,56 @@ public class FloorTransitionController : MonoBehaviour
     /// <summary>
     /// Wire sebagai persistent listener pada UnityEvent LocalizationSuccess milik
     /// MapLocalizationManager — sama seperti FloorVisibilityManager.OnLocalizationSuccess.
+    ///
+    /// Amandemen 020-C: method ini HANYA membuka gerbang, bukan mengambil keputusan. Alasannya
+    /// tidak bisa diverifikasi dari kode: apakah SDK menerapkan koreksi pose Map Space instan
+    /// di frame yang sama dengan event ini, atau menghaluskannya beberapa frame (pola umum SDK
+    /// VPS agar visual tidak meloncat) — SDK-nya DLL tertutup. Membaca posisi kamera di sini
+    /// berarti bertaruh pada timing yang tak diketahui. Keputusan sesungguhnya dilakukan
+    /// ConfirmFloorProgress() lewat jendela konsistensi, bersandar pada tracking ARCore yang
+    /// memang terbukti kontinu tiap frame.
     /// </summary>
     public void OnLocalizationSuccess()
     {
-        if (_phase != Phase.AwaitingRelocalize || _finalDestination == null) return;
+        if (_phase != Phase.AwaitingRelocalize) return;
+        _hasRelocalizedSinceWaiting = true;
+        if (logChanges) Debug.Log("[FloorTransition] Localize sukses — mulai konfirmasi lantai.");
+    }
+
+    /// <summary>
+    /// Amandemen 020-C: sambung segmen 2 hanya kalau lantai user KONSISTEN menunjuk lantai
+    /// tujuan selama floorConfirmWindow berturut-turut. Sengaja TIDAK memakai CurrentFloorIndex:
+    /// nilai itu sengaja dibuat stabil/lambat (hysteresis marker, Amandemen 018-A) untuk
+    /// mencegah kedip visual — konsekuensi salahnya beda, jadi knob-nya juga dipisah.
+    /// </summary>
+    private void ConfirmFloorProgress()
+    {
+        if (_phase != Phase.AwaitingRelocalize || !_hasRelocalizedSinceWaiting) return;
+        if (_finalDestination == null) return;
 
         var data = _finalDestination.GetComponent<POIData>();
         if (data == null) { ResetState(); return; }
 
-        // Lantai aktif dijamin sudah sah begitu BuildFloorClusters() selesai — method itu
-        // menghitungnya di panggilan yang sama, tidak meninggalkan -1 sementara. Tetap dijaga
-        // di sini karena "belum tahu lantai" TIDAK BOLEH berarti "lantai sudah sama": salah
-        // baca di titik ini berarti user diarahkan ke POI lantai atas padahal masih di bawah.
-        if (floorVisibility.CurrentFloorIndex < 0)
+        int userFloor = floorVisibility.ComputeInstantFloor();
+        bool onTargetFloor = userFloor >= 0
+                             && floorVisibility.TryGetFloorIndex(data, out int destFloor)
+                             && userFloor == destFloor;
+
+        if (!onTargetFloor)
         {
-            Debug.LogWarning("[FloorTransition] Lantai user belum diketahui — menunggu localize berikutnya.");
+            // Belum sampai (atau sempat meleset) -> hitungan konfirmasi diulang dari nol.
+            // ADR-020 risiko residual: JANGAN berasumsi user menuruti instruksi.
+            _floorConfirmSince = -1f;
             return;
         }
 
-        // ADR-020 risiko residual: JANGAN berasumsi user menuruti instruksi. Tentukan ulang
-        // lantai user dari clustering; kalau ternyata masih di lantai lama, katakan apa adanya.
-        if (floorVisibility.IsOnDifferentFloor(data))
+        if (_floorConfirmSince < 0f)
         {
-            ToastManager.Instance?.ShowAlert(
-                $"Anda masih belum di {data.Floor}. Naik lift dulu, lalu pindai ulang.");
-            if (logChanges) Debug.Log("[FloorTransition] Relocalize sukses tapi lantai belum berubah.");
+            _floorConfirmSince = Time.time;
             return;
         }
+
+        if (Time.time - _floorConfirmSince < floorConfirmWindow) return;
 
         StopRelocalizeLoop();
         _phase = Phase.ToDestination;
@@ -407,6 +445,8 @@ public class FloorTransitionController : MonoBehaviour
         _phase = Phase.Idle;
         _finalDestination = null;
         _connector = null;
+        _hasRelocalizedSinceWaiting = false;
+        _floorConfirmSince = -1f;
     }
 
     /// <summary>Jalan keluar wajib (ADR-020): navigasi tidak boleh mandek diam.</summary>
@@ -434,7 +474,10 @@ public class FloorTransitionController : MonoBehaviour
     private void Debug_LogState() => Debug.Log(
         $"[FloorTransition] phase={_phase}, connector='{(_connector != null ? _connector.poiName : "-")}', " +
         $"final='{(_finalDestination != null ? _finalDestination.poiName : "-")}', " +
-        $"lantaiUser={floorVisibility?.CurrentFloorIndex}");
+        $"lantaiUser(stabil)={floorVisibility?.CurrentFloorIndex}, " +
+        $"lantaiUser(instan)={floorVisibility?.ComputeInstantFloor()}, " +
+        $"gerbangRelocalize={_hasRelocalizedSinceWaiting}, " +
+        $"konfirmasiSejak={(_floorConfirmSince < 0f ? "belum" : (Time.time - _floorConfirmSince).ToString("F1") + "s")}");
 
     [ContextMenu("Debug/Simulate arrival")]
     private void Debug_SimulateArrival() => OnArrived();

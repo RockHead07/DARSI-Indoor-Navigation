@@ -176,6 +176,20 @@ ada di sisi MyRSIy (ROADMAP langkah 8).
 
 **Bentuk implementasi:** komponen aditif baru `FloorVisibilityManager` (belum dibuat) — reuse list POI dari `POIManager` yang sudah ada, tidak menyentuh script protected. Validasi awal pakai data kampus (11 POI, 2 lantai) sebagai testbed sebelum data RSI asli tersedia.
 
+#### Amandemen 018-A (2026-07-20) — `_currentFloor` berhenti direset tiap relocalize latar belakang
+
+**Pemicu:** tes lapangan pertama di RSI (2026-07-20): POI lantai bawah tetap terlihat padahal seharusnya senyap. Tidak reproduksi di Editor — `DeviceAnimation` menggerakkan kamera lewat jalur simulasi bersih, beda dari hasil align MultiSet yang nyata.
+
+**Akar masalah:** `BuildFloorClusters()` (dipanggil dari listener `LocalizationSuccess`) me-reset `_currentFloor` ke -1 lalu menebak ulang dari **satu sampel Y instan**, setiap kali event itu menyala. Dan event itu menyala berkali-kali sepanjang sesi, bukan cuma sekali di awal — setelan SDK (`backgroundLocalization=true`, `relocalization=true`) membuatnya relocalize di latar belakang secara periodik. Akibatnya, mekanisme smoothing+hysteresis yang sudah dirancang di `Update()` justru dilewati tiap kali relocalize latar belakang terjadi — persis kasus yang seharusnya diredam.
+
+**Keputusan:** `_currentFloor` TIDAK lagi direset paksa tiap `BuildFloorClusters()` dipanggil. Nilai lama dipertahankan sebagai prior; `Update()` yang menuntaskan penyesuaian lewat evaluasi kontinu (smoothing + hysteresis), bukan snap sesaat. Reset ke -1 hanya terjadi kalau memang belum pernah ada nilai (localize pertama sesi), atau jumlah cluster berubah sehingga index lama jadi tidak sah.
+
+**Alasan:** keanggotaan cluster (`_floorPois`, POI mana masuk lantai mana) TIDAK perlu dihitung ulang tiap event — dia invariant terhadap transform rigid, karena posisi Y POI relatif satu sama lain tidak berubah walau Map Space digeser-align ulang (sudah dicatat di komentar kode sejak awal ADR ini). Yang sebenarnya rentan cuma satu angka: posisi Y kamera **saat itu juga**. Membuang seluruh status stabil demi satu sampel yang belum tentu representatif berarti mengabaikan mekanisme peredam noise yang sudah dibangun untuk kasus persis ini.
+
+**Konsekuensi:** method baru `ComputeInstantFloor()` — baca posisi kamera fresh, tanpa smoothing, tanpa efek samping ke `_currentFloor`. Dipakai konsumen yang butuh jawaban seketika di satu titik keputusan spesifik (lihat Amandemen 020-C), terpisah dari jalur stabil yang menggerakkan visibility marker.
+
+**Bentuk implementasi:** perubahan lokal di `FloorVisibilityManager.BuildFloorClusters()` + guard index di `Update()`. Tidak menyentuh script protected.
+
 ---
 
 ### ADR-019 — Out-of-bounds = *coverage notice* (bukan barrier), auto-derive dari tepi NavMesh
@@ -276,6 +290,25 @@ jarak = path(user → lift lantai user) + path(lift lantai tujuan → POI)
 **Prasyarat data yang ditemukan saat implementasi:** `NavMesh.CalculatePath` hanya men-snap target ~1 m secara vertikal. Empat `poiCollider` berjarak 1.03–1.29 m dari permukaan NavMesh dan menghasilkan `PathInvalid` walau NavMesh-nya tersambung. Tooltip SDK sudah memperingatkan ("Collider should be near NavMesh") — jadi penempatan collider adalah **prasyarat**, bukan detail kosmetik.
 
 **Yang belum terbukti:** seluruh rantai ini terverifikasi di Editor, termasuk lewat UnityEvent `LocalizationSuccess` yang asli. Yang belum: apakah localize sungguhan berhasil di lantai baru di gedung RSI, dan apakah `LocalizeFrame()` benar-benar me-restart jendela `bgLocalizationDuration` (60 detik). Keduanya ada di dalam DLL dan hanya bisa dijawab di lapangan.
+
+#### Amandemen 020-C (2026-07-20) — Konfirmasi lantai lewat jendela konsistensi, bukan sampel instan tunggal
+
+**Pemicu:** sama seperti Amandemen 018-A — tes lapangan RSI (2026-07-20) membongkar bahwa `FloorVisibilityManager` men-snap ulang status lantai dari satu sampel instan tiap relocalize latar belakang. Perbaikan 018-A membuat `_currentFloor` stabil lagi — tapi `FloorTransitionController.OnLocalizationSuccess()` (dibangun sehari sebelumnya) membaca nilai itu justru mengandalkan sifat "langsung ter-update sinkron" untuk mengonfirmasi user sudah sampai di lantai tujuan. Begitu nilainya jadi stabil/lambat berubah (via hysteresis ~1 detik), penyambungan segmen 2 T5.3 bisa telat kalau tetap bergantung pada nilai yang sama dengan yang menggerakkan marker.
+
+**Opsi pertama yang dipertimbangkan lalu DITOLAK:** tambah `ComputeInstantFloor()` dan baca **langsung, sinkron, di frame yang sama** dengan event `LocalizationSuccess`. Ditolak karena bertumpu pada asumsi yang **tidak bisa diverifikasi**: apakah MultiSet SDK menerapkan koreksi pose Map Space secara instan di frame yang sama dengan event sukses-nya, atau menghaluskannya lewat beberapa frame (pola umum di SDK VPS, mencegah "lompatan" visual). SDK-nya DLL tertutup — timing internal ini tidak bisa dibaca dari kode. Membangun keputusan navigasi di atas asumsi tak terverifikasi itu persis pola yang berulang kali terbukti salah sepanjang proyek ini (bandingkan koreksi `listTitle`→`poiName` di ADR-021).
+
+**Keputusan:** `FloorTransitionController` tidak mempercayai satu sampel instan sama sekali — pakai **jendela konfirmasi pendek** yang bersandar pada tracking ARCore (terbukti kontinu tiap frame, berbeda dari timing internal SDK yang tak diketahui):
+
+1. `OnLocalizationSuccess()` cuma jadi **gerbang** — set flag `_hasRelocalizedSinceWaiting = true`. Bukan lagi titik keputusan.
+2. Selama fase `AwaitingRelocalize` **dan** gerbang itu sudah terbuka, tiap frame (`LateUpdate`) cek `FloorVisibilityManager.ComputeInstantFloor()` (Amandemen 018-A).
+3. Kalau hasilnya **konsisten** menunjuk lantai tujuan selama `floorConfirmWindow` (default 1 detik) berturut-turut → sambung ke segmen 2. Sempat meleset di tengah jalan → hitungan reset ke nol.
+4. Gerbang di poin 1 tetap wajib: sebelum localize sukses **pertama kali** sejak masuk fase menunggu, `ComputeInstantFloor()` sama sekali tidak dibaca — Map Space saat itu masih ter-align ke lantai lama, sehingga angkanya bisa kebetulan cocok padahal user masih di dalam lift.
+
+**Alasan jendela ini dipisah dari hysteresis marker** (`FloorVisibilityManager`, juga ~1 detik): dua mekanisme ini kelihatan mirip tapi melayani konsekuensi berbeda — hysteresis marker mencegah kedip visual (salah sesaat = ikon berkedip), jendela konfirmasi T5.3 mencegah salah rute (salah sesaat = user diarahkan navigasi berdasarkan lantai yang belum tentu benar). Dua knob terpisah supaya masing-masing disetel sesuai konsekuensinya sendiri — bukan duplikasi.
+
+**Konsekuensi:** field baru `_hasRelocalizedSinceWaiting`, `_floorConfirmSince`, `[SerializeField] floorConfirmWindow` di `FloorTransitionController`. `OnArrived()` (masuk `AwaitingRelocalize`) me-reset keduanya. Tidak menyentuh script protected.
+
+**Yang belum terbukti:** jendela 1 detik itu tebakan awal, sama seperti seluruh angka lain di T5.3 — perlu di-tune dari data lapangan asli, bukan diasumsikan benar dari sini.
 
 ---
 
