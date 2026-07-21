@@ -45,7 +45,20 @@ public class PhotonManager : MonoBehaviourPunCallbacks
         debugLocalize.performed += _ =>
         {
             Debug.Log("[PhotonManager] DEBUG: L key detected — simulating localization.");
-            OnLocalizationSuccess();
+            // Tembak UnityEvent BERSAMA, jangan panggil OnLocalizationSuccess() sendiri.
+            // Memanggil diri sendiri membuat Editor menguji jalur yang berbeda dari device:
+            // di device LocalizationSuccess menyalakan semua listener (UaaLEntryPoint,
+            // FloorVisibilityManager, FloorTransitionController, ...), di Editor dulu hanya
+            // PhotonManager — sehingga bug wiring lolos di Editor lalu muncul di lapangan.
+            //
+            // ponytail: ini tambalan, bukan solusi. Yang benar adalah simulasi bawaan SDK
+            // (SimulationDataManager -> Fetch/Download). Hapus blok ini begitu data simulasi
+            // untuk map yang dipakai sudah direkam lewat scene SimulationDataCapture.unity.
+            var lm = FindFirstObjectByType<MultiSet.SingleFrameLocalizationManager>();
+            if (lm != null && lm.LocalizationSuccess != null)
+                lm.LocalizationSuccess.Invoke();
+            else
+                OnLocalizationSuccess();
         };
         debugLocalize.Enable();
         Debug.Log("[PhotonManager] DEBUG: Press L anytime to simulate localization success.");

@@ -129,8 +129,11 @@ public class FloorVisibilityManager : MonoBehaviour
         // (lihat komentar di awal method) dan Update() yang menuntaskan lewat smoothing+hysteresis.
         if (_currentFloor < 0 || _currentFloor >= _floorPois.Count)
             _currentFloor = -1;
-        else
-            ApplyVisibility();
+
+        // Selalu terapkan, bukan cuma saat lantai sudah sah. Dengan _currentFloor = -1 tidak
+        // ada lantai yang cocok, sehingga semua marker padam — itulah keadaan yang benar
+        // sebelum localize. Update() yang nanti menentukan lantai dan menyalakannya kembali.
+        ApplyVisibility();
     }
 
     /// <summary>Centroid Y lantai dihitung LIVE dari posisi POI saat ini (bukan cache).</summary>
@@ -252,13 +255,17 @@ public class FloorVisibilityManager : MonoBehaviour
 
     private void ApplyVisibility()
     {
+        // ADR-007/011: posisi POI baru sah SETELAH localize. Sebelum itu semua marker
+        // disembunyikan — menampilkannya berarti menjanjikan lokasi yang belum kami ketahui,
+        // dan marker akan melompat begitu align pertama masuk.
+        bool localized = uaaLEntryPoint == null || uaaLEntryPoint.IsLocalized;
         POIData activeTarget = uaaLEntryPoint != null ? uaaLEntryPoint.ActiveNavTarget : null;
 
         foreach (var kvp in _floorOfPoi)
         {
             POIData poi = kvp.Key;
             int floor = kvp.Value;
-            bool visible = floor == _currentFloor || poi == activeTarget;
+            bool visible = localized && (floor == _currentFloor || poi == activeTarget);
 
             if (_markerOf.TryGetValue(poi, out var marker) && marker != null)
                 marker.gameObject.SetActive(visible);
