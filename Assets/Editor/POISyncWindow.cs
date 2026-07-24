@@ -18,11 +18,11 @@ using UnityEngine;
 /// </summary>
 public class POISyncWindow : EditorWindow
 {
-    private const string PrefUrlKey = "Darsi.POISync.BackendUrl";
-    private const string PrefTokenKey = "Darsi.POISync.AdminToken";
+    private const string PrefUrlKey = "Darsi.POISync.SupabaseUrl";
+    private const string PrefKeyKey = "Darsi.POISync.ServiceKey";
 
-    private string backendUrl = "";
-    private string adminToken = "";
+    private string supabaseUrl = "";
+    private string serviceKey = "";
     private string lastResult = "";
 
     [MenuItem("DARSI/Sync POIs to Backend")]
@@ -34,20 +34,21 @@ public class POISyncWindow : EditorWindow
 
     private void OnEnable()
     {
-        backendUrl = EditorPrefs.GetString(PrefUrlKey, "");
-        adminToken = EditorPrefs.GetString(PrefTokenKey, "");
+        supabaseUrl = EditorPrefs.GetString(PrefUrlKey, "");
+        serviceKey = EditorPrefs.GetString(PrefKeyKey, "");
     }
 
     private void OnGUI()
     {
         EditorGUILayout.HelpBox(
-            "Push field statis POI (id, nama, kategori, gedung, lantai, sinonim) ke backend. " +
-            "`status` tidak pernah ikut disentuh — itu tetap dikelola backend (ADR-014).",
+            "Push field statis POI (id, nama, kategori, gedung, lantai, sinonim) ke Supabase " +
+            "(RPC sync_pois). `status`/is_popular/deskripsi/foto tak pernah ikut disentuh — " +
+            "tetap dikelola DB (ADR-014).",
             MessageType.Info);
 
         EditorGUILayout.Space();
-        backendUrl = EditorGUILayout.TextField("Backend URL", backendUrl);
-        adminToken = EditorGUILayout.PasswordField("Admin Token", adminToken);
+        supabaseUrl = EditorGUILayout.TextField("Supabase URL", supabaseUrl);
+        serviceKey = EditorGUILayout.PasswordField("Service Role Key", serviceKey);
 
         EditorGUILayout.Space();
         var pois = FindAllPOIs();
@@ -64,12 +65,12 @@ public class POISyncWindow : EditorWindow
                 AssignMissingIds(pois);
         }
 
-        using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(backendUrl) || pois.Count == 0))
+        using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(supabaseUrl) || pois.Count == 0))
         {
             if (GUILayout.Button("Sync to Backend"))
             {
-                EditorPrefs.SetString(PrefUrlKey, backendUrl);
-                EditorPrefs.SetString(PrefTokenKey, adminToken);
+                EditorPrefs.SetString(PrefUrlKey, supabaseUrl);
+                EditorPrefs.SetString(PrefKeyKey, serviceKey);
                 SyncToBackend(pois);
             }
         }
@@ -121,11 +122,13 @@ public class POISyncWindow : EditorWindow
         public string[] synonyms;
     }
 
-    // JsonUtility tidak bisa serialize root array langsung -> dibungkus.
+    // JsonUtility tidak bisa serialize root array langsung -> dibungkus. Field HARUS
+    // bernama "payload": itu nama argumen RPC sync_pois(payload jsonb); PostgREST
+    // memetakan {"payload":[...]} ke argumen fungsi.
     [Serializable]
     private class PoiSyncPayload
     {
-        public PoiSyncEntry[] pois;
+        public PoiSyncEntry[] payload;
     }
 
     [Serializable]
@@ -172,10 +175,10 @@ public class POISyncWindow : EditorWindow
             };
         }
 
-        string json = JsonUtility.ToJson(new PoiSyncPayload { pois = entries });
+        string json = JsonUtility.ToJson(new PoiSyncPayload { payload = entries });
         byte[] body = Encoding.UTF8.GetBytes(json);
 
-        string url = backendUrl.TrimEnd('/') + "/api/poi/sync";
+        string url = supabaseUrl.TrimEnd('/') + "/rest/v1/rpc/sync_pois";
 
         // Pakai HttpWebRequest (.NET) yang BENAR-BENAR sinkron, BUKAN UnityWebRequest.
         // Kenapa: UnityWebRequest butuh main thread Unity untuk memompa progres request.
@@ -190,11 +193,13 @@ public class POISyncWindow : EditorWindow
             var request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "POST";
             request.ContentType = "application/json";
-            request.Headers["X-Admin-Token"] = adminToken;
-            // 120 detik, bukan 15: backend deploy (Railway free-tier) spin-down saat nganggur,
-            // dan cold-start-nya bisa >60 detik. Request PERTAMA setelah idle yang kena — request
-            // berikutnya cepat. Timeout pendek membunuh request justru saat server sedang bangun,
-            // dan gejalanya menipu: "timed out" padahal backend hidup.
+            // Supabase auth: apikey + Bearer service_role. service_role bypass RLS DAN punya
+            // EXECUTE pada sync_pois (di-grant eksplisit di setup.sql). Editor-only — key ini
+            // tak pernah ikut ke build player. JANGAN commit/share.
+            request.Headers["apikey"] = serviceKey;
+            request.Headers["Authorization"] = "Bearer " + serviceKey;
+            // 120 dtk longgar. Supabase always-on (tak ada cold-start Railway lagi), tapi sync
+            // banyak POI di jaringan lambat tetap aman dengan timeout lega.
             request.Timeout = 120000;
             request.ReadWriteTimeout = 120000;
             request.ContentLength = body.Length;
