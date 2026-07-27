@@ -1,0 +1,56 @@
+name: Unity UaaL Android Export & Release 🤖
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+
+jobs:
+  build-uaal-android:
+    name: Export Unity as a Library (Android)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-Android-${{ hashFiles('Assets/**', 'Packages/**') }}
+          restore-keys: |
+            Library-Android-
+
+      - name: Build Unity Android UaaL Export
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: Android
+          customParameters: -executeMethod UaaLBuildScript.BuildAndroidUaaL
+
+      - name: Compress Exported UaaL Module
+        run: |
+          cd Builds/AndroidUaaL
+          zip -r ../../unity-android-uaal-export.zip .
+
+      - name: Upload UaaL Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DARSI-Unity-UaaL-Android
+          path: unity-android-uaal-export.zip
+          retention-days: 14
+
+      - name: Trigger Flutter Host App Pipeline (MyRSIy)
+        if: secrets.FLUTTER_DISPATCH_TOKEN != ''
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.FLUTTER_DISPATCH_TOKEN }}
+          repository: RockHead07/MyRSIy
+          event-type: unity-uaal-updated
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'

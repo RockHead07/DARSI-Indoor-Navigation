@@ -1,0 +1,43 @@
+name: Backend Service CI 🐍
+
+on:
+  push:
+    paths:
+      - 'Backend/**'
+  pull_request:
+    paths:
+      - 'Backend/**'
+  workflow_dispatch:
+
+jobs:
+  test-backend:
+    name: Test & Lint Python YOLO API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Cache Pip Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('Backend/requirements.txt') }}
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest
+          if [ -f Backend/requirements.txt ]; then pip install -r Backend/requirements.txt; fi
+
+      - name: Code Quality & Syntax Check
+        run: |
+          ruff check Backend/
+
+      - name: Run PyTest
+        run: |
+          if [ -d Backend/tests ]; then pytest Backend/tests; else echo "No backend unit test directory found yet, skipping pytest."; fi
