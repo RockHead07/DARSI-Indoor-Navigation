@@ -340,3 +340,15 @@ jarak = path(user → lift lantai user) + path(lift lantai tujuan → POI)
 - Nilai turunan tidak lagi berupa field yang bisa diketik di Inspector → **wajib ditampilkan read-only** lewat Inspector kustom, supaya tetap bisa di-spot-check.
 
 **Risiko residual (diakui):** hilangnya kemampuan meng-override nama per-POI untuk kasus khusus (mis. nama tampilan sengaja beda dari label SDK). Kalau kebutuhan itu benar-benar muncul, tambahkan field override opsional yang **kosong secara default** dan hanya dipakai bila diisi — jangan kembali menyimpan salinan penuh (YAGNI sampai terbukti perlu). Penurunan `floor` dari prefix nama GameObject (`[Ground]`/`[Lantai1]`) mengandalkan konvensi penamaan; kalau konvensi dilanggar, penurunan gagal — Inspector harus menampilkan kegagalan itu secara mencolok, bukan diam.
+
+---
+
+### ADR-022 — Validasi Lapangan WebXR AR Runtime, kamera aktif jernih (`showMesh: false`), & model 3D panah kustom (2026-07-28)
+
+**Pemicu:** Pengujian WebXR AR runtime (`DARSI-Indoor-Navigation-WebXR`) di lokasi RS Jemursari (2026-07-28). Terkonfirmasi user berada di Lantai 2, namun sempat mempertanyakan tampilan visual mesh diagnostik yang offset serta visibilitas kamera dunia nyata.
+
+**Keputusan:**
+1. **Validasi Lantai 2 Terkonfirmasi:** Diskriminasi lantai berbasis elevasi `position.Y >= 1.5m` (Map Set Space) terbukti valid dan akurat di lapangan (Lantai 2 ter-localize dengan koordinat $Y \approx 3.8\text{m}$, $X \approx -1.56\text{m}$, $Z \approx 39.58\text{m}$).
+2. **Kamera Asli Aktif Jernih (`showMesh: false`):** Mesh 3D diagnostik gedung dimatikan (`showMesh: false`). Tampilan video kamera dunia nyata dari HP (ARCore via WebXR) aktif 100% transparan sebagai latar belakang AR. Hal ini **tidak mempengaruhi kinerja VPS/lokalisasi**, dan justru **mengurangi beban render GPU Three.js** karena tidak perlu me-render mesh 3D fisik gedung.
+3. **Integrasi Model 3D Panah Kustom (`public/models/arrow.gltf`):** Objek visual petunjuk arah menggunakan file 3D model GLTF kustom yang diletakkan di `public/models/`, di-scale secara dinamis (~0.35m), dan terotasi secara real-time mengarah ke POI tujuan di setiap frame AR (`onXRFrame`).
+4. **Rekam POI Lapangan (Tandai-di-Web):** Fitur rekam titik POI langsung di lokasi via tombol `REKAM POI 📍` sukses menghasilkan snippet JSON map-space untuk disimpan ke `public/data/pois.json` dan dipanggil via `?poiId=...`.
