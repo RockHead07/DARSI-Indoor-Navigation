@@ -352,3 +352,25 @@ jarak = path(user → lift lantai user) + path(lift lantai tujuan → POI)
 2. **Kamera Asli Aktif Jernih (`showMesh: false`):** Mesh 3D diagnostik gedung dimatikan (`showMesh: false`). Tampilan video kamera dunia nyata dari HP (ARCore via WebXR) aktif 100% transparan sebagai latar belakang AR. Hal ini **tidak mempengaruhi kinerja VPS/lokalisasi**, dan justru **mengurangi beban render GPU Three.js** karena tidak perlu me-render mesh 3D fisik gedung.
 3. **Integrasi Model 3D Panah Kustom (`public/models/arrow.gltf`):** Objek visual petunjuk arah menggunakan file 3D model GLTF kustom yang diletakkan di `public/models/`, di-scale secara dinamis (~0.35m), dan terotasi secara real-time mengarah ke POI tujuan di setiap frame AR (`onXRFrame`).
 4. **Rekam POI Lapangan (Tandai-di-Web):** Fitur rekam titik POI langsung di lokasi via tombol `REKAM POI 📍` sukses menghasilkan snippet JSON map-space untuk disimpan ke `public/data/pois.json` dan dipanggil via `?poiId=...`.
+
+---
+
+### ADR-023 — Kualitas capture untuk launching: Insta360 dipertimbangkan, digerbangi cek dukungan Pano MultiSet dulu (2026-08-10)
+
+**Status: ⏸ BELUM DIPUTUSKAN** — dicatat sebagai rencana lintas-repo, bukan keputusan final. Dicatat identik di kedua repo yang memakai MultiSet (repo ini, `com.multiset.sdk` v1.11.5 — dan `DARSI-Indoor-Navigation-WebXR`, `@multisetai/vps` ^2.3.1) supaya keputusan Insta360 tidak diambil dua kali secara terpisah dan tidak konsisten.
+
+**Pemicu:** Menjelang pembuatan final/launching, pemilik project mempertimbangkan kamera **Insta360 X4/X5** untuk map yang lebih imersif dibanding hasil LiDAR (`MultiSet Mapper`) yang dipakai sekarang. Bersamaan dengan itu, MultiSet merilis (v2.2.0, 2026-07-30) **Pano 360° Virtual Tour API** (`/v1/pano/*`) — tur 360° yang bisa dijelajahi, dibangun dari node berisi posisi, rotasi, dan gambar panorama.
+
+**Yang sudah terverifikasi:**
+- Syarat Pano API eksplisit: *"Limited to 360 (Insta360) maps that have been processed for panoramic tours"* — map yang tidak diproses lewat jalur itu balas 404. **Map LiDAR yang sudah ada tidak otomatis dapat fitur ini**, meski format impor "foto/360°" sudah disebut di protokol scan repo WebXR — dua hal itu berbeda, jangan disamakan.
+- v2.2.0 juga membawa **Map Scale API**, khusus mengoreksi skala metrik pada map Insta360 *standalone* — konfirmasi tambahan bahwa jalur Insta360 punya pipeline pemrosesan sendiri, terpisah dari jalur LiDAR/point-cloud yang dipakai kedua repo saat ini.
+- Auth: endpoint pano tunduk pada model scope yang sama (Query/Write/Delete) dengan endpoint VPS yang sudah dipakai, tapi **belum diverifikasi** apakah scope `Query` yang ada sekarang otomatis mencakup `/v1/pano/*`.
+
+**Keputusan (rencana, bukan final):**
+1. **Sebelum membeli Insta360 X4/X5**, cek dulu apakah MultiSet sudah mendukung 360 secara umum untuk map yang relevan — verifikasi lewat `GET /v1/pano` dengan credential yang ada, dan cek apakah ada alur uji coba murah (mis. video 360 dari HP) sebelum investasi kamera dedicated.
+2. Digerbangi ke **fase pra-launch** di kedua repo — tidak mengganggu prioritas berjalan (Fase 0–5 di repo ini; data POI/tikungan/akurasi di repo WebXR).
+3. Kalau jadi dipakai, pano 360 berperan sebagai **lapisan visual tambahan** (tur immersive, atau kandidat fallback saat VPS gagal localize) — **bukan pengganti** point cloud/LiDAR yang sudah terbukti jalan untuk lokalisasi.
+
+**Alasan:** jangan beli hardware sebelum membuktikan software-nya mendukung use case-nya. MultiSet baru merilis fitur pano 11 hari sebelum catatan ini ditulis — belum ada bukti lapangan bahwa alur Insta360→MultiSet cocok dengan koridor RS (sempit, berulang, minim tekstur) yang jadi kasus DARSI.
+
+**Konsekuensi:** tidak ada perubahan kode dari ADR ini di kedua repo. Salinan lengkap ada di `DARSI-Indoor-Navigation-WebXR/docs/DECISIONS.md` (ADR-W013) — kalau salah satu diperbarui (mis. hasil verifikasi `GET /v1/pano`), perbarui juga yang satunya.

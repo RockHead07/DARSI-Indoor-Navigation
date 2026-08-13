@@ -298,3 +298,4 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 - **Foto POI asli.** Kolom `photos` masih kosong → UI render placeholder. Isi URL setelah foto kampus ada.
 - **Release build + kecilin APK.** Ganti `--debug` → `--release` (~300MB → ~150-180MB, strip symbol + R8). Untuk demo/distribusi.
 - **Re-entry AR dgn POI berbeda.** Setelah balik dari AR (Unity paused), masuk lagi dgn POI lain: `DarsiUnityActivity` singleTask → `onNewIntent`, tapi `UaaLEntryPoint` baca intent cuma di `Start()`. Perlu handle intent baru saat resume kalau mau ganti tujuan tanpa restart Unity.
+- **Capture map kualitas launching (Insta360 vs LiDAR).** Digerbangi ke fase pra-launch — cek dukungan Pano 360 MultiSet dulu sebelum beli hardware (ADR-023, dicatat identik di repo WebXR sebagai ADR-W013).
