@@ -1,17 +1,11 @@
-name: Backend Service CI 🐍
+name: Reusable Backend Tests
 
 on:
-  push:
-    paths:
-      - 'Backend/**'
-  pull_request:
-    paths:
-      - 'Backend/**'
-  workflow_dispatch:
+  workflow_call:
 
 jobs:
   test-backend:
-    name: Test & Lint Python YOLO API
+    name: Test & Lint Python API
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -34,7 +28,7 @@ jobs:
           pip install ruff pytest
           if [ -f Backend/requirements.txt ]; then pip install -r Backend/requirements.txt; fi
 
-      - name: Code Quality & Syntax Check
+      - name: Code Quality & Syntax Check (Ruff)
         run: |
           ruff check Backend/
 

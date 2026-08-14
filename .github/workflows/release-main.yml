@@ -1,0 +1,15 @@
+name: Release Pipeline 🚀
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  run-unity-tests:
+    uses: ./.github/workflows/_unity-tests.yml
+    secrets: inherit
+
+  build-unity-uaal:
+    needs: run-unity-tests
+    uses: ./.github/workflows/_unity-build-uaal.yml
+    secrets: inherit

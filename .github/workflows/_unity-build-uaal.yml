@@ -1,16 +1,26 @@
-name: Unity UaaL Android Export & Release 🤖
+name: Reusable Unity Build UaaL
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
-    tags: [ 'v*.*.*' ]
+  workflow_call:
 
 jobs:
   build-uaal-android:
     name: Export Unity as a Library (Android)
     runs-on: ubuntu-latest
+    env:
+      DISPATCH_TOKEN: ${{ secrets.FLUTTER_DISPATCH_TOKEN }}
     steps:
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
@@ -34,6 +44,14 @@ jobs:
           targetPlatform: Android
           customParameters: -executeMethod UaaLBuildScript.BuildAndroidUaaL
 
+      - name: Upload Unity Editor Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unity-Editor-Log-Build
+          path: ~/.config/unity3d/**/*.log
+          retention-days: 7
+
       - name: Compress Exported UaaL Module
         run: |
           cd Builds/AndroidUaaL
@@ -47,10 +65,10 @@ jobs:
           retention-days: 14
 
       - name: Trigger Flutter Host App Pipeline (MyRSIy)
-        if: secrets.FLUTTER_DISPATCH_TOKEN != ''
+        if: env.DISPATCH_TOKEN != ''
         uses: peter-evans/repository-dispatch@v3
         with:
-          token: ${{ secrets.FLUTTER_DISPATCH_TOKEN }}
+          token: ${{ env.DISPATCH_TOKEN }}
           repository: RockHead07/MyRSIy
           event-type: unity-uaal-updated
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'

@@ -1,0 +1,14 @@
+name: PR Validation 🛡️
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  run-backend-tests:
+    uses: ./.github/workflows/_backend-tests.yml
+    secrets: inherit
+
+  run-unity-tests:
+    uses: ./.github/workflows/_unity-tests.yml
+    secrets: inherit
