@@ -3,6 +3,10 @@ name: Reusable Unity Tests
 on:
   workflow_call:
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   unity-tests:
     name: Unity EditMode & PlayMode Tests

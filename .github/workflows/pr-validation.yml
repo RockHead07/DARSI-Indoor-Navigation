@@ -10,5 +10,8 @@ jobs:
     secrets: inherit
 
   run-unity-tests:
+    permissions:
+      contents: read
+      checks: write
     uses: ./.github/workflows/_unity-tests.yml
     secrets: inherit
