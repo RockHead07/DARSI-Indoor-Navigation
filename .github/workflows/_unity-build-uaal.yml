@@ -42,7 +42,11 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: Android
-          customParameters: -executeMethod UaaLBuildScript.BuildAndroidUaaL
+          # buildMethod, BUKAN customParameters: unity-builder sudah mengirim
+          # -executeMethod miliknya sendiri, jadi menambah satu lagi lewat
+          # customParameters menghasilkan ArgumentException "duplicate key:
+          # executeMethod" (lihat docs/CICD.md §7).
+          buildMethod: UaaLBuildScript.BuildAndroidUaaL
 
       - name: Upload Unity Editor Log on Failure
         if: failure()
