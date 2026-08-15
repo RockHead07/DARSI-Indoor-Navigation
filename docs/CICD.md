@@ -123,5 +123,64 @@ Untuk mempercepat build Unity di GitHub Actions:
 | `This action is no longer supported` | Action sudah dipensiunkan upstream | Cari pengganti resmi di docs upstream — jangan cuma ganti versi |
 | Ruff gagal di `_backend-tests.yml` | Pelanggaran lint nyata di `Backend/` | `ruff check Backend/` lokal untuk lihat detail, banyak yang `--fix`-able |
 | `build-unity-uaal` skip (`-`) padahal push ke main | `run-unity-tests` gagal duluan — `needs:` mencegah build jalan | Perbaiki test Unity dulu |
+| `Resource not accessible by integration` saat post hasil test | `GITHUB_TOKEN` tanpa `checks: write` | Sudah diperbaiki (commit `47a5926`) — blok `permissions:` eksplisit |
+| `ArgumentException: ... Key: executeMethod` | **`-executeMethod` ganda** — lihat §7 | Pakai input `buildMethod:`, bukan `customParameters` |
+| `.meta file ... does not have a valid GUID` | GUID placeholder, bukan 32-hex — lihat §7 | Hapus `.meta`-nya, biarkan Unity regenerate |
 
 Cek status run terkini: `gh run list --limit 10` (butuh `gh auth login` sekali).
+
+---
+
+## 🐞 7. Blocker Aktif — `build-unity-uaal` gagal (per 2026-08-15)
+
+**Status pipeline:** `run-unity-tests` ✅ **LOLOS** (sejak `47a5926`). Gagal berpindah ke
+tahap berikutnya yang **belum pernah tercapai sebelumnya** — jadi ini kemajuan, bukan
+kemunduran. Dua bug bertumpuk, keduanya harus beres.
+
+### Bug 1 — `-executeMethod` ganda
+
+```
+ArgumentException: An item with the same key has already been added. Key: executeMethod
+executeMethod method UnityBuilderAction.Builder.BuildProject threw exception.
+Build failed, with exit code 1
+```
+
+`game-ci/unity-builder@v4` **sudah** mengirim `-executeMethod UnityBuilderAction.Builder.BuildProject`
+miliknya sendiri (terlihat di log: `CUSTOM_PARAMETERS=-executeMethod UaaLBuildScript.BuildAndroidUaaL`
+digabung dengan milik action). Kita menambahkan satu lagi lewat `customParameters` di
+[`_unity-build-uaal.yml`](file:///.github/workflows/_unity-build-uaal.yml) baris 45 →
+duplikat key → crash.
+
+**Perbaikan:** pakai input **`buildMethod:`** milik action (memang disediakan untuk ini),
+jangan menjejalkan `-executeMethod` ke `customParameters`.
+
+### Bug 2 — GUID `.meta` tidak valid
+
+```
+The .meta file Assets/Editor/UaaLBuildScript.cs.meta does not have a valid GUID
+and its corresponding Asset file will be ignored
+```
+
+Isi `Assets/Editor/UaaLBuildScript.cs.meta`:
+```yaml
+guid: dynamic_guid_uaal_build_script_001    # ← placeholder, bukan GUID 32-hex
+```
+
+Unity **mengabaikan `UaaLBuildScript.cs` sepenuhnya**. Artinya meski Bug 1 diperbaiki,
+method `UaaLBuildScript.BuildAndroidUaaL` tetap **tidak akan ditemukan**.
+
+**Perbaikan:** hapus file `.meta`-nya dan biarkan Unity regenerate saat project dibuka
+(GUID valid = 32 karakter heksadesimal, bandingkan dengan `.meta` sehat mana pun di repo).
+
+### Catatan tambahan dari log yang sama (belum tentu fatal)
+
+```
+Error: Unsupported video codec 'VP9' found in Assets/video/video.webm
+Error while reading movie: Assets/video/Desain tanpa judul.mp4
+Error while reading movie: Assets/video/download.mp4
+```
+
+Tiga file video di `Assets/video/` gagal di-import di runner Linux. **[Belum diverifikasi]**
+apakah ini ikut menggagalkan build atau sekadar error impor yang ditoleransi — build sudah
+gagal duluan karena Bug 1. Cek ulang setelah Bug 1 & 2 beres; kalau masih muncul,
+pertimbangkan transcode ke codec yang didukung atau keluarkan dari `Assets/` bila tak dipakai.
