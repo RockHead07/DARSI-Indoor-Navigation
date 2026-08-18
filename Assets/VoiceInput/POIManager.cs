@@ -23,49 +23,37 @@ public class POIManager : MonoBehaviour
 
     private static readonly Dictionary<string, string[]> sinonimMap = new Dictionary<string, string[]>
     {
-        { "MMB Studio", new[] { 
-            "studio", "mmb", "multimedia", "lab multimedia", 
-            "studio multimedia", "ruang mmb", "lab mmb" 
+        { "IGD", new[] {
+            "darurat", "gawat darurat", "emergency", "instalasi gawat darurat",
+            "unit gawat darurat", "ugd"
         }},
-        { "Lab Teori 203", new[] { 
-            "lab 203", "teori 203", "ruang 203", "dua kosong tiga",
-            "laboratorium 203", "kelas 203"
+        { "Farmasi", new[] {
+            "apotek", "apotik", "obat", "ambil obat", "beli obat", "tebus resep"
         }},
-        { "Lab Teori 202", new[] { 
-            "lab 202", "teori 202", "ruang 202", "dua kosong dua",
-            "laboratorium 202", "kelas 202"
+        { "Radiology", new[] {
+            "radiologi", "ct scan", "usg", "mri"
         }},
-        { "Lab Teori 201", new[] { 
-            "lab 201", "teori 201", "ruang 201", "dua kosong satu",
-            "laboratorium 201", "kelas 201"
+        { "Ruang X-Ray", new[] {
+            "rontgen", "x ray", "foto rontgen", "sinar x", "roentgen"
         }},
-        { "Lab Mikrotik", new[] { 
-            "mikrotik", "lab jaringan", "jaringan", "networking",
-            "lab network", "ruang mikrotik", "cisco"
+        { "Resepsionis", new[] {
+            "pendaftaran", "informasi", "front office", "daftar",
+            "customer service", "cs"
         }},
-        { "Mushola", new[] { 
-            "masjid", "sholat", "solat", "salat", "ibadah",
-            "musholla", "sembahyang", "ngaji", "wudhu",
-            "mau salat", "mau sholat", "tempat sholat",
-            "tempat ibadah", "surau"
+        { "Toilet", new[] {
+            "kamar mandi", "wc", "kamar kecil", "toilet umum"
         }},
-        { "BAAK", new[] { 
-            "administrasi", "tata usaha", "akademik", "surat",
-            "baak", "biro", "administrasi akademik",
-            "ngurus surat", "legalisir", "transkrip"
+        { "Lift", new[] {
+            "elevator", "naik lift", "turun lift"
         }},
-        { "Perpustakaan", new[] { 
-            "perpus", "library", "buku", "pustaka",
-            "ruang baca", "baca buku", "cari buku",
-            "pinjam buku", "referensi"
+        { "Parkir Mobil", new[] {
+            "parkir", "parkiran mobil", "tempat parkir mobil"
         }},
-        { "Lab 102", new[] { 
-            "lab seratus dua", "ruang 102", "satu kosong dua",
-            "laboratorium 102", "kelas 102", "102"
+        { "Parkir Motor Karyawan", new[] {
+            "parkir motor", "parkiran motor", "parkir karyawan"
         }},
-        { "Lab 103", new[] { 
-            "lab seratus tiga", "ruang 103", "satu kosong tiga",
-            "laboratorium 103", "kelas 103", "103"
+        { "Ground", new[] {
+            "lobi", "lantai dasar", "pintu masuk", "entrance", "gerbang masuk"
         }},
     };
 

@@ -17,6 +17,13 @@ public class OllamaConnector : MonoBehaviour
     public string modelName = "llama3.2:latest";
     public bool useHttps = false;
 
+    [Header("Groq Fallback (Opsional)")]
+    [Tooltip("Dipakai otomatis kalau Ollama lokal tidak terjangkau setelah retry habis. Kosongkan untuk nonaktifkan fallback.")]
+    public string groqApiKey = "";
+    // llama-3.1-8b-instant dimatikan Groq utk free/developer tier per 2026-08-16 (404 kalau dipakai).
+    // openai/gpt-oss-20b = pengganti resmi yang direkomendasikan.
+    public string groqModel = "openai/gpt-oss-20b";
+
     // Event ketika koneksi gagal setelah retry habis, UI bisa tampilkan pesan error
     [Header("Events")]
     [Tooltip("Event dipanggil ketika koneksi Ollama gagal setelah retry habis.")]
@@ -37,36 +44,39 @@ public class OllamaConnector : MonoBehaviour
     private const int PREWARM_TIMEOUT = 60;
 
     private string OllamaURL => $"{(useHttps ? "https" : "http")}://{ollamaHost}:{ollamaPort}/api/generate";
+    private const string GroqURL = "https://api.groq.com/openai/v1/chat/completions";
 
     // System prompt khusus ekstrak POI — singkat dan terarah
     private const string SYSTEM_PROMPT = @"
-Kamu adalah sistem ekstraksi tujuan navigasi indoor di sebuah gedung kampus.
+Kamu adalah sistem ekstraksi tujuan navigasi indoor di RS Islam A. Yani.
 Tugasmu HANYA mengekstrak nama lokasi tujuan dari kalimat pengguna.
 
 PENTING:
 - Input berasal dari speech recognition, mungkin tidak sempurna
 - Pengguna berbicara informal, santai, atau campur bahasa
-- Normalize variasi ejaan: salat/sholat/solat = tempat ibadah
 - Jika ada nama lokasi yang mirip, pilih yang paling relevan
 
 Daftar lokasi yang tersedia:
-- MMB Studio (lab multimedia)
-- Lab Teori 201, 202, 203
-- Lab Mikrotik (lab jaringan)
-- Mushola (tempat ibadah, sholat, salat)
-- BAAK (administrasi akademik)
-- Perpustakaan
-- Lab 102, Lab 103
+- Ground (lobi, lantai dasar, pintu masuk)
+- IGD (Instalasi Gawat Darurat, unit darurat)
+- Farmasi (apotek, ambil obat)
+- Radiology
+- Ruang X-Ray (rontgen)
+- Resepsionis (pendaftaran, informasi)
+- Toilet
+- Lift
+- Parkir Mobil
+- Parkir Motor Karyawan
 
 Jawab HANYA dengan JSON berikut, tanpa teks lain:
 {""poi"": ""nama lokasi sesuai daftar di atas""}
 
 Contoh:
-Input: ""aku mau salat"" → Output: {""poi"": ""Mushola""}
-Input: ""perpus mana ya"" → Output: {""poi"": ""Perpustakaan""}
-Input: ""mau ngurus surat"" → Output: {""poi"": ""BAAK""}
-Input: ""lab dua kosong tiga"" → Output: {""poi"": ""Lab Teori 203""}
-Input: ""mau ke studio"" → Output: {""poi"": ""MMB Studio""}
+Input: ""mau ambil obat"" → Output: {""poi"": ""Farmasi""}
+Input: ""ini darurat, ke IGD"" → Output: {""poi"": ""IGD""}
+Input: ""mau daftar dulu"" → Output: {""poi"": ""Resepsionis""}
+Input: ""mau rontgen"" → Output: {""poi"": ""Ruang X-Ray""}
+Input: ""kamar mandi dimana"" → Output: {""poi"": ""Toilet""}
 
 Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
 ";
@@ -125,14 +135,88 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
         }
     }
 
+    // Groq (cloud) jadi utama — Ollama lokal cuma dipakai kalau Groq gagal/kosong,
+    // supaya tidak perlu nyala-matikan Ollama terus demi hemat RAM.
     public IEnumerator ExtractPOI(string spokenText, Action<string> onResult)
     {
-        // Tandai sedang proses agar UI bisa tampilkan loading
         IsProcessing = true;
+        Debug.Log($"[Voice] Mengirim: {spokenText}");
 
+        bool ok = false;
+        string poiName = null;
+
+        if (!string.IsNullOrEmpty(groqApiKey))
+        {
+            Debug.Log("[Voice] Mencoba Groq (utama)...");
+            yield return TryGroq(spokenText, (success, poi) => { ok = success; poiName = poi; });
+        }
+
+        if (!ok)
+        {
+            if (!string.IsNullOrEmpty(groqApiKey))
+                Debug.LogWarning("[Voice] Groq tidak terjangkau, fallback ke Ollama lokal...");
+            yield return TryOllama(spokenText, (success, poi) => { ok = success; poiName = poi; });
+        }
+
+        if (!ok)
+        {
+            Debug.LogError("[Voice] Groq dan Ollama dua-duanya gagal/tidak tersedia.");
+            onConnectionFailed?.Invoke();
+            onResult?.Invoke(null);
+            IsProcessing = false;
+            yield break;
+        }
+
+        Debug.Log($"[Voice] POI extracted: {poiName}");
+        onResult?.Invoke(poiName);
+        IsProcessing = false;
+    }
+
+    // ponytail: groqApiKey ikut ter-bundle ke APK (field publik, tersimpan di scene/prefab) —
+    // cukup untuk demo/uji lapangan, tapi bisa diekstrak siapapun yang decompile APK-nya.
+    // Sebelum rilis produksi, pindahkan panggilan Groq ke backend proxy supaya key tidak
+    // pernah ikut ke client.
+    private IEnumerator TryGroq(string spokenText, Action<bool, string> onDone)
+    {
         string prompt = $"{SYSTEM_PROMPT}\nInput: \"{spokenText}\"\nOutput:";
 
-        // Buat request body
+        string requestBody = JsonUtility.ToJson(new GroqRequest
+        {
+            model = groqModel,
+            messages = new[] { new GroqMessage { role = "user", content = prompt } },
+            temperature = 0f
+        });
+
+        using (UnityWebRequest request = new UnityWebRequest(GroqURL, "POST"))
+        {
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(requestBody);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Authorization", $"Bearer {groqApiKey}");
+            request.timeout = 30;
+
+            yield return request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning($"[Groq] Gagal: {request.error}");
+                onDone?.Invoke(false, null);
+                yield break;
+            }
+
+            Debug.Log($"[Groq] Response raw: {request.downloadHandler.text}");
+            GroqResponse groqResponse = JsonUtility.FromJson<GroqResponse>(request.downloadHandler.text);
+            string generatedText = groqResponse.choices[0].message.content.Trim();
+            Debug.Log($"[Groq] Generated: {generatedText}");
+
+            onDone?.Invoke(true, ParsePOIFromJson(generatedText));
+        }
+    }
+
+    private IEnumerator TryOllama(string spokenText, Action<bool, string> onDone)
+    {
+        string prompt = $"{SYSTEM_PROMPT}\nInput: \"{spokenText}\"\nOutput:";
         string requestBody = JsonUtility.ToJson(new OllamaRequest
         {
             model = modelName,
@@ -140,11 +224,6 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
             stream = false,
             think = false // Mematikan thinking mode untuk qwen3:8b
         });
-
-        Debug.Log($"[Ollama] Mengirim: {spokenText}");
-
-        string responseText = null; // Simpan response jika berhasil
-        bool requestSucceeded = false; // Flag keberhasilan
 
         // Loop retry: coba MAX_ATTEMPTS kali (percobaan awal + 1 retry)
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)
@@ -164,50 +243,25 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
 
                 if (request.result == UnityWebRequest.Result.Success)
                 {
-                    // Berhasil — simpan response, keluar loop
-                    responseText = request.downloadHandler.text;
-                    requestSucceeded = true;
                     Debug.Log($"[Ollama] Berhasil di percobaan ke-{attempt}");
-                    break;
+                    OllamaResponse ollamaResponse = JsonUtility.FromJson<OllamaResponse>(request.downloadHandler.text);
+                    string generatedText = ollamaResponse.response.Trim();
+                    Debug.Log($"[Ollama] Generated: {generatedText}");
+                    onDone?.Invoke(true, ParsePOIFromJson(generatedText));
+                    yield break;
                 }
-                else
+
+                Debug.LogWarning($"[Ollama] Gagal percobaan ke-{attempt}: {request.error}");
+                if (attempt < MAX_ATTEMPTS)
                 {
-                    Debug.LogWarning($"[Ollama] Gagal percobaan ke-{attempt}: {request.error}");
-                    // Jika belum percobaan terakhir, tunggu sebelum retry
-                    if (attempt < MAX_ATTEMPTS)
-                    {
-                        Debug.Log($"[Ollama] Menunggu {RETRY_DELAY_SECONDS}s sebelum retry...");
-                        yield return new WaitForSeconds(RETRY_DELAY_SECONDS);
-                    }
+                    Debug.Log($"[Ollama] Menunggu {RETRY_DELAY_SECONDS}s sebelum retry...");
+                    yield return new WaitForSeconds(RETRY_DELAY_SECONDS);
                 }
             }
         }
 
-        // Semua percobaan gagal
-        if (!requestSucceeded)
-        {
-            Debug.LogError($"[Ollama] Semua {MAX_ATTEMPTS} percobaan gagal. Server tidak tersedia.");
-            // Panggil event agar UI bisa tampilkan "Server tidak tersedia"
-            onConnectionFailed?.Invoke();
-            onResult?.Invoke(null);
-            IsProcessing = false; // Selesai proses
-            yield break;
-        }
-
-        // Berhasil — parse response
-        Debug.Log($"[Ollama] Response raw: {responseText}");
-
-        // Parse response Ollama
-        OllamaResponse ollamaResponse = JsonUtility.FromJson<OllamaResponse>(responseText);
-        string generatedText = ollamaResponse.response.Trim();
-        Debug.Log($"[Ollama] Generated: {generatedText}");
-
-        // Parse JSON poi dari generated text
-        string poiName = ParsePOIFromJson(generatedText);
-        Debug.Log($"[Ollama] POI extracted: {poiName}");
-
-        onResult?.Invoke(poiName);
-        IsProcessing = false; // Selesai proses
+        Debug.LogWarning($"[Ollama] Semua {MAX_ATTEMPTS} percobaan gagal. Server lokal tidak tersedia.");
+        onDone?.Invoke(false, null);
     }
 
     string ParsePOIFromJson(string jsonText)
@@ -252,5 +306,32 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
     class POIResult
     {
         public string poi;
+    }
+
+    [Serializable]
+    class GroqRequest
+    {
+        public string model;
+        public GroqMessage[] messages;
+        public float temperature;
+    }
+
+    [Serializable]
+    class GroqMessage
+    {
+        public string role;
+        public string content;
+    }
+
+    [Serializable]
+    class GroqResponse
+    {
+        public GroqChoice[] choices;
+    }
+
+    [Serializable]
+    class GroqChoice
+    {
+        public GroqMessage message;
     }
 }
