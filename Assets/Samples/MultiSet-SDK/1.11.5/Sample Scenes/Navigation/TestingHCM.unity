@@ -361,7 +361,7 @@ MonoBehaviour:
   ollamaPort: 11434
   modelName: qwen3:8b
   useHttps: 0
-  groqApiKey:
+  groqApiKey: 
   groqModel: openai/gpt-oss-20b
   onConnectionFailed:
     m_PersistentCalls:

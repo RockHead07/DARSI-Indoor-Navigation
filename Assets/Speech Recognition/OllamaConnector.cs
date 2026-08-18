@@ -37,8 +37,10 @@ public class OllamaConnector : MonoBehaviour
     [Tooltip("Referensi ke TextMeshPro untuk menampilkan status pre-warm. Boleh kosong.")]
     public TMP_Text txtStatus;
 
-    // Jumlah maksimal percobaan (1 awal + 1 retry = 2)
-    private const int MAX_ATTEMPTS = 2;
+    // Ollama sekarang cuma fallback (Groq utama) — kalau tidak kejangkau (beda jaringan
+    // dari LAN rumah), retry ke IP yang sama tidak akan membantu. Satu percobaan saja,
+    // supaya gagalnya cepat, bukan bikin user nunggu lama tanpa hasil.
+    private const int MAX_ATTEMPTS = 1;
     // Jeda sebelum retry, memberi waktu server pulih
     private const float RETRY_DELAY_SECONDS = 2f;
     // Timeout lebih panjang untuk pre-warm karena model besar butuh waktu load ke RAM
@@ -249,8 +251,9 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
-                // Timeout diubah 15 -> 30 detik, LLM lokal butuh waktu lebih lama
-                request.timeout = 30;
+                // Fallback best-effort: 8 detik cukup buat LAN yang benar-benar kejangkau,
+                // gagal cepat kalau memang beda jaringan (bukan 30 detik x 2 percobaan lagi).
+                request.timeout = 8;
 
                 yield return request.SendWebRequest();
 
