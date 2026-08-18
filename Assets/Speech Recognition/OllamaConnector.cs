@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Events; // Ditambahkan: untuk UnityEvent agar bisa kirim event ke UI
@@ -85,6 +86,18 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
     {
         if (instance == null) instance = this;
         else Destroy(gameObject);
+
+#if UNITY_EDITOR
+        // Baca key dari file lokal (gitignored) kalau field Inspector kosong — supaya key
+        // asli tidak pernah tersimpan di scene/prefab yang di-track git. Isi filenya sendiri,
+        // satu baris berisi key, di root project: groq-api-key.local.txt
+        if (string.IsNullOrEmpty(groqApiKey))
+        {
+            string path = Path.Combine(Application.dataPath, "..", "groq-api-key.local.txt");
+            if (File.Exists(path))
+                groqApiKey = File.ReadAllText(path).Trim();
+        }
+#endif
     }
 
     void Start()

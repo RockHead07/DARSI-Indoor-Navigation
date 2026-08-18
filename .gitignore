@@ -11,6 +11,11 @@
 # Get latest from https://github.com/github/gitignore/blob/main/Unity.gitignore
 #
 .utmp/
+
+# Groq API key — dibaca dari file lokal ini di Editor (OllamaConnector.cs),
+# JANGAN pernah diisi langsung ke field Inspector (ikut ter-serialize ke scene).
+groq-api-key.local.txt
+
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
