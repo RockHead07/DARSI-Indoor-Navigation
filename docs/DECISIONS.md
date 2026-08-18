@@ -374,3 +374,41 @@ jarak = path(user → lift lantai user) + path(lift lantai tujuan → POI)
 **Alasan:** jangan beli hardware sebelum membuktikan software-nya mendukung use case-nya. MultiSet baru merilis fitur pano 11 hari sebelum catatan ini ditulis — belum ada bukti lapangan bahwa alur Insta360→MultiSet cocok dengan koridor RS (sempit, berulang, minim tekstur) yang jadi kasus DARSI.
 
 **Konsekuensi:** tidak ada perubahan kode dari ADR ini di kedua repo. Salinan lengkap ada di `DARSI-Indoor-Navigation-WebXR/docs/DECISIONS.md` (ADR-W013) — kalau salah satu diperbarui (mis. hasil verifikasi `GET /v1/pano`), perbarui juga yang satunya.
+
+---
+
+### ADR-024 — Voice input: Groq (cloud) jadi provider utama, Ollama lokal turun jadi fallback (2026-08-18)
+
+**Keputusan:** Urutan provider LLM untuk ekstraksi tujuan navigasi dari suara dibalik. Sebelumnya Ollama lokal satu-satunya; sekarang **Groq dicoba lebih dulu**, Ollama cuma dipakai kalau Groq gagal atau `groqApiKey` kosong.
+
+**Pemicu:** Ollama lokal (`OllamaConnector.ollamaHost`, hardcoded IP LAN) cuma kejangkau kalau HP dan laptop satu WiFi. Di lapangan (RS/kampus) itu tidak realistis — pemilik project juga tidak selalu bisa membuka laptop di lokasi. Menyalakan Ollama terus-menerus juga memakan RAM tanpa hasil.
+
+**Yang berubah di kode:**
+- `ExtractPOI()` → `TryGroq()` dulu, `TryOllama()` sebagai cadangan. Dua-duanya berbagi `SYSTEM_PROMPT` & parser yang sama.
+- `groqModel` default `openai/gpt-oss-20b`. **Bukan** `llama-3.1-8b-instant` — model itu resmi dimatikan Groq untuk free/developer tier per **2026-08-16** dan membalas **404** (terverifikasi di lapangan, bukan dugaan).
+- Timeout fallback Ollama dipangkas `30s × 2 percobaan` → `8s × 1 percobaan`. Retry ke IP LAN yang sama saat memang beda jaringan tidak pernah berhasil, cuma bikin user menunggu hampir semenit.
+- `SYSTEM_PROMPT` diganti dari daftar lokasi **kampus lama** (MMB Studio, Lab Mikrotik, BAAK, dst — sisa scene lama) ke 10 POI RS yang benar-benar ada di scene aktif. `POIManager.sinonimMap` ikut disesuaikan.
+
+**Kredensial:** `groqApiKey` **tidak boleh diisi lewat Inspector** — field publik ikut ter-serialize ke file scene yang di-track git, dan itu sempat kejadian (key ter-commit ke dua scene, dibersihkan sebelum ter-push). Sekarang `Awake()` membaca `groq-api-key.local.txt` di root project (gitignored) kalau field-nya kosong. Untuk rilis produksi, key tetap perlu pindah ke **backend proxy** — APK bisa di-decompile (catatan `ponytail:` ada di kodenya).
+
+**Pengecualian tercatat terhadap CLAUDE.md:** `OllamaConnector.cs` masuk daftar "jangan diubah tanpa alasan kuat". Perubahan ini disengaja & disetujui pemilik project: prompt-nya faktual salah (konteks kampus di app rumah sakit) dan provider lokal terbukti tidak workable di lapangan. Sama seperti ADR-021 untuk `POIData.cs`, ini dicatat, bukan penyimpangan diam-diam.
+
+---
+
+### ADR-025 — Validasi akurasi VPS: HUD ground-truth admin-only, ukur manual pakai meteran (2026-08-18)
+
+**Keputusan:** Akurasi lokalisasi divalidasi dengan **HUD diagnostik di dalam app + pengukuran meteran manual**, bukan sistem logging otomatis. HUD digerbangi mode admin (5× tap di logo DARSI dalam 10 detik, status disimpan di `PlayerPrefs`).
+
+**Pemicu:** Dosen pembimbing (Pak Amma) meminta bukti akurasi posisi yang bisa dibandingkan ke dunia nyata — *"posisi real di titik 1m,1m, di MultiSet ternyata 90cm,90cm"*. Sebelum ini **belum pernah ada angka akurasi sama sekali** di project: yang selama ini terukur cuma *repeatability* (konsistensi antar-localize di titik sama), dan itu **bukan** akurasi. Repo WebXR sudah lebih dulu menabrak jebakan ini (lihat `KNOWN-ISSUES.md` di sana: *"geser kecil = REPEATABILITY, BUKAN AKURASI"*).
+
+**Yang diukur (dua hal terpisah, jangan dicampur):**
+1. **Repeatability** — tekan "Set Titik 0" di POI awal, jalan ke POI lain, balik ke titik fisik yang sama. Kalau HUD menunjukkan Δ mendekati 0,0 lagi, VPS konsisten.
+2. **Akurasi** — bandingkan jarak yang ditampilkan HUD dengan jarak asli yang diukur meteran antar dua titik itu. Selisihnya = angka offset untuk laporan.
+
+**Isi HUD:** `pos(map)` XYZ, `Δx`/`Δz` dari titik 0, jarak datar dari titik 0, dan **confidence**. Confidence diambil dari `MultiSet.LocalizationSuccessResponse.confidence` (float) lewat event `SingleFrameLocalizationManager.OnLocalizationWithResponse` — ditemukan lewat reflection langsung ke SDK, bukan tebakan. Tanpa confidence, "akurat karena yakin" tidak bisa dibedakan dari "akurat kebetulan".
+
+**Sengaja TIDAK dibangun:** logging otomatis ke file, kalkulator offset di dalam app, PIN tambahan di gerbang admin. Angka dibaca dari layar dan dicatat manual — cara yang sama sudah terbukti cukup di repo WebXR, dan menambah mesin logging sekarang = infrastruktur tanpa pemakai.
+
+**Protokol lapangan (best practice, disepakati):** satu loop sekali jalan **tidak cukup** — ulangi 3–5× di pasangan POI yang sama supaya hasilnya rata-rata, bukan satu titik data yang bisa saja kebetulan. Saat melapor, **sebutkan jumlah percobaannya** ("rata-rata dari N=5"), jangan satu angka telanjang. Kalau waktu masih ada, tambah satu pasang POI di lokasi berbeda — akurasi VPS bisa berbeda antar-lokasi.
+
+**Implementasi:** `Assets/Scripts/LocalizationDebugHUD.cs` (UI dibangun runtime, tidak menyuntik YAML scene), terpasang di scene `TestingHCM` sebagai GameObject `DebugHUD`. Terverifikasi lewat Coplay: 5× tap mengubah `_isAdmin` false→true dan memunculkan panel. Confidence belum terisi di Editor (wajar — tidak ada localize sungguhan tanpa lokasi fisik yang cocok); **verifikasi di device masih tersisa**. Spec: `docs/superpowers/specs/2026-08-18-localization-ground-truth-hud-design.md`.

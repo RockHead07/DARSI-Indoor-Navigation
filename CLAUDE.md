@@ -20,6 +20,8 @@ DARSI adalah fitur AR indoor navigation untuk RS Islam A. Yani, di-embed ke app 
 
 **Pengecualian tercatat — `POIData.cs` (ADR-021, sign-off 2026-07-19).** Field `poiName`/`building`/`floor` diubah dari data tersimpan menjadi **diturunkan** (dari `POI.poiName` SDK, konstanta `POIData.BuildingName`, dan prefiks nama GameObject `[Ground]`/`[Lantai1]`). Ini BUKAN penyimpangan diam-diam: dilakukan karena duplikasi data manual terbukti melenceng di lapangan (ditemukan `[Lantai1] IGD` menyimpan nama `"Perpustakaan"` dari scene kampus lama). `POIData` sekarang hanya menyimpan yang benar-benar dimilikinya: `poiId`, `kategori`, `sinonim`. Baca ADR-021 sebelum menyentuh file ini lagi.
 
+**Pengecualian tercatat — `OllamaConnector.cs` + `POIManager.cs` (ADR-024, sign-off 2026-08-18).** Dua alasan kuat: (1) `SYSTEM_PROMPT` dan `sinonimMap` masih berisi lokasi **kampus lama** (MMB Studio, Lab Mikrotik, BAAK) padahal scene aktif sudah RS — faktual salah, bukan preferensi gaya; (2) Ollama lokal (IP LAN hardcoded) tidak workable di lapangan, jadi **Groq jadi provider utama, Ollama turun jadi fallback**. `groqApiKey` **jangan pernah diisi lewat Inspector** (ikut ter-serialize ke scene yang di-track git — sempat kejadian); isi `groq-api-key.local.txt` di root project (gitignored). Baca ADR-024 sebelum menyentuh file ini lagi.
+
 ## Alur kerja yang diharapkan
 
 1. Setiap task besar: baca ulang `docs/DECISIONS.md` dulu — cek apakah sudah ada ADR yang relevan sebelum mengusulkan pendekatan baru.

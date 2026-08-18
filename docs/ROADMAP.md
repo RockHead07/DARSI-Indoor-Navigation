@@ -292,6 +292,35 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 
 ---
 
+## Agenda uji lapangan berikutnya — validasi akurasi VPS (ADR-025)
+
+**Status: alat sudah siap, angkanya BELUM pernah diambil.** Ini permintaan eksplisit
+pembimbing (Pak Amma) untuk Laporan Kemajuan, dan sampai sekarang project **belum punya
+satu pun angka akurasi terhadap dunia nyata** — yang selama ini terukur cuma
+*repeatability*, dan itu bukan hal yang sama.
+
+**Bawa:** meteran/penggaris, selotip penanda titik, alat tulis. Lokasi yang disepakati:
+**PENS HCM Lantai 10**.
+
+**Langkah:**
+1. Buka app → **5× tap logo DARSI** (dalam 10 detik) → HUD admin muncul.
+2. Berdiri di POI awal → tekan **Set Titik 0** → HUD harus menampilkan Δ 0,0.
+3. Jalan ke POI kedua → catat `jarak dari titik 0` yang ditampilkan HUD **dan** `confidence`-nya.
+4. Ukur jarak fisik antara dua titik itu dengan meteran → catat.
+5. Balik ke POI awal (titik fisik yang sama persis) → catat apakah Δ kembali mendekati
+   0,0. Ini uji *repeatability*, **terpisah** dari akurasi.
+6. **Ulangi 3–5×.** Satu loop = satu titik data; bisa kebetulan bagus atau kebetulan jelek.
+
+**Cara melapor:** selisih (HUD − meteran) = angka offset. Sebutkan **jumlah percobaannya**
+("rata-rata dari N=5"), jangan satu angka telanjang. Kalau waktu masih ada, ulangi di
+pasangan POI lain — akurasi VPS bisa berbeda antar lokasi.
+
+**Belum diverifikasi di device:** HUD baru diuji di Editor (gerbang admin & panel terbukti
+jalan); `confidence` belum pernah terisi karena butuh localize sungguhan. Kunjungan ini
+sekaligus jadi validasi pertamanya.
+
+---
+
 ## Backlog / Known Issues (ditunda sadar — bukan bug yang harus segera)
 
 - **PERF-1 — Navigasi Indoor terasa berat.** Ditemukan 2026-07-04 saat tes device. Dugaan penyebab (urut dampak, BELUM diukur): (1) **debug build** — semua APK sejauh ini `--debug` (JIT, no AOT, debug asserts) → bukan performa asli; validasi harus di `--profile`/`--release` dulu. (2) **Unity residency** — desain T4.5 sengaja TIDAK destroy Unity (destroy = crash), jadi setelah masuk AR sekali engine Unity+IL2CPP+ARCore tetap di RAM (ratusan MB) → bikin WebView & app sluggish di HP mid-range. (3) **animasi `.darsi-pulse`** di WebView nge-animate `box-shadow` infinite (bukan GPU-composited → repaint tiap frame). **Best-practice sebelum eksekusi: ukur dulu** — build `--profile`, kalau ringan berarti cuma debug-overhead (fix lain jadi YAGNI); kalau masih berat, `dumpsys meminfo` buktikan Unity residency sebelum sentuh arsitektur (langkah berisiko). Fix (3) aman dikerjakan kapan saja (ganti box-shadow → `transform: scale`+`opacity`).
