@@ -397,7 +397,7 @@ jarak = path(user → lift lantai user) + path(lift lantai tujuan → POI)
 
 ### ADR-025 — Validasi akurasi VPS: HUD ground-truth admin-only, ukur manual pakai meteran (2026-08-18)
 
-**Keputusan:** Akurasi lokalisasi divalidasi dengan **HUD diagnostik di dalam app + pengukuran meteran manual**, bukan sistem logging otomatis. HUD digerbangi mode admin (5× tap di logo DARSI dalam 10 detik, status disimpan di `PlayerPrefs`).
+**Keputusan:** Akurasi lokalisasi divalidasi dengan **HUD diagnostik di dalam app + pengukuran meteran manual**, bukan sistem logging otomatis. HUD digerbangi mode admin (5× tap di logo DARSI dalam 20 detik, status disimpan di `PlayerPrefs`).
 
 **Pemicu:** Dosen pembimbing (Pak Amma) meminta bukti akurasi posisi yang bisa dibandingkan ke dunia nyata — *"posisi real di titik 1m,1m, di MultiSet ternyata 90cm,90cm"*. Sebelum ini **belum pernah ada angka akurasi sama sekali** di project: yang selama ini terukur cuma *repeatability* (konsistensi antar-localize di titik sama), dan itu **bukan** akurasi. Repo WebXR sudah lebih dulu menabrak jebakan ini (lihat `KNOWN-ISSUES.md` di sana: *"geser kecil = REPEATABILITY, BUKAN AKURASI"*).
 

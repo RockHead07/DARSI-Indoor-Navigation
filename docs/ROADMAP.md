@@ -303,7 +303,7 @@ satu pun angka akurasi terhadap dunia nyata** — yang selama ini terukur cuma
 **PENS HCM Lantai 10**.
 
 **Langkah:**
-1. Buka app → **5× tap logo DARSI** (dalam 10 detik) → HUD admin muncul.
+1. Buka app → **5× tap logo DARSI** (dalam 20 detik) → HUD admin muncul.
 2. Berdiri di POI awal → tekan **Set Titik 0** → HUD harus menampilkan Δ 0,0.
 3. Jalan ke POI kedua → catat `jarak dari titik 0` yang ditampilkan HUD **dan** `confidence`-nya.
 4. Ukur jarak fisik antara dua titik itu dengan meteran → catat.

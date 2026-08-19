@@ -25,7 +25,7 @@ public class LocalizationDebugHUD : MonoBehaviour
 
     private const string AdminPrefKey = "DARSI_AdminMode";
     private const int TapsToToggle = 5;
-    private const float TapWindowSeconds = 10f;
+    private const float TapWindowSeconds = 20f;
 
     private int _tapCount;
     private float _firstTapTime;
@@ -133,7 +133,12 @@ public class LocalizationDebugHUD : MonoBehaviour
     // ── UI dibuat sendiri saat runtime, minimal, nempel ke Canvas yang sudah ada ──
     private void BuildUI()
     {
-        Canvas canvas = FindAnyObjectByType<Canvas>();
+        // FindAnyObjectByType<Canvas>() itu ambigu -- scene ini punya ~11 Canvas kecil
+        // per-POI (papan tanda) selain Canvas utama, dan bisa kepilih yang salah (nempel
+        // ke Canvas POI yang kebetulan nonaktif, jadi HUD toggle tapi gak pernah kelihatan).
+        // logoTapTarget sudah pasti nempel ke Canvas utama -- turunkan dari situ.
+        Canvas canvas = logoTapTarget != null ? logoTapTarget.GetComponentInParent<Canvas>() : null;
+        if (canvas == null) canvas = FindAnyObjectByType<Canvas>();
         if (canvas == null)
         {
             Debug.LogWarning("[LocalizationDebugHUD] Tidak ada Canvas di scene, HUD tidak dibuat.");
