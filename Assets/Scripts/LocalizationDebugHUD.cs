@@ -152,7 +152,7 @@ public class LocalizationDebugHUD : MonoBehaviour
         panelRt.anchorMax = new Vector2(0f, 1f);
         panelRt.pivot = new Vector2(0f, 1f);
         panelRt.anchoredPosition = new Vector2(20f, -160f);
-        panelRt.sizeDelta = new Vector2(420f, 190f);
+        panelRt.sizeDelta = new Vector2(520f, 240f);
 
         Image bg = _panel.AddComponent<Image>();
         bg.color = new Color(0f, 0f, 0f, 0.6f);
@@ -162,10 +162,10 @@ public class LocalizationDebugHUD : MonoBehaviour
         RectTransform textRt = textGO.GetComponent<RectTransform>();
         textRt.anchorMin = new Vector2(0f, 0f);
         textRt.anchorMax = new Vector2(1f, 1f);
-        textRt.offsetMin = new Vector2(12f, 44f);
-        textRt.offsetMax = new Vector2(-12f, -8f);
+        textRt.offsetMin = new Vector2(14f, 54f);
+        textRt.offsetMax = new Vector2(-14f, -10f);
         _infoText = textGO.AddComponent<TextMeshProUGUI>();
-        _infoText.fontSize = 22f;
+        _infoText.fontSize = 28f;
         _infoText.color = Color.white;
         _infoText.text = "";
 
@@ -175,8 +175,8 @@ public class LocalizationDebugHUD : MonoBehaviour
         btnRt.anchorMin = new Vector2(0f, 0f);
         btnRt.anchorMax = new Vector2(1f, 0f);
         btnRt.pivot = new Vector2(0.5f, 0f);
-        btnRt.anchoredPosition = new Vector2(0f, 8f);
-        btnRt.sizeDelta = new Vector2(-24f, 32f);
+        btnRt.anchoredPosition = new Vector2(0f, 10f);
+        btnRt.sizeDelta = new Vector2(-28f, 40f);
         Image btnImg = btnGO.AddComponent<Image>();
         btnImg.color = new Color(0.2f, 0.6f, 1f, 1f);
         Button setOriginButton = btnGO.AddComponent<Button>();
@@ -192,7 +192,7 @@ public class LocalizationDebugHUD : MonoBehaviour
         TextMeshProUGUI btnLabel = btnTextGO.AddComponent<TextMeshProUGUI>();
         btnLabel.text = "Set Titik 0";
         btnLabel.alignment = TextAlignmentOptions.Center;
-        btnLabel.fontSize = 18f;
+        btnLabel.fontSize = 22f;
         btnLabel.color = Color.white;
 
         _panel.SetActive(false);
