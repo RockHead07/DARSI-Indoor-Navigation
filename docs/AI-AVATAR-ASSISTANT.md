@@ -9,6 +9,17 @@
 > (GitHub: `RockHead07/DARSI-Indoor-Navigation-Backend`), berkas
 > `docs/superpowers/specs/2026-08-20-rag-assistant-backend-design.md`.
 >
+> **Fase 3 sudah DIIMPLEMENTASIKAN dan DIUKUR (2026-08-20).** Keputusan arsitekturnya
+> terkunci di **ADR-026** (`docs/DECISIONS.md` repo ini), angka dan metodologinya di
+> `docs/RETRIEVAL-EVALUATION.md` repo `darsi-backend`.
+>
+> Yang paling penting diketahui lebih dulu: **relevansi diputuskan LLM, bukan ambang
+> skor kemiripan.** Rancangan awal mengasumsikan ada ambang yang bisa menyaring
+> pertanyaan di luar cakupan, dan asumsi itu terbukti salah saat diukur (pertanyaan
+> sampah bisa mendapat skor lebih tinggi daripada pertanyaan sah, pada dua model
+> embedding berbeda). Angka sah untuk dilaporkan: **recall@3 71,9%** pada set uji
+> bersih, corpus simulasi.
+>
 > **Baca spec itu dulu sebelum menyentuh apa pun soal RAG.** Spec tersebut memuat beberapa
 > keputusan yang **mengoreksi** rancangan awal di §3 di bawah, khususnya:
 > - **Jadwal dokter TIDAK lewat vector search**, tapi query SQL biasa (data terstruktur =
