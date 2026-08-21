@@ -49,6 +49,29 @@ public class FloorVisibilityManager : MonoBehaviour
 
     private int _currentFloor = -1;
     private int _pendingFloor = -1;
+
+    /// <summary>
+    /// Label lantai aktif ("Ground", "Lantai1", ...), atau null kalau lantai belum
+    /// ditentukan. Diturunkan dari prefiks nama GameObject POI lewat POIData.Floor
+    /// (ADR-021: satu pemilik sah, sisanya diturunkan), BUKAN disimpan terpisah.
+    ///
+    /// Null sebelum localize berhasil, dan itu memang benar (ADR-007/011): posisi
+    /// belum sah, jadi jangan mengaku tahu lantai. Pemakainya wajib tahan null.
+    /// </summary>
+    public string CurrentFloorLabel
+    {
+        get
+        {
+            if (_currentFloor < 0 || _currentFloor >= _floorPois.Count) return null;
+            foreach (var poi in _floorPois[_currentFloor])
+            {
+                if (poi == null) continue;
+                string label = poi.Floor;
+                if (!string.IsNullOrEmpty(label)) return label;
+            }
+            return null;
+        }
+    }
     private float _pendingSince;
     private POIData _lastActiveTarget;
 
