@@ -17,8 +17,10 @@ belum terbukti di perangkat".** Sampai tes lapangan RSI, jangan bangun apa pun b
 
 **Rencana pekan-pekan depan (urut dependensi, bukan kemenarikan):**
 
-1. **🔴 Railway trial hampir habis — cek/perpanjang DULUAN.** Eksternal, tak bisa diburu mendadak.
-   Kalau backend mati saat di RSI, tes batal & kunjungan (butuh izin) terbuang.
+1. **🟢 Backend Hosting & Ingress (ADR-027):** Ketergantungan trial Railway dialihkan ke
+   strategi multi-target: Zero Trust Cloudflare Tunnel pada server privat (HTTPS resmi tanpa
+   buka port/VPN di HP), Managed Cloud alternatif (Supabase + Koyeb/Render), dan Docker Compose
+   lokal + `adb reverse` untuk pengujian harian.
 2. **Beresin yang menggantung:** commit scene + `NavPathMaterial.mat`; commit+push+deploy
    `app/page.tsx` (WebView "Layanan Utama"); perbaiki `BuildingName` (masih tebakan, sudah
    nyasar ke 11 baris DB) + kategori Resepsionis; build APK, tes buka-tutup.

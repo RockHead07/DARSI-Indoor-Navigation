@@ -114,3 +114,6 @@ InitTestScene*.unity*
 # Python
 venv/
 __pycache__/
+
+# Tooling / IDE
+.mcp.json

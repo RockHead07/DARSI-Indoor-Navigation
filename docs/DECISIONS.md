@@ -436,3 +436,34 @@ jarak = path(user → lift lantai user) + path(lift lantai tujuan → POI)
 **Konsekuensi ke repo ini.** Alur voice Unity (`VoiceInputHandler.cs`, `OllamaConnector.cs`, ADR-024) **tidak berubah sama sekali** — endpoint asisten berdiri sendiri. Groq yang dipanggil dari sisi server juga menutup utang keamanan yang tercatat di komentar `ponytail:` pada `OllamaConnector.cs` (key ikut ter-bundle ke APK) untuk jalur asisten. Keputusan di mana jawaban asisten ditampilkan (WebView pra-AR, panel Unity, atau tombol mic yang sudah ada) **sengaja belum diambil**, menunggu mekanisme retrieval terbukti di lapangan.
 
 **Rujukan lengkap:** `docs/RETRIEVAL-EVALUATION.md` di repo `darsi-backend` (metodologi empat set uji, seluruh angka, batasan, dan daftar klaim yang dilarang). Baca itu sebelum menyetel ambang, mengganti model embedding, atau melaporkan angka apa pun.
+
+---
+
+### ADR-027 — Infrastruktur Backend & Ingress: Zero Trust Tunnel / Managed Cloud vs Penghentian Ketergantungan Railway (2026-08-22)
+
+**Konteks.** Kuota *free-tier* / kredit trial Railway habis. Di sisi lain, tersedia server privat di cloud yang berada di balik jaringan privat (OpenVPN tanpa IP publik). Kebutuhannya: backend FastAPI + PostgreSQL (`pgvector`) harus tetap dapat diakses secara publik dan aman oleh klien Unity (Editor & build APK Android) tanpa hambatan konfigurasi jaringan di perangkat klien.
+
+**Keputusan 1 — Portabilitas arsitektur tetap dijaga (ADR-001 / ADR-014).** Kode FastAPI dan skema SQL tidak mengikat diri pada platform hosting tertentu. Seluruh interaksi database menggunakan standar `DATABASE_URL` via `psycopg` murni, sehingga pergantian host database hanya berupa perubahan variabel *connection string*.
+
+**Keputusan 2 — Ingress server privat via Zero Trust Application Connector (Cloudflare Tunnel).**
+Jika menggunakan server pribadi yang berada di balik firewall/OpenVPN:
+- Memasang daemon `cloudflared` sebagai *system service* di server.
+- Mengarahkan traffic HTTPS publik dari domain/subdomain resmi ke endpoint internal FastAPI (`http://localhost:8000`).
+- **Mengapa ini Best Practice:**
+  1. *Zero Open Inbound Ports:* Server tidak membuka port apapun ke publik (kebal serangan *port scanning* & *direct DDoS*).
+  2. *Tanpa VPN di Klien:* HP Android penguji/pasien langsung mengakses URL HTTPS resmi tanpa perlu menginstal atau menyalakan profil OpenVPN.
+  3. *SSL/TLS & WAF Otomatis:* Sertifikat SSL dikelola penuh oleh Cloudflare secara gratis tanpa konfigurasi manual Certbot/Nginx.
+
+**Keputusan 3 — Opsi Managed Serverless Cloud Alternatif (100% Free Tier).**
+Jika ingin sistem yang *zero-maintenance* tanpa mengelola server fisik/VPN:
+- Database: **Supabase** (PostgreSQL 16 + ekstensi `pgvector` bawaan, 500 MB kuota gratis permanen).
+- Compute API: **Koyeb / Render / Fly.io** (menjalankan container FastAPI langsung dari auto-deploy GitHub).
+
+**Keputusan 4 — Standardisasi Dev Environment via Docker Compose.**
+Untuk menjaga konsistensi lingkungan lokal dan server:
+- Backend dikemas via `docker-compose.yml` (`fastapi` + `pgvector/pgvector:pg16`).
+- Pengujian lokal harian dari HP Android menggunakan `adb reverse tcp:8000 tcp:8000` (latensi 0 ms via kabel USB).
+
+**Yang Ditolak:**
+- Mewajibkan instalasi OpenVPN di HP penguji/pasien — menyulitkan evaluasi lapangan dan demonstrasi kepada pihak RS/dosen pembimbing.
+- Membuka *port forwarding* mentah pada router/firewall tanpa reverse proxy dan WAF.

@@ -54,12 +54,15 @@ MyRSIy (Flutter, native — sudah di Play Store)
 | `DARSI-Indoor-Navigation` | Unity 6000.3.14f1 + MultiSet SDK v1.11.5 + ARCore + Photon PUN 2 | AR Navigation, Cari Teman (render posisi), Voice input | Bagus |
 | `DARSI-Indoor-Navigation-Backend` (repo terpisah, di GitHub; folder lokal `darsi-backend`; endpoint dikonsumsi WebView, lihat `API_CONTRACT.md`) | FastAPI (Python) + Postgres via `DATABASE_URL` (Supabase atau self-hosted) | Data POI, friendlist/friend-request, presence, business logic | Bagus |
 
-## Backend
+## Backend & Infrastruktur Hosting (ADR-001, ADR-014, ADR-027)
 
-- **Supabase** (PostgreSQL + Auth + Realtime) — dipilih karena auth bawaan, realtime built-in, no cold start, HIPAA-ready untuk rencana produksi di RS
-- **FastAPI** (Python) — custom business logic di atas Supabase (role-based filtering, friend-request logic, presence)
-- Konsisten dengan stack Python yang sudah dipakai untuk Ollama voice pipeline
-- Seluruh pengerjaan backend ini tanggung jawab Bagus (lihat `ROADMAP.md` Fase 2/3) — bukan pihak ketiga
+- **FastAPI (Python):** Business logic, POI sync, dan RAG hybrid retrieval (`/api/assistant/query`).
+- **PostgreSQL (`pgvector`):** Penyimpanan relasional POI, tabel chunk pengetahuan bervektor 384-dimensi, dan tabel jadwal dokter.
+- **Portabilitas Penuh:** Menggunakan PostgreSQL standar via `DATABASE_URL` dengan `psycopg` murni (tanpa vendor-lockin).
+- **Strategi Ingress & Hosting (ADR-027):**
+  1. *Server Privat / On-Premise:* Daemon **Cloudflare Tunnel (`cloudflared`)** sebagai Zero Trust application connector, menyediakan endpoint HTTPS publik resmi tanpa membuka port inbound dan tanpa mewajibkan OpenVPN di HP klien.
+  2. *Managed Serverless Cloud:* **Supabase** (Postgres + pgvector gratis) + **Koyeb / Render / Fly.io** (FastAPI compute gratis).
+  3. *Lokal / Development:* **Docker Compose** (`pgvector/pgvector:pg16` + FastAPI) + `adb reverse` untuk testing kabel USB ke HP Android.
 
 **Penting — tidak ada shared database dengan MyRSIy.** MyRSIy punya database sendiri (PostgreSQL + MySQL, dikonfirmasi Pak Farris/IT RSI A. Yani) yang sepenuhnya terpisah dan tidak diakses DARSI. Satu-satunya jalur komunikasi antara DARSI dan MyRSIy adalah lewat UaaL bridge (`postMessage` / `UnitySendMessage`), bukan lewat query database bersama. Lihat ADR-012 di `DECISIONS.md`.
 

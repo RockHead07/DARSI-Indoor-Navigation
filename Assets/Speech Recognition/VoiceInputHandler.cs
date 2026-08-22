@@ -137,19 +137,19 @@ public class VoiceInputHandler : MonoBehaviour
         // Mode editor — simulasi input teks untuk testing di PC
         if (txtStatus != null)
         {
-            txtStatus.text = "[EDITOR] Simulasi: 'saya mau ke IGD'";
+            txtStatus.text = "[EDITOR] Simulasi: 'saya mau ke toilet'";
         }
         if (txtResult != null)
         {
-            txtResult.text = "saya mau ke IGD";
+            txtResult.text = "saya mau ke toilet";
         }
         if (voiceUI != null)
         {
             voiceUI.ShowPanel();
             voiceUI.SetListening(true);
-            voiceUI.SetTranscript("saya mau ke IGD");
+            voiceUI.SetTranscript("saya mau ke toilet");
         }
-        StartCoroutine(SendToOllama("saya mau ke IGD"));
+        StartCoroutine(SendToOllama("saya mau ke toilet"));
         #endif
     }
 
