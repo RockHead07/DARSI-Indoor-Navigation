@@ -25,7 +25,9 @@ public class POIManager : MonoBehaviour
     {
         { "IGD", new[] {
             "darurat", "gawat darurat", "emergency", "instalasi gawat darurat",
-            "unit gawat darurat", "ugd"
+            "unit gawat darurat", "ugd", "kecelakaan", "ketabrak", "tertabrak",
+            "pingsan", "kejang", "sesak", "serangan jantung", "patah tulang",
+            "luka parah", "pendarahan", "berdarah", "kritis"
         }},
         { "Farmasi", new[] {
             "apotek", "apotik", "obat", "ambil obat", "beli obat", "tebus resep"
@@ -41,7 +43,9 @@ public class POIManager : MonoBehaviour
             "customer service", "cs"
         }},
         { "Toilet", new[] {
-            "kamar mandi", "wc", "kamar kecil", "toilet umum"
+            "kamar mandi", "wc", "kamar kecil", "toilet umum", "toilet",
+            "kencing", "kebelet", "kebelet kencing", "buang air", "buang air kecil",
+            "buang air besar", "bab", "bak", "pipis", "restroom", "lavatory"
         }},
         { "Lift", new[] {
             "elevator", "naik lift", "turun lift"
@@ -53,7 +57,7 @@ public class POIManager : MonoBehaviour
             "parkir motor", "parkiran motor", "parkir karyawan"
         }},
         { "Ground", new[] {
-            "lobi", "lantai dasar", "pintu masuk", "entrance", "gerbang masuk"
+            "lobi", "lantai dasar", "pintu masuk", "entrance", "gerbang masuk", "lobby"
         }},
     };
 
@@ -132,6 +136,23 @@ public class POIManager : MonoBehaviour
         }
 
         Debug.Log($"[POIManager] Scanned {poiList.Count} POI(s) dari '{poiRoot.name}', {lookupDict.Count} entri lookup.");
+    }
+
+    /// <summary>
+    /// Cari POI berdasarkan ID stabil (GUID).
+    /// Berguna untuk pencarian cepat dari hasil RAG assistant.
+    /// </summary>
+    public POIData FindById(string poiId)
+    {
+        if (string.IsNullOrWhiteSpace(poiId)) return null;
+        foreach (var poi in poiList)
+        {
+            if (poi != null && string.Equals(poi.poiId, poiId, StringComparison.OrdinalIgnoreCase))
+            {
+                return poi;
+            }
+        }
+        return null;
     }
 
     /// <summary>

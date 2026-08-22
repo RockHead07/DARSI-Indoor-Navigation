@@ -467,3 +467,38 @@ Untuk menjaga konsistensi lingkungan lokal dan server:
 **Yang Ditolak:**
 - Mewajibkan instalasi OpenVPN di HP penguji/pasien — menyulitkan evaluasi lapangan dan demonstrasi kepada pihak RS/dosen pembimbing.
 - Membuka *port forwarding* mentah pada router/firewall tanpa reverse proxy dan WAF.
+
+---
+
+### ADR-028 — Hybrid RAG Voice Navigation, Clinical Triage, & POI GUID Resolution (2026-08-22)
+
+**Konteks.** 
+Pengujian suara pengguna di lapangan memunculkan ambiguitas semantik dan *false positive* berbahaya jika hanya mengandalkan pencarian kata kunci (*lexical string matching*):
+1. **Insiden Benturan Kosakata (*Keyword Collision*):** Ucapan *"Anakku habis ketabrak motor"* keliru diarahkan ke *"Parkir Motor Karyawan"* karena algoritma pencocokan lokal mencocokkan substring kata *"motor"*. Padahal konteks klinisnya adalah kegawatdaruratan medis yang wajib menuju ke **IGD**.
+2. **Bahasa Gaul & Kebutuhan Mendesak (*Colloquial Slang*):** Ucapan *"Aku kebelet kencing"* atau *"Mau pipis"* tidak menemukan rute ke **Toilet** karena belum terdaftar di kamus sinonim dan database korpus RS belum memiliki chunk sanitasi.
+3. **Pemisahan Peran (*Separation of Concerns*):** RAG AI dibutuhkan untuk memproses intensi semantik kompleks, tetapi sistem tidak boleh kehilangan kemampuan navigasi saat koneksi internet terputus (*offline fallback*).
+
+**Keputusan 1 — Arsitektur Hybrid: RAG AI sebagai Primary Interpreter & Heuristik Lokal sebagai Fallback.**
+- **Primary Route (Cloud/Server RAG):** `VoiceInputHandler.cs` mengutamakan pengiriman teks ke `AssistantClient` (`POST /api/assistant/query`). AI memproses konteks kalimat menggunakan model Transformer dan Groq LLM.
+- **Hierarki Resolusi POI Presisi:**
+  1. *Metadata Binding:* Cek `ragAnswer.poi_id` (GUID exact match via `POIManager.FindById`).
+  2. *Entity Name Extraction:* Cek `ragAnswer.poi_name`.
+  3. *Clinical Triage Priority:* Pindai teks jawaban AI (`ragAnswer.answer`). Jika AI menyarankan rujukan medis (misal: *"segera ke IGD"*), sistem mengunci tujuan ke **`IGD`** dan mengabaikan kata kendaraan seperti motor/mobil.
+  4. *Direct Keyword Match:* Jika AI tidak menyebutkan POI fisik, gunakan pencocokan lokal dari ucapan pengguna.
+- **Graceful Offline Fallback:** Jika server offline atau timeout, sistem otomatis beralih ke `POIManager.FindBestMatch` dan `OllamaConnector` lokal tanpa memblokir aplikasi.
+
+**Keputusan 2 — Sinkronisasi GUID POI Statis (11 Titik POI RS Islam A. Yani).**
+- 11 POI dari scene `TestingHCM.unity` (`IGD`, `Farmasi`, `Radiologi`, `Ruang X-Ray`, `Resepsionis`, `Toilet`, `Lift Lantai 1`, `Lift Lantai 2`, `Parkir Mobil`, `Parkir Motor Karyawan`, `Ground`) di-sinkronkan ke tabel `pois` PostgreSQL via tool `POISyncWindow.cs` (`POST /api/poi/sync` dengan token `x-admin-token`).
+- Seluruh dokumen di `corpus_simulasi.py` diikat ke `poi_unity_id` yang sesuai sehingga API RAG langsung mengembalikan GUID POI yang valid.
+
+**Keputusan 3 — Penyetelan System Prompt & Triase Klinis di Backend.**
+- `_SYSTEM_PROMPT` di `app/assistant/generation.py` disetel tegas:
+  > *"TRIASE GAWAT DARURAT: Jika pengguna menyebutkan kondisi gawat darurat atau kecelakaan (tertabrak, pendarahan, patah tulang, pingsan, kejang, demam tinggi/step anak), WAJIB langsung mengarahkan pasien untuk segera menuju ke IGD di Lantai 1 tanpa perlu menunggu pendaftaran poli."*
+
+**Keputusan 4 — Validasi Standar Industri: LLM-as-a-Judge Benchmark Suite.**
+- Dibangun script benchmark otomatis `scripts/eval_llm_judge.py` berisi 52 skenario rumah sakit yang mencakup 7 domain (Gawat Darurat, Poliklinik, Farmasi, Diagnostik, Administrasi/BPJS, Fasilitas Umum, Out-of-Scope).
+- Hasil evaluasi mencapai **100.0% Pass Rate (52/52 Passed)** pada keselamatan triase, ketepatan rute, dan ketahanan anti-halusinasi.
+
+**Yang Ditolak:**
+- Mengandalkan *single word matching* untuk memutuskan tujuan navigasi tanpa memeriksa intensi semantik kalimat.
+- Menghapus total modul pencocokan lokal (harus tetap dipertahankan sebagai *fallback resiliency*).

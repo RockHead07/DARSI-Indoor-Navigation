@@ -81,3 +81,20 @@ jaringan lain (mis. lapangan/kampus).
 [`OllamaConnector.cs`](../Assets/Speech%20Recognition/OllamaConnector.cs) — `TryOllama()`:
 timeout dipangkas 30 → 8 detik, percobaan dipangkas 2 → 1 (retry ke IP yang sama tidak
 membantu kalau memang beda jaringan). **Perlu build baru untuk verifikasi.**
+
+---
+
+## 🟡 Endpoint Backend / Cloudflare Tunnel Mati (`DNS_PROBE_FINISHED_NXDOMAIN`)
+
+**Status:** Teridentifikasi & Solusi Terdokumentasi (2026-08-22).
+
+### Gejala
+Browser / Unity menampilkan `DNS_PROBE_FINISHED_NXDOMAIN` saat mengakses URL `*.trycloudflare.com/api/...` setelah sesi SSH server ditutup.
+
+### Akar Masalah
+Quick Tunnel `cloudflared` mati saat SSH ditutup (SIGHUP) dan Cloudflare menghapus domain sementara tersebut.
+
+### Solusi & Runbook Lengkap
+Gunakan `tmux` agar proses tunnel tetap detached di background, atau gunakan Cloudflare Zero Trust Named Tunnel untuk URL permanen.
+Panduan lengkap: [`docs/BACKEND-SERVER-OPERATIONS.md`](BACKEND-SERVER-OPERATIONS.md).
+

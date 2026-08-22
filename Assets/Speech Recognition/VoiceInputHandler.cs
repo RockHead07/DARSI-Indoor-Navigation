@@ -28,6 +28,16 @@ public class VoiceInputHandler : MonoBehaviour
     [SerializeField] private POIManager poiManager;
     [SerializeField] private POIDataEvent onPoiMatched;
 
+    [Header("RAG Assistant (Primary AI & Semantic POI)")]
+    [Tooltip("Klien RAG Assistant untuk pemahaman intent dan resolusi POI canggih.")]
+    [SerializeField] private AssistantClient assistantClient;
+    [Tooltip("Gunakan RAG sebagai pipeline utama")]
+    [SerializeField] private bool useRAGPrimary = true;
+
+    [Header("Fallback Settings")]
+    [Tooltip("Fallback otomatis ke Ollama/Groq lokal jika RAG backend gagal/offline")]
+    [SerializeField] private bool enableFallback = true;
+
     [System.Serializable]
     public class POIDataEvent : UnityEvent<POIData> { }
 
@@ -48,6 +58,11 @@ public class VoiceInputHandler : MonoBehaviour
         if (txtResult == null)
         {
             Debug.LogWarning("[VoiceInputHandler] txtResult belum di-assign.");
+        }
+
+        if (assistantClient == null)
+        {
+            assistantClient = FindAnyObjectByType<AssistantClient>();
         }
 
         // Minta permission mic saat start
@@ -137,19 +152,19 @@ public class VoiceInputHandler : MonoBehaviour
         // Mode editor — simulasi input teks untuk testing di PC
         if (txtStatus != null)
         {
-            txtStatus.text = "[EDITOR] Simulasi: 'saya mau ke toilet'";
+            txtStatus.text = "[EDITOR] Simulasi: 'Anakku habis ketabrak motor'";
         }
         if (txtResult != null)
         {
-            txtResult.text = "saya mau ke toilet";
+            txtResult.text = "Anakku habis ketabrak motor";
         }
         if (voiceUI != null)
         {
             voiceUI.ShowPanel();
             voiceUI.SetListening(true);
-            voiceUI.SetTranscript("saya mau ke toilet");
+            voiceUI.SetTranscript("Anakku habis ketabrak motor");
         }
-        StartCoroutine(SendToOllama("saya mau ke toilet"));
+        StartCoroutine(ProcessVoiceInput("Anakku habis ketabrak motor"));
         #endif
     }
 
@@ -179,7 +194,7 @@ public class VoiceInputHandler : MonoBehaviour
             voiceUI.SetListening(false);
             voiceUI.SetTranscript(result);
         }
-        StartCoroutine(SendToOllama(result));
+        StartCoroutine(ProcessVoiceInput(result));
     }
 
     public void OnSpeechError(string error)
@@ -192,17 +207,135 @@ public class VoiceInputHandler : MonoBehaviour
         ResetButton();
     }
 
-    IEnumerator SendToOllama(string spokenText)
+    private IEnumerator ProcessVoiceInput(string spokenText)
     {
-        if (txtStatus != null)
-        {
-            txtStatus.text = "Memproses ke Ollama...";
-        }
         if (voiceUI != null) voiceUI.SetProcessing(true);
-        yield return OllamaConnector.instance.ExtractPOI(spokenText, OnPOIReceived);
+
+        bool ragResolved = false;
+
+        // ── 1. PRIMARY: RAG Assistant (Backend AI & Intent Analysis) ──
+        if (useRAGPrimary && assistantClient != null)
+        {
+            if (txtStatus != null) txtStatus.text = "Menganalisis tujuan (RAG)...";
+            Debug.Log($"[VoiceInputHandler] Mengirim ke RAG Assistant (Utama): '{spokenText}'");
+
+            AssistantAnswer ragAnswer = null;
+            yield return assistantClient.Ask(spokenText, (answer) => { ragAnswer = answer; });
+
+            if (ragAnswer != null && !string.IsNullOrEmpty(ragAnswer.answer))
+            {
+                Debug.Log($"[VoiceInputHandler] RAG response: '{ragAnswer.answer}' (poi_id={ragAnswer.poi_id ?? "null"}, poi_name={ragAnswer.poi_name ?? "null"})");
+
+                POIData matchedPoi = null;
+
+                // A. Match via poi_id (GUID exact match dari metadata RAG)
+                if (!string.IsNullOrEmpty(ragAnswer.poi_id) && poiManager != null)
+                {
+                    matchedPoi = poiManager.FindById(ragAnswer.poi_id);
+                }
+
+                // B. Match via poi_name yang diekstrak RAG
+                if (matchedPoi == null && !string.IsNullOrEmpty(ragAnswer.poi_name) && poiManager != null)
+                {
+                    matchedPoi = poiManager.FindBestMatch(ragAnswer.poi_name);
+                }
+
+                // C. PRIORITAS UTAMA RAG: Cari POI yang direkomendasikan AI di dalam kalimat jawaban!
+                // Contoh: Pengguna bilang "anakku ketabrak motor", RAG menjawab "...segera ke IGD" -> "IGD" ditemukan!
+                if (matchedPoi == null && poiManager != null)
+                {
+                    matchedPoi = poiManager.FindBestMatch(ragAnswer.answer);
+                }
+
+                // D. Cek apakah query awal pengguna cocok dengan POI lokal (jika RAG tidak menyebut POI spesifik)
+                if (matchedPoi == null && poiManager != null)
+                {
+                    matchedPoi = poiManager.FindBestMatch(spokenText);
+                }
+
+                if (matchedPoi != null)
+                {
+                    ragResolved = true;
+                    if (txtStatus != null)
+                    {
+                        txtStatus.text = $"Navigasi ke: {matchedPoi.EffectiveName}";
+                    }
+                    if (voiceUI != null)
+                    {
+                        voiceUI.SetTranscript($"{matchedPoi.EffectiveName}\n\"{ragAnswer.answer}\"");
+                        voiceUI.HidePanel();
+                    }
+                    onPoiMatched?.Invoke(matchedPoi);
+                    FinishProcessing();
+                    yield break;
+                }
+                else
+                {
+                    // RAG memberi jawaban info/SOP/jadwal dokter tanpa tujuan navigasi fisik
+                    ragResolved = true;
+                    string prefix = ragAnswer.contains_simulated_data ? "[DATA SIMULASI] " : "";
+                    if (txtStatus != null)
+                    {
+                        txtStatus.text = prefix + ragAnswer.answer;
+                    }
+                    if (voiceUI != null)
+                    {
+                        voiceUI.SetTranscript(prefix + ragAnswer.answer);
+                    }
+                    Debug.Log($"[VoiceInputHandler] RAG menjawab informasi umum (tanpa POI terpetakan): {ragAnswer.answer}");
+                    FinishProcessing();
+                    yield break;
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[VoiceInputHandler] RAG Assistant tidak merespons atau gagal. Mencoba fallback...");
+            }
+        }
+
+        // ── 2. FALLBACK: Direct Match / OllamaConnector (Jika RAG Offline/Timeout) ──
+        POIData localDirectMatch = poiManager != null ? poiManager.FindBestMatch(spokenText) : null;
+        if (localDirectMatch != null)
+        {
+            if (txtStatus != null) txtStatus.text = $"Navigasi ke: {localDirectMatch.EffectiveName}";
+            if (voiceUI != null) voiceUI.HidePanel();
+            onPoiMatched?.Invoke(localDirectMatch);
+            FinishProcessing();
+            yield break;
+        }
+
+        // ── 2. FALLBACK: OllamaConnector / Local Extractor ──
+        if (!ragResolved && enableFallback)
+        {
+            Debug.Log("[VoiceInputHandler] Beralih ke fallback Ollama/Groq lokal...");
+            if (txtStatus != null)
+            {
+                txtStatus.text = "Memproses (Fallback lokal)...";
+            }
+
+            if (OllamaConnector.instance != null)
+            {
+                yield return OllamaConnector.instance.ExtractPOI(spokenText, OnFallbackPOIReceived);
+            }
+            else if (poiManager != null)
+            {
+                // Fallback langsung ke POIManager fuzzy match
+                POIData localMatch = poiManager.FindBestMatch(spokenText);
+                OnFallbackPOIReceived(localMatch != null ? localMatch.EffectiveName : null);
+            }
+            else
+            {
+                OnFallbackPOIReceived(null);
+            }
+        }
+        else if (!ragResolved)
+        {
+            if (txtStatus != null) txtStatus.text = "Gagal memproses input suara.";
+            FinishProcessing();
+        }
     }
 
-    void OnPOIReceived(string poiName)
+    private void OnFallbackPOIReceived(string poiName)
     {
         if (string.IsNullOrEmpty(poiName))
         {
@@ -239,6 +372,12 @@ public class VoiceInputHandler : MonoBehaviour
                 }
             }
         }
+
+        FinishProcessing();
+    }
+
+    private void FinishProcessing()
+    {
         if (voiceUI != null)
         {
             voiceUI.SetProcessing(false);

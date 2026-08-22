@@ -129,6 +129,7 @@ public class POISyncWindow : EditorWindow
     private class PoiSyncPayload
     {
         public PoiSyncEntry[] payload;
+        public PoiSyncEntry[] pois;
     }
 
     [Serializable]
@@ -175,31 +176,32 @@ public class POISyncWindow : EditorWindow
             };
         }
 
-        string json = JsonUtility.ToJson(new PoiSyncPayload { payload = entries });
+        string json = JsonUtility.ToJson(new PoiSyncPayload { payload = entries, pois = entries });
         byte[] body = Encoding.UTF8.GetBytes(json);
 
-        string url = supabaseUrl.TrimEnd('/') + "/rest/v1/rpc/sync_pois";
+        bool isSupabase = supabaseUrl.Contains("supabase.co");
+        string url = isSupabase
+            ? supabaseUrl.TrimEnd('/') + "/rest/v1/rpc/sync_pois"
+            : supabaseUrl.TrimEnd('/') + "/api/poi/sync";
 
-        // Pakai HttpWebRequest (.NET) yang BENAR-BENAR sinkron, BUKAN UnityWebRequest.
-        // Kenapa: UnityWebRequest butuh main thread Unity untuk memompa progres request.
-        // Versi sebelumnya menunggu pakai `while (!op.isDone) {}` — busy-wait itu mengunci
-        // main thread, jadi request-nya tidak pernah maju dan selalu berakhir
-        // "Request timeout" (responseCode 0), bahkan saat backend jelas hidup.
-        // HttpWebRequest melakukan I/O blocking di thread ini sendiri, tanpa perlu pumping
-        // Unity — dan tanpa async/await, jadi tidak ada risiko deadlock SynchronizationContext.
         EditorUtility.DisplayProgressBar("POI Sync", $"Mengirim {pois.Count} POI...", 0.5f);
         try
         {
             var request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "POST";
             request.ContentType = "application/json";
-            // Supabase auth: apikey + Bearer service_role. service_role bypass RLS DAN punya
-            // EXECUTE pada sync_pois (di-grant eksplisit di setup.sql). Editor-only — key ini
-            // tak pernah ikut ke build player. JANGAN commit/share.
-            request.Headers["apikey"] = serviceKey;
-            request.Headers["Authorization"] = "Bearer " + serviceKey;
-            // 120 dtk longgar. Supabase always-on (tak ada cold-start Railway lagi), tapi sync
-            // banyak POI di jaringan lambat tetap aman dengan timeout lega.
+
+            if (isSupabase)
+            {
+                request.Headers["apikey"] = serviceKey;
+                request.Headers["Authorization"] = "Bearer " + serviceKey;
+            }
+            else
+            {
+                string token = string.IsNullOrEmpty(serviceKey) ? "darsi-admin-token" : serviceKey;
+                request.Headers["x-admin-token"] = token;
+            }
+
             request.Timeout = 120000;
             request.ReadWriteTimeout = 120000;
             request.ContentLength = body.Length;
@@ -217,8 +219,6 @@ public class POISyncWindow : EditorWindow
         }
         catch (WebException ex)
         {
-            // Status non-2xx (mis. 401 token salah, 422 kategori tak dikenal) masuk ke sini.
-            // Body-nya penting — di situ backend menyebut kategori mana yang salah (ADR-016).
             int code = 0;
             string detail = "";
             if (ex.Response is HttpWebResponse errResponse)
