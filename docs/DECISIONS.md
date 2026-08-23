@@ -502,3 +502,67 @@ Pengujian suara pengguna di lapangan memunculkan ambiguitas semantik dan *false 
 **Yang Ditolak:**
 - Mengandalkan *single word matching* untuk memutuskan tujuan navigasi tanpa memeriksa intensi semantik kalimat.
 - Menghapus total modul pencocokan lokal (harus tetap dipertahankan sebagai *fallback resiliency*).
+
+**Catatan koreksi (2026-08-23) — angka 100% pada Keputusan 4 belum boleh dipercaya.**
+`eval_llm_judge.py` punya 3 cacat metodologi belum diperbaiki: kegagalan panggilan
+juri default PASS (fallback di blok `except`), `GROQ_API_KEY` kosong juga default
+PASS, dan model juri = model generator (`openai/gpt-oss-20b` dua-duanya, jadi
+sistem menilai dirinya sendiri). Jangan kutip 100% pass rate ini di laporan
+mana pun sampai ketiganya diperbaiki dan diukur ulang.
+
+---
+
+### ADR-029 — Provider LLM Utama Pindah dari Qwen-Lokal-di-`vm-amma` ke Bifrost Gateway Eksternal (2026-08-23)
+
+**Konteks.**
+ADR-028 (Keputusan 1) menyebut "Groq LLM" sebagai provider utama RAG, tapi
+antara ADR-028 ditulis dan sekarang, `app/assistant/generation.py` di repo
+`darsi-backend` sempat diubah (commit `0924d6a`) supaya **Qwen lokal (`qwen2.5:7b`
+via Ollama Docker) jadi provider UTAMA**, Groq turun jadi fallback — dengan
+asumsi server deploy (`vm-amma`) punya GPU NVIDIA (jawaban pemilik project
+sebelum dicek langsung).
+
+Verifikasi langsung di server (`lspci | grep nvidia`, `systemd-detect-virt`,
+`nproc`, `free -h`) membuktikan **`vm-amma` adalah VM KVM tanpa GPU sama
+sekali** (bukan cuma driver belum terpasang — device-nya memang tidak
+ter-*attach*), cuma 2 vCPU. Inferensi 7B parameter CPU-only butuh 1-2 menit
+per jawaban, jauh melebihi timeout 30 detik yang sudah disetel — konsekuensinya
+Ollama akan SELALU gagal ke Groq, tidak pernah benar-benar jadi primer. Ini
+kali kedua asumsi infrastruktur ("ada GPU"/"server terjangkau") ternyata salah
+tanpa verifikasi langsung di proyek ini (kali pertama: server OpenVPN-only yang
+tak terjangkau dari Railway, pemicu ADR-027).
+
+**Keputusan.** Cabut rencana Qwen-lokal-di-`vm-amma` sepenuhnya (kode dan
+service `ollama` di `docker-compose.yml` dihapus, bukan dinonaktifkan — tidak
+ada alasan menyimpan kode mati untuk hardware yang tidak akan pernah ada di
+server ini). Sebagai gantinya: **Bifrost, gateway OpenAI-compatible eksternal
+yang di-host tim PSDKU/HCM Lab (`bifrost.hcm-lab.id`, GPU sungguhan), jadi
+provider UTAMA.** Model yang dipakai: `llama.cpp/medgemma-1.5-4b-it-q4` —
+di-tuning domain medis, dipilih ketimbang `gemma-4-12b-it-q8` (general-purpose)
+karena relevansi ke kasus pakai asisten RS. Groq tetap FALLBACK, tidak berubah
+dari ADR-028.
+
+**Kenapa bukan "minta GPU lebih besar ke pemilik server"**: `vm-amma`
+kemungkinan besar server pinjaman pembimbing (Pak Amma), jadi menambah beban
+resource di situ bukan sepenuhnya keputusan sepihak proyek ini. Bifrost
+menghindari trade-off itu — inferensi berat berjalan di server pihak lain yang
+memang diperuntukkan untuk itu, `vm-amma` cukup jadi proxy/API caller.
+
+**Detail teknis yang beda dari Groq**: autentikasi Bifrost pakai header
+`x-api-key`, BUKAN `Authorization: Bearer` seperti Groq/OpenAI-compatible pada
+umumnya — kalau ada provider OpenAI-compatible baru lagi ke depan, jangan
+asumsikan format auth sama, cek dulu.
+
+**Belum diverifikasi saat ADR ini ditulis**: panggilan sungguhan ke endpoint
+Bifrost belum pernah dites end-to-end (kunci API baru diterima, kode baru
+ditulis). Prioritas lapangan berikutnya: satu panggilan uji manual dari
+`AssistantTestPanel.cs` atau `curl` langsung untuk memastikan format respons
+(`choices[0].message.content`) sungguhan cocok dengan asumsi kode.
+
+**Yang Ditolak:**
+- Model kecil (`qwen2.5:1.5b`) sebagai fallback terakhir di `vm-amma` — dibatalkan
+  begitu ada alternatif GPU eksternal yang lebih baik (medgemma, tuning domain
+  medis) tanpa trade-off kecepatan.
+- Menyimpan service `ollama` di `docker-compose.yml` dalam keadaan nonaktif
+  "untuk jaga-jaga" — kode mati untuk hardware yang tidak akan pernah ada di
+  server ini cuma menambah kebingungan pembaca berikutnya.
