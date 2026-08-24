@@ -12,7 +12,8 @@ public static class AvatarSandboxSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/Sandbox_AvatarCompanion.unity";
 
-    [MenuItem("Tools/DARSI Avatar/Setup Sandbox Scene")]
+    [MenuItem("DARSI/Avatar/Setup Sandbox Scene")]
+    [MenuItem("Tools/Avatar/Setup Sandbox Scene")]
     public static void CreateOrOpenSandboxScene()
     {
         // 1. Buat scene baru
