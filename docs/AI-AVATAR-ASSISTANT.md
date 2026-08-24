@@ -29,6 +29,22 @@
 > - **`audio_url` / `gesture` / `expression`** di kontrak §3.1 belum diimplementasikan
 >   (menunggu Fase 1/2), jadi jangan diasumsikan sudah tersedia.
 > - Seluruh isi corpus tahap ini adalah **data simulasi** dan wajib ditandai seperti itu.
+>
+> **⛔ Keputusan urutan kerja (2026-08-24): JANGAN mulai avatar 3D/VRM sebelum RAG
+> backend ini benar-benar matang.** RAG sudah live di produksi (Bifrost + Groq
+> fallback, ADR-029) dan terverifikasi end-to-end dari Unity, tapi masih ada
+> utang nyata yang harus diberesin dulu:
+> - `POI_SYNC_TOKEN` di server belum dirotasi dari default.
+> - Angka recall@3 (71,9%) sudah basi — corpus produksi berubah bentuk
+>   (25→27 chunk, ADR-028) setelah angka itu diukur, belum ada pengukuran ulang.
+> - `eval_llm_judge.py` (klaim 100% pass) masih punya 3 cacat metodologi belum
+>   diperbaiki — lihat catatan koreksi di ADR-028, `docs/DECISIONS.md`.
+> - Cloudflare Tunnel masih quick tunnel (URL berubah tiap restart), belum
+>   Named Tunnel permanen — lihat `docs/BACKEND-SERVER-OPERATIONS.md` Metode B.
+> - **Belum pernah dites di device Android fisik pakai mic asli** — seluruh
+>   verifikasi sejauh ini lewat Unity Editor Play mode.
+> Selesaikan daftar ini dulu sebelum membuka pekerjaan avatar 3D di bawah —
+> avatar butuh RAG yang stabil sebagai fondasi jawabannya, bukan sebaliknya.
 
 ---
 

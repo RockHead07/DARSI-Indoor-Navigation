@@ -21,13 +21,19 @@ using UnityEngine.Networking;
 public class AssistantClient : MonoBehaviour
 {
     [Header("Backend")]
-    [Tooltip("Base URL backend. Kosongkan trailing slash. Belum di-deploy saat ini; " +
-             "untuk uji lokal di device pakai 'adb reverse tcp:8000 tcp:8000' lalu " +
+    [Tooltip("Base URL backend (Cloudflare Tunnel, ADR-027). Kosongkan trailing slash. " +
+             "Kalau pakai quick tunnel (tmux, bukan Named Tunnel permanen), URL berubah " +
+             "tiap 'cloudflared' di-restart -- isi ulang di sini setiap kali itu terjadi. " +
+             "Untuk uji lokal di device pakai 'adb reverse tcp:8000 tcp:8000' lalu " +
              "isi http://127.0.0.1:8000")]
     [SerializeField] private string baseUrl = "http://127.0.0.1:8000";
 
-    [Tooltip("Detik. Retrieval + LLM butuh waktu lebih lama dari request biasa.")]
-    [SerializeField] private int timeoutSeconds = 25;
+    [Tooltip("Detik. ADR-029: Bifrost (provider primer) terukur butuh 13-32 detik " +
+             "(reasoning trace medgemma + overhead tunnel), lebih lama dari Groq yang " +
+             "dulu jadi primer. Nilai ini HARUS lebih besar dari skenario terburuk " +
+             "backend (Bifrost timeout 30 detik + kemungkinan fallback Groq), kalau " +
+             "tidak Unity menyerah duluan padahal backend sebenarnya akan berhasil.")]
+    [SerializeField] private int timeoutSeconds = 60;
 
     [Header("Konteks posisi (opsional, ADR-026)")]
     [Tooltip("Kosongkan untuk cari otomatis. Dipakai mengirim lantai aktif supaya " +
