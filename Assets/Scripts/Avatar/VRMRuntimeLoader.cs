@@ -104,11 +104,6 @@ public class VRMRuntimeLoader : MonoBehaviour
                     lookAt.HeadBone = headBone;
                     Debug.Log($"[VRMRuntimeLoader] Head Bone terhubung ke: {headBone.name}");
                 }
-                if (neckBone != null)
-                {
-                    lookAt.NeckBone = neckBone;
-                    Debug.Log($"[VRMRuntimeLoader] Neck Bone terhubung ke: {neckBone.name}");
-                }
             }
 
             // Perbarui renderer pada AvatarSafetyFade

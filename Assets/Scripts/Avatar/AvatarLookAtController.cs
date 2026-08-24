@@ -1,9 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// Mengendalikan tatapan kepala dan leher Avatar 3D agar menatap ke Camera.main secara 100% akurat.
-/// Menggunakan World-Space Quaternion.FromToRotation yang independen dari orientasi lokal rig tulang,
-/// sehingga tidak akan pernah terbalik, miring, atau terpelintir pada model 3D/VRM apa pun.
+/// Kontroler tatapan kepala Avatar 3D (Look-At Tracking) yang stabil, presisi, dan natural.
+/// Menggunakan kalkulasi sudut yaw/pitch berbasis vektor proyeksi relatif terhadap sumbu avatar (Up & Right),
+/// sehingga tidak pernah mengakumulasi rotasi (anti-spinning) dan selalu menatap ke target kamera secara presisi.
 /// </summary>
 [DisallowMultipleComponent]
 public class AvatarLookAtController : MonoBehaviour
@@ -13,21 +13,24 @@ public class AvatarLookAtController : MonoBehaviour
     [SerializeField] private Transform targetOverride;
 
     [Header("Bone References")]
-    [Tooltip("Transform tulang kepala.")]
+    [Tooltip("Transform tulang kepala avatar (misal: J_Bip_C_Head).")]
     [SerializeField] private Transform headBone;
-    [Tooltip("Transform tulang leher (opsional, untuk mendistribusikan rotasi natural).")]
-    [SerializeField] private Transform neckBone;
 
-    [Header("Look-At Settings")]
-    [Tooltip("Batas sudut maksimal tatapan kepala (derajat) terhadap arah hadap tubuh.")]
-    [Range(10f, 90f)] [SerializeField] private float maxLookAngle = 65f;
-    [Tooltip("Kecepatan lerp penghalusan tatapan.")]
-    [SerializeField] private float lookSpeed = 8.0f;
+    [Header("Angle Limits & Tuning")]
+    [Tooltip("Batas sudut putar horizontal maksimal (derajat).")]
+    [Range(10f, 85f)] [SerializeField] private float maxYawAngle = 55f;
+    [Tooltip("Batas sudut tengadah/tunduk vertikal maksimal (derajat).")]
+    [Range(10f, 60f)] [SerializeField] private float maxPitchAngle = 35f;
+    [Tooltip("Kecepatan lerp interpolasi tatapan.")]
+    [SerializeField] private float lookSpeed = 6.0f;
     [Range(0f, 1f)] [SerializeField] private float overallWeight = 1.0f;
 
     private Transform _target;
     private float _currentWeight = 0f;
     private bool _lookAtEnabled = true;
+
+    private Quaternion _headRestLocalRot = Quaternion.identity;
+    private bool _hasRestPose = false;
 
     public bool IsLookAtEnabled
     {
@@ -38,18 +41,25 @@ public class AvatarLookAtController : MonoBehaviour
     public Transform HeadBone
     {
         get => headBone;
-        set => headBone = value;
-    }
-
-    public Transform NeckBone
-    {
-        get => neckBone;
-        set => neckBone = value;
+        set
+        {
+            headBone = value;
+            if (headBone != null)
+            {
+                _headRestLocalRot = headBone.localRotation;
+                _hasRestPose = true;
+            }
+        }
     }
 
     private void Awake()
     {
         ResolveTarget();
+        if (headBone != null && !_hasRestPose)
+        {
+            _headRestLocalRot = headBone.localRotation;
+            _hasRestPose = true;
+        }
     }
 
     private void OnEnable()
@@ -76,56 +86,69 @@ public class AvatarLookAtController : MonoBehaviour
             ResolveTarget();
         }
 
-        // Penghalusan transisi bobot tatapan (fade in / out)
+        // Fade in bobot tatapan saat aktif, fade out saat nonaktif
         float targetWeight = (_lookAtEnabled && _target != null) ? overallWeight : 0f;
         _currentWeight = Mathf.MoveTowards(_currentWeight, targetWeight, Time.deltaTime * lookSpeed);
     }
 
-    /// <summary>
-    /// Eksekusi di LateUpdate() setelah seluruh kalkulasi skinning/glTF selesai.
-    /// Menggunakan delta rotasi World Space dari transform.forward ke target direction.
-    /// </summary>
     private void LateUpdate()
     {
-        if (headBone == null || _target == null || _currentWeight < 0.001f) return;
+        if (headBone == null || _target == null) return;
 
-        // Vektor dari kepala ke target kamera
+        if (!_hasRestPose)
+        {
+            _headRestLocalRot = headBone.localRotation;
+            _hasRestPose = true;
+        }
+
+        ApplyLookAt();
+    }
+
+    private void ApplyLookAt()
+    {
+        // 1. Vektor arah dari kepala ke kamera di World Space
         Vector3 headPos = headBone.position;
         Vector3 targetPos = _target.position;
         Vector3 dirToTarget = (targetPos - headPos).normalized;
 
         if (dirToTarget.sqrMagnitude < 0.001f) return;
 
-        // Arah hadap tubuh avatar di world space
-        Vector3 bodyForward = transform.forward;
+        // 2. Sumbu-sumbu orientasi tubuh avatar
+        Vector3 forward = transform.forward;
+        Vector3 right = transform.right;
+        Vector3 up = transform.up;
 
-        // Batasi sudut maksimal agar leher tidak berputar ke belakang
-        float angle = Vector3.Angle(bodyForward, dirToTarget);
-        Vector3 clampedDir = dirToTarget;
-        if (angle > maxLookAngle)
+        // 3. Proyeksi arah target ke sistem koordinat avatar
+        float x = Vector3.Dot(dirToTarget, right);   // Jarak horizontal (+ kanan, - kiri)
+        float y = Vector3.Dot(dirToTarget, up);      // Jarak vertikal (+ atas, - bawah)
+        float z = Vector3.Dot(dirToTarget, forward); // Jarak ke depan
+
+        // Jika target berada di belakang avatar (z <= 0.05), jangan paksa memutar leher
+        if (z <= 0.05f)
         {
-            clampedDir = Vector3.RotateTowards(bodyForward, dirToTarget, Mathf.Deg2Rad * maxLookAngle, 0f);
+            _currentWeight = Mathf.MoveTowards(_currentWeight, 0f, Time.deltaTime * lookSpeed * 2f);
         }
 
-        // Hitung delta rotasi world space yang dibutuhkan dari arah hadap tubuh ke arah target
-        Quaternion lookDelta = Quaternion.FromToRotation(bodyForward, clampedDir);
+        // 4. Hitung sudut yaw dan pitch dalam derajat
+        float rawYaw = Mathf.Atan2(x, Mathf.Max(0.01f, z)) * Mathf.Rad2Deg;
+        float rawPitch = -Mathf.Atan2(y, Mathf.Sqrt(x * x + z * z)) * Mathf.Rad2Deg;
 
-        // Interpolasikan delta rotasi dengan bobot aktif
-        Quaternion weightedDelta = Quaternion.Slerp(Quaternion.identity, lookDelta, _currentWeight);
+        // 5. Batasi sudut sesuai limit anatomi dan kalikan dengan bobot aktif
+        float clampedYaw = Mathf.Clamp(rawYaw, -maxYawAngle, maxYawAngle) * _currentWeight;
+        float clampedPitch = Mathf.Clamp(rawPitch, -maxPitchAngle, maxPitchAngle) * _currentWeight;
 
-        if (neckBone != null)
-        {
-            // Bagi rotasi: 35% pada leher, 65% pada kepala
-            Quaternion neckDelta = Quaternion.Slerp(Quaternion.identity, weightedDelta, 0.35f);
-            Quaternion headDelta = Quaternion.Slerp(Quaternion.identity, weightedDelta, 0.65f);
+        // 6. Buat rotasi offset di World Space: Yaw di sekitar sumbu Up, Pitch di sekitar sumbu Right
+        Quaternion yawRot = Quaternion.AngleAxis(clampedYaw, up);
+        Quaternion pitchRot = Quaternion.AngleAxis(clampedPitch, right);
+        Quaternion lookOffset = yawRot * pitchRot;
 
-            neckBone.rotation = neckDelta * neckBone.rotation;
-            headBone.rotation = headDelta * headBone.rotation;
-        }
-        else
-        {
-            // Terapkan seluruh delta pada kepala
-            headBone.rotation = weightedDelta * headBone.rotation;
-        }
+        // 7. Hitung rotasi kepala dasar (Base Rest Pose mengikuti orientasi badan avatar)
+        Quaternion baseHeadWorldRot = transform.rotation * _headRestLocalRot;
+
+        // 8. Rotasi akhir absolut untuk frame ini (Bebas dari efek akumulasi/spinning)
+        Quaternion targetHeadWorldRot = lookOffset * baseHeadWorldRot;
+
+        // Interpolasikan rotasi kepala secara halus
+        headBone.rotation = Quaternion.Slerp(headBone.rotation, targetHeadWorldRot, Time.deltaTime * lookSpeed);
     }
 }

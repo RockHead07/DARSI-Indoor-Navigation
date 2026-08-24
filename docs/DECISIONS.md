@@ -619,3 +619,35 @@ Sesuai prinsip arsitektur, RAG adalah "otak" dan Avatar 3D adalah "kulit". Menca
 - Mengembangkan avatar 3D langsung di branch `main` saat RAG masih dalam proses pematangan dan belum diuji di device fisik.
 - Menghubungkan avatar langsung ke endpoint RAG yang belum stabil tanpa melalui tahap *mock data / contract-first*.
 
+
+### ADR-031 — Audit & Perbaikan CI/CD Pipeline vs Konten Projek Aktual (2026-08-24)
+
+**Konteks.**
+Hasil audit menyeluruh CI/CD pipeline terhadap isi projek aktual mengungkap tiga masalah
+kritis: (1) Unity Test Runner berjalan tanpa satupun test file, (2) `Backend/tests/`
+tidak ada sehingga pytest selalu di-skip, (3) `release-main.yml` tidak menjalankan
+backend tests — hanya `pr-validation.yml` yang menjalankan keduanya.
+
+**Keputusan.**
+1. **Backend tests di release pipeline:** `release-main.yml` ditambahkan job
+   `run-backend-tests` yang memanggil `_backend-tests.yml` secara paralel dengan
+   Unity tests — mencegah kode backend lolos tanpa validasi saat push langsung ke main.
+2. **Buat `Backend/tests/`:** Smoke test (`test_yolo_api.py`) memvalidasi endpoint
+   `/api/human` mengembalikan JSON shape yang benar dan logika `crowded` threshold.
+   YOLO dan cv2 di-mock agar test jalan tanpa model/kamera.
+3. **Buat Unity EditMode tests:** `Assets/Tests/Editor/POIDataTests.cs` memvalidasi
+   properti turunan `POIData` (ADR-021): `Floor`, `Building`, `EffectiveName`,
+   dan auto-generated `poiId`. Ini menjadikan Unity test gate bermakna.
+4. **Enable scene produksi:** `DARSi-Indoor Navigation.unity` diaktifkan kembali di
+   `EditorBuildSettings` agar `UaaLBuildScript.BuildAndroidUaaL()` mengekspor
+   scene yang benar — bukan scene testing `TestingHCM` saja.
+5. **Ruff config:** `pyproject.toml` ditambahkan dengan target Python 3.10 dan rule
+   set E/F/W/I agar linting konsisten dan reproducible.
+6. **CHANGELOG.md:** Diganti dari sisa template menjadi histori DARSI sesungguhnya
+   yang diturunkan dari 95 commit git history.
+
+**Yang Ditolak:**
+- Mennonaktifkan `_unity-tests.yml` sementara tidak ada test (lebih baik tambahkan
+  test minimal agar gate bermakna).
+- Menambahkan `run-backend-tests` sebagai `needs:` dependency dari `build-unity-uaal`
+  (backend dan Unity build independent — tidak perlu saling menunggu).

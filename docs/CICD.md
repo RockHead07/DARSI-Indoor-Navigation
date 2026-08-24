@@ -3,10 +3,12 @@
 Dokumen ini mencakup arsitektur, panduan konfigurasi, dan alur kerja **CI/CD** untuk
 proyek **DARSI-Indoor Navigation**.
 
-> **Status per 2026-08-14:** CI **belum jalan** — nol GitHub Secrets terpasang di repo
-> ini. Setiap workflow yang menyentuh Unity gagal di langkah aktivasi lisensi. Lihat
-> §3 untuk cara memperbaikinya. Ini bukan bug di workflow — arsitekturnya sudah benar,
-> cuma langkah setup manual (sekali jalan) belum selesai.
+> **Status per 2026-08-24:** Arsitektur workflow sudah **diaudit dan diperbaiki** —
+> backend tests ditambahkan ke release pipeline, Unity EditMode tests tersedia, dan
+> scene build settings diperbaiki. **Satu hal yang tersisa:** GitHub Secrets
+> (`UNITY_LICENSE`, `UNITY_EMAIL`, `UNITY_PASSWORD`) belum terpasang di repo ini.
+> Setiap workflow yang menyentuh Unity gagal di langkah aktivasi lisensi. Lihat §3
+> untuk cara memperbaikinya — langkah manual sekali jalan.
 
 ---
 
