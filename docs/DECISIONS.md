@@ -525,6 +525,22 @@ PASS, dan model juri = model generator (`openai/gpt-oss-20b` dua-duanya, jadi
 sistem menilai dirinya sendiri). Jangan kutip 100% pass rate ini di laporan
 mana pun sampai ketiganya diperbaiki dan diukur ulang.
 
+**UPDATE 2026-08-24 — kode-nya sudah diperbaiki, angka 100% (52/52) LAMA tetap
+tidak boleh dikutip sampai diukur ulang.** Perbaikan di `scripts/eval_llm_judge.py`
+(repo `darsi-backend`): (1) kegagalan panggilan juri sekarang verdict `ERROR`
+eksplisit, dipisah dari PASS/FAIL, tidak lagi otomatis lolos; (2) `GROQ_API_KEY`
+kosong sekarang `SystemExit`, bukan lolos otomatis; (3) juri (`gpt-oss-20b` via
+Groq) dan generator SEKARANG BEDA MODEL sejak ADR-029 (Bifrost/medgemma jadi
+primer) — masalah "menilai diri sendiri" berkurang untuk kasus normal, TAPI
+kalau Bifrost gagal dan jatuh ke fallback Groq, generator ikut jadi `gpt-oss-20b`
+lagi (skrip belum bisa mendeteksi kapan ini terjadi, karena `generation.py`
+tidak mengembalikan info provider mana yang menjawab). URL target default yang
+lama (quick tunnel mati) juga dihapus — sekarang wajib diisi eksplisit lewat
+`TARGET_URL`, tidak lagi diam-diam menguji host yang sudah tidak ada.
+**Belum dijalankan ulang** — 52/52 (100%) LAMA masih angka dari kode yang
+rusak, dan angka BARU belum ada sampai `python -m scripts.eval_llm_judge`
+benar-benar dieksekusi dan hasilnya dicatat di sini.
+
 ---
 
 ### ADR-029 — Provider LLM Utama Pindah dari Qwen-Lokal-di-`vm-amma` ke Bifrost Gateway Eksternal (2026-08-23)
