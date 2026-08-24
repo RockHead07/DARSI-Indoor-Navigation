@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -8,11 +9,13 @@ using TMPro;
 
 /// <summary>
 /// Tool otomatis untuk membuat dan menyiapkan Scene Sandbox Avatar Companion (Tahap 1 MVP - ADR-030).
+/// Mendukung model VRM (AvatarSample_A.vrm) maupun procedural hospital assistant avatar.
 /// Menu: DARSI > Avatar > Setup Sandbox Scene / Tools > Avatar > Setup Sandbox Scene.
 /// </summary>
 public static class AvatarSandboxSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/Sandbox_AvatarCompanion.unity";
+    private const string VRMPath = "Assets/3d-Models-Char-VRM/AvatarSample_A.vrm";
 
     [MenuItem("DARSI/Avatar/Setup Sandbox Scene")]
     [MenuItem("Tools/Avatar/Setup Sandbox Scene")]
@@ -21,19 +24,18 @@ public static class AvatarSandboxSceneBuilder
         // 1. Buat scene baru
         var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
-        // 2. Setup EventSystem dengan InputSystemUIInputModule (Wajib untuk New Input System)
+        // 2. Setup EventSystem dengan InputSystemUIInputModule (New Input System)
         var eventSystemGo = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
         // 3. Setup Kamera Bebas (WASD + Mouse Look) & Cahaya
         var mainCam = Camera.main;
         if (mainCam != null)
         {
-            mainCam.transform.position = new Vector3(0, 1.6f, 0);
+            mainCam.transform.position = new Vector3(0, 1.4f, 0);
             mainCam.transform.rotation = Quaternion.identity;
             mainCam.clearFlags = CameraClearFlags.SolidColor;
-            mainCam.backgroundColor = new Color(0.15f, 0.17f, 0.22f);
+            mainCam.backgroundColor = new Color(0.12f, 0.15f, 0.20f);
 
-            // Pasang SimpleSandboxFreeCam untuk navigasi mudah di PC Editor (New Input System)
             if (mainCam.GetComponent<SimpleSandboxFreeCam>() == null)
             {
                 mainCam.gameObject.AddComponent<SimpleSandboxFreeCam>();
@@ -47,9 +49,9 @@ public static class AvatarSandboxSceneBuilder
             var light = lightObj.GetComponent<Light>();
             if (light != null)
             {
-                light.color = new Color(1f, 0.96f, 0.9f);
-                light.intensity = 1.2f;
-                light.transform.rotation = Quaternion.Euler(50f, -30f, 0);
+                light.color = new Color(1f, 0.98f, 0.94f);
+                light.intensity = 1.3f;
+                light.transform.rotation = Quaternion.Euler(45f, -35f, 0);
             }
         }
 
@@ -59,12 +61,11 @@ public static class AvatarSandboxSceneBuilder
         floor.transform.position = Vector3.zero;
         floor.transform.localScale = new Vector3(2f, 1f, 2f);
         
-        // Buat material lantai netral
         var floorRend = floor.GetComponent<MeshRenderer>();
         if (floorRend != null)
         {
             var floorMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-            floorMat.color = new Color(0.3f, 0.35f, 0.4f);
+            floorMat.color = new Color(0.22f, 0.26f, 0.32f);
             floorRend.sharedMaterial = floorMat;
         }
 
@@ -73,55 +74,55 @@ public static class AvatarSandboxSceneBuilder
         avatarRoot.transform.position = new Vector3(0, 0, 1.8f);
         avatarRoot.transform.rotation = Quaternion.Euler(0, 180f, 0);
 
-        // Pasang Visual Model (Humanoid Model)
         GameObject visualModel = null;
-        string[] modelGuids = AssetDatabase.FindAssets("Idle t:Model");
-        if (modelGuids.Length > 0)
-        {
-            string modelPath = AssetDatabase.GUIDToAssetPath(modelGuids[0]);
-            var modelPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
-            if (modelPrefab != null)
-            {
-                visualModel = (GameObject)PrefabUtility.InstantiatePrefab(modelPrefab, avatarRoot.transform);
-                visualModel.name = "Model_Visual";
-                visualModel.transform.localPosition = Vector3.zero;
-                visualModel.transform.localRotation = Quaternion.identity;
+        Transform headTransform = null;
+        Animator animator = null;
 
-                // Pasang Animator Controller jika ada
-                var animator = visualModel.GetComponent<Animator>();
-                if (animator != null)
-                {
-                    string[] controllerGuids = AssetDatabase.FindAssets("Idle t:AnimatorController");
-                    if (controllerGuids.Length > 0)
-                    {
-                        string ctrlPath = AssetDatabase.GUIDToAssetPath(controllerGuids[0]);
-                        var runtimeCtrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(ctrlPath);
-                        if (runtimeCtrl != null)
-                        {
-                            animator.runtimeAnimatorController = runtimeCtrl;
-                        }
-                    }
-                }
+        // Cek apakah file VRM ada dan bisa di-load sebagai GameObject
+        GameObject vrmPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(VRMPath);
+        if (vrmPrefab == null)
+        {
+            // Cari prefab atau asset model VRM lainnya di 3d-Models-Char-VRM
+            string[] vrmGuids = AssetDatabase.FindAssets("t:GameObject", new[] { "Assets/3d-Models-Char-VRM" });
+            if (vrmGuids.Length > 0)
+            {
+                vrmPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(vrmGuids[0]));
             }
         }
 
-        if (visualModel == null)
+        if (vrmPrefab != null)
         {
-            // Fallback capsule placeholder
-            visualModel = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            visualModel.name = "Model_Placeholder";
-            visualModel.transform.SetParent(avatarRoot.transform, false);
-            visualModel.transform.localPosition = new Vector3(0, 0.9f, 0);
+            visualModel = (GameObject)PrefabUtility.InstantiatePrefab(vrmPrefab, avatarRoot.transform);
+            visualModel.name = "Model_Visual_VRM";
+            visualModel.transform.localPosition = Vector3.zero;
+            visualModel.transform.localRotation = Quaternion.identity;
 
-            var visor = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            visor.name = "Visor_Eyes";
-            visor.transform.SetParent(visualModel.transform, false);
-            visor.transform.localPosition = new Vector3(0, 0.35f, 0.35f);
-            visor.transform.localScale = new Vector3(0.5f, 0.2f, 0.3f);
+            animator = visualModel.GetComponent<Animator>() ?? visualModel.GetComponentInChildren<Animator>(true);
+            if (animator != null && animator.isHuman)
+            {
+                headTransform = animator.GetBoneTransform(HumanBodyBones.Head);
+            }
+            Debug.Log($"[AvatarSandboxSceneBuilder] Berhasil menginstansiasi model VRM dari: {AssetDatabase.GetAssetPath(vrmPrefab)}");
         }
 
+        // Jika VRM belum di-convert atau tidak ada, buat model 3D stylized companion assistant
+        if (visualModel == null)
+        {
+            visualModel = CreateStylizedAssistantVisual(avatarRoot.transform, out headTransform);
+        }
+
+        // Pasang Controller & Look-At ke Head Bone
         var lookAt = avatarRoot.AddComponent<AvatarLookAtController>();
+        if (headTransform != null)
+        {
+            var lookAtSo = new SerializedObject(lookAt);
+            lookAtSo.FindProperty("headBone").objectReferenceValue = headTransform;
+            lookAtSo.ApplyModifiedProperties();
+        }
+
         var safetyFade = avatarRoot.AddComponent<AvatarSafetyFade>();
+        safetyFade.CacheRenderers();
+
         var companionCtrl = avatarRoot.AddComponent<AvatarCompanionController>();
 
         // Wire serialized properties on companionCtrl
@@ -130,10 +131,9 @@ public static class AvatarSandboxSceneBuilder
         ctrlSo.FindProperty("autoSpawnOnStart").boolValue = true;
         ctrlSo.FindProperty("lookAtController").objectReferenceValue = lookAt;
         ctrlSo.FindProperty("safetyFade").objectReferenceValue = safetyFade;
-        var modelAnimator = visualModel.GetComponent<Animator>();
-        if (modelAnimator != null)
+        if (animator != null)
         {
-            ctrlSo.FindProperty("animator").objectReferenceValue = modelAnimator;
+            ctrlSo.FindProperty("animator").objectReferenceValue = animator;
         }
         ctrlSo.ApplyModifiedProperties();
 
@@ -162,7 +162,7 @@ public static class AvatarSandboxSceneBuilder
         statusRect.anchoredPosition = new Vector2(0, 60f);
         statusRect.sizeDelta = new Vector2(460f, 30f);
         var txtStatus = txtStatusGo.GetComponent<TextMeshProUGUI>();
-        txtStatus.text = "State: Spawning...";
+        txtStatus.text = "State: <b>Idle</b>";
         txtStatus.alignment = TextAlignmentOptions.Center;
         txtStatus.fontSize = 18;
         txtStatus.color = Color.white;
@@ -197,7 +197,6 @@ public static class AvatarSandboxSceneBuilder
 
         var sandboxUI = canvasGo.AddComponent<AvatarSandboxUI>();
         
-        // Serialized property setup via SerializedObject
         var so = new SerializedObject(sandboxUI);
         so.FindProperty("companionController").objectReferenceValue = companionCtrl;
         so.FindProperty("btnSpawn").objectReferenceValue = btnSpawn;
@@ -210,6 +209,100 @@ public static class AvatarSandboxSceneBuilder
         // 7. Simpan Scene
         EditorSceneManager.SaveScene(scene, ScenePath);
         Debug.Log($"[AvatarSandboxSceneBuilder] Scene berhasil dibuat dan disimpan di: {ScenePath}");
+    }
+
+    private static GameObject CreateStylizedAssistantVisual(Transform parent, out Transform headTransform)
+    {
+        var visualModel = new GameObject("Model_Visual_Stylized");
+        visualModel.transform.SetParent(parent, false);
+        visualModel.transform.localPosition = Vector3.zero;
+        visualModel.transform.localRotation = Quaternion.identity;
+
+        var whiteMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+        whiteMat.color = new Color(0.95f, 0.95f, 0.98f);
+
+        var medicalTealMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+        medicalTealMat.color = new Color(0.0f, 0.65f, 0.60f);
+
+        var visorGlowMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+        visorGlowMat.color = new Color(0.1f, 0.85f, 1.0f);
+        if (visorGlowMat.HasProperty("_EmissionColor"))
+        {
+            visorGlowMat.EnableKeyword("_EMISSION");
+            visorGlowMat.SetColor("_EmissionColor", new Color(0.1f, 0.85f, 1.0f) * 1.5f);
+        }
+
+        // Badan / Torso (Capsule)
+        var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        body.name = "Body_Torso";
+        body.transform.SetParent(visualModel.transform, false);
+        body.transform.localPosition = new Vector3(0, 0.85f, 0);
+        body.transform.localScale = new Vector3(0.55f, 0.65f, 0.45f);
+        body.GetComponent<MeshRenderer>().sharedMaterial = whiteMat;
+        Object.DestroyImmediate(body.GetComponent<Collider>());
+
+        // Sabuk / Strip Medis (Cylinder)
+        var belt = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        belt.name = "Medical_Belt";
+        belt.transform.SetParent(body.transform, false);
+        belt.transform.localPosition = Vector3.zero;
+        belt.transform.localScale = new Vector3(1.05f, 0.15f, 1.05f);
+        belt.GetComponent<MeshRenderer>().sharedMaterial = medicalTealMat;
+        Object.DestroyImmediate(belt.GetComponent<Collider>());
+
+        // Kepala (Head Bone untuk Look-At Tracking)
+        var headBone = new GameObject("Head_Bone");
+        headBone.transform.SetParent(visualModel.transform, false);
+        headBone.transform.localPosition = new Vector3(0, 1.55f, 0);
+        headTransform = headBone.transform;
+
+        var headMesh = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        headMesh.name = "Head_Mesh";
+        headMesh.transform.SetParent(headBone.transform, false);
+        headMesh.transform.localPosition = Vector3.zero;
+        headMesh.transform.localScale = new Vector3(0.48f, 0.52f, 0.48f);
+        headMesh.GetComponent<MeshRenderer>().sharedMaterial = whiteMat;
+        Object.DestroyImmediate(headMesh.GetComponent<Collider>());
+
+        // Visor Mata Glowing
+        var visor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        visor.name = "Visor_Eyes";
+        visor.transform.SetParent(headBone.transform, false);
+        visor.transform.localPosition = new Vector3(0, 0.05f, 0.22f);
+        visor.transform.localScale = new Vector3(0.36f, 0.12f, 0.15f);
+        visor.GetComponent<MeshRenderer>().sharedMaterial = visorGlowMat;
+        Object.DestroyImmediate(visor.GetComponent<Collider>());
+
+        // Topi Medis / Nurse Cap (Cube tipis)
+        var cap = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cap.name = "Nurse_Cap";
+        cap.transform.SetParent(headBone.transform, false);
+        cap.transform.localPosition = new Vector3(0, 0.26f, -0.05f);
+        cap.transform.localScale = new Vector3(0.32f, 0.12f, 0.25f);
+        cap.GetComponent<MeshRenderer>().sharedMaterial = medicalTealMat;
+        Object.DestroyImmediate(cap.GetComponent<Collider>());
+
+        // Tangan Kiri
+        var leftArm = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        leftArm.name = "Left_Arm";
+        leftArm.transform.SetParent(visualModel.transform, false);
+        leftArm.transform.localPosition = new Vector3(-0.38f, 0.85f, 0);
+        leftArm.transform.localScale = new Vector3(0.16f, 0.45f, 0.16f);
+        leftArm.transform.localRotation = Quaternion.Euler(0, 0, -10f);
+        leftArm.GetComponent<MeshRenderer>().sharedMaterial = whiteMat;
+        Object.DestroyImmediate(leftArm.GetComponent<Collider>());
+
+        // Tangan Kanan
+        var rightArm = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        rightArm.name = "Right_Arm";
+        rightArm.transform.SetParent(visualModel.transform, false);
+        rightArm.transform.localPosition = new Vector3(0.38f, 0.85f, 0);
+        rightArm.transform.localScale = new Vector3(0.16f, 0.45f, 0.16f);
+        rightArm.transform.localRotation = Quaternion.Euler(0, 0, 10f);
+        rightArm.GetComponent<MeshRenderer>().sharedMaterial = whiteMat;
+        Object.DestroyImmediate(rightArm.GetComponent<Collider>());
+
+        return visualModel;
     }
 
     private static Button CreateButton(string name, string label, Transform parent, Color bgColor)

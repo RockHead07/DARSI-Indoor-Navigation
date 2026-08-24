@@ -8,7 +8,7 @@
         "com.unity.inputsystem": "1.1.1",
         "com.unity.cloud.gltfast": "6.12.1"
       },
-      "hash": "620446adff3fa0b064fdea90ee35100370006146"
+      "hash": "80a27c71362179181f3a7419314c5ebe9b64a19f"
     },
     "com.coplaydev.unity-mcp": {
       "version": "file:com.coplaydev.unity-mcp",
@@ -413,6 +413,25 @@
       "depth": 0,
       "source": "embedded",
       "dependencies": {}
+    },
+    "com.vrmc.gltf": {
+      "version": "0.127.2",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.animation": "1.0.0"
+      },
+      "url": "https://package.openupm.com"
+    },
+    "com.vrmc.univrm": {
+      "version": "0.127.2",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.vrmc.gltf": "0.127.2",
+        "com.unity.ugui": "1.0.0"
+      },
+      "url": "https://package.openupm.com"
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
