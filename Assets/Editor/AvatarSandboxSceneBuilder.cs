@@ -2,6 +2,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 using TMPro;
 
@@ -20,8 +21,8 @@ public static class AvatarSandboxSceneBuilder
         // 1. Buat scene baru
         var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
-        // 2. Setup EventSystem (Wajib untuk UI Button Clicks)
-        var eventSystemGo = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        // 2. Setup EventSystem dengan InputSystemUIInputModule (Wajib untuk New Input System)
+        var eventSystemGo = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
         // 3. Setup Kamera Bebas (WASD + Mouse Look) & Cahaya
         var mainCam = Camera.main;
@@ -32,7 +33,7 @@ public static class AvatarSandboxSceneBuilder
             mainCam.clearFlags = CameraClearFlags.SolidColor;
             mainCam.backgroundColor = new Color(0.15f, 0.17f, 0.22f);
 
-            // Pasang SimpleSandboxFreeCam untuk navigasi mudah di PC Editor
+            // Pasang SimpleSandboxFreeCam untuk navigasi mudah di PC Editor (New Input System)
             if (mainCam.GetComponent<SimpleSandboxFreeCam>() == null)
             {
                 mainCam.gameObject.AddComponent<SimpleSandboxFreeCam>();
