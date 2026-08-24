@@ -17,7 +17,7 @@ public class VRMRuntimeLoader : MonoBehaviour
 
     [Header("Visual & Orientation Settings")]
     [Tooltip("Offset rotasi model VRM agar bagian depan (wajah/dada) menghadap ke kamera.")]
-    [SerializeField] private Vector3 vrmRotationOffset = new Vector3(0, 180f, 0);
+    [SerializeField] private Vector3 vrmRotationOffset = Vector3.zero;
 
     [Tooltip("GameObject placeholder/stylized yang akan disembunyikan saat model VRM berhasil dimuat.")]
     [SerializeField] private GameObject fallbackVisual;
@@ -96,8 +96,8 @@ public class VRMRuntimeLoader : MonoBehaviour
             var lookAt = GetComponentInParent<AvatarLookAtController>();
             if (lookAt != null)
             {
-                Transform headBone = FindBoneByName(_vrmInstance.transform, "head");
-                Transform neckBone = FindBoneByName(_vrmInstance.transform, "neck");
+                Transform headBone = FindBoneByName(_vrmInstance.transform, "bip_c_head", "head");
+                Transform neckBone = FindBoneByName(_vrmInstance.transform, "bip_c_neck", "neck");
 
                 if (headBone != null)
                 {
@@ -126,10 +126,10 @@ public class VRMRuntimeLoader : MonoBehaviour
 
     private void CacheBones(Transform root)
     {
-        _leftUpperArm = FindBoneByName(root, "leftupperarm", "bip_l_upperarm", "arm_l");
-        _rightUpperArm = FindBoneByName(root, "rightupperarm", "bip_r_upperarm", "arm_r");
-        _leftLowerArm = FindBoneByName(root, "leftlowerarm", "bip_l_lowerarm", "forearm_l");
-        _rightLowerArm = FindBoneByName(root, "rightlowerarm", "bip_r_lowerarm", "forearm_r");
+        _leftUpperArm = FindBoneByName(root, "bip_l_upperarm", "leftupperarm", "arm_l");
+        _rightUpperArm = FindBoneByName(root, "bip_r_upperarm", "rightupperarm", "arm_r");
+        _leftLowerArm = FindBoneByName(root, "bip_l_lowerarm", "leftlowerarm", "forearm_l");
+        _rightLowerArm = FindBoneByName(root, "bip_r_lowerarm", "rightlowerarm", "forearm_r");
 
         if (_leftUpperArm != null) _leftArmInitRot = _leftUpperArm.localRotation;
         if (_rightUpperArm != null) _rightArmInitRot = _rightUpperArm.localRotation;
@@ -137,39 +137,36 @@ public class VRMRuntimeLoader : MonoBehaviour
         if (_rightLowerArm != null) _rightForearmInitRot = _rightLowerArm.localRotation;
 
         _bonesCached = true;
+        Debug.Log($"[VRMRuntimeLoader] Arm bones cached: Left={_leftUpperArm?.name}, Right={_rightUpperArm?.name}");
     }
 
     private void LateUpdate()
     {
         if (!_bonesCached || !relaxArmTPose) return;
 
-        // Pose relaksasi lengan (menurunkan tangan dari T-Pose)
+        // Pose relaksasi lengan (menurunkan tangan dari T-Pose ke samping tubuh)
         float breathe = enableBreathingSway ? Mathf.Sin(Time.time * 2.0f) * 1.5f : 0f;
 
         if (_leftUpperArm != null)
         {
-            // Turunkan lengan kiri ke samping tubuh
             Quaternion relaxLeft = Quaternion.Euler(0, 0, -(armDropAngle + breathe));
             _leftUpperArm.localRotation = relaxLeft * _leftArmInitRot;
         }
 
         if (_rightUpperArm != null)
         {
-            // Turunkan lengan kanan ke samping tubuh
             Quaternion relaxRight = Quaternion.Euler(0, 0, (armDropAngle + breathe));
             _rightUpperArm.localRotation = relaxRight * _rightArmInitRot;
         }
 
         if (_leftLowerArm != null)
         {
-            // Sedikit lekukan siku alami
             Quaternion bendLeft = Quaternion.Euler(0, 10f, -5f);
             _leftLowerArm.localRotation = bendLeft * _leftForearmInitRot;
         }
 
         if (_rightLowerArm != null)
         {
-            // Sedikit lekukan siku alami
             Quaternion bendRight = Quaternion.Euler(0, -10f, 5f);
             _rightLowerArm.localRotation = bendRight * _rightForearmInitRot;
         }

@@ -1,8 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// Mengendalikan tatapan kepala dan leher Avatar 3D agar menatap ke Camera.main secara akurat dan natural.
-/// Mendukung kalibrasi pitch (atas-bawah) dan yaw (kiri-kanan) secara presisi.
+/// Mengendalikan tatapan kepala dan leher Avatar 3D agar menatap ke Camera.main secara 100% akurat.
+/// Menggunakan World-Space Quaternion.FromToRotation yang independen dari orientasi lokal rig tulang,
+/// sehingga tidak akan pernah terbalik, miring, atau terpelintir pada model 3D/VRM apa pun.
 /// </summary>
 [DisallowMultipleComponent]
 public class AvatarLookAtController : MonoBehaviour
@@ -14,30 +15,19 @@ public class AvatarLookAtController : MonoBehaviour
     [Header("Bone References")]
     [Tooltip("Transform tulang kepala.")]
     [SerializeField] private Transform headBone;
-    [Tooltip("Transform tulang leher (opsional).")]
+    [Tooltip("Transform tulang leher (opsional, untuk mendistribusikan rotasi natural).")]
     [SerializeField] private Transform neckBone;
 
-    [Header("Angle Limits & Tuning")]
-    [Tooltip("Sudut rotasi horizontal maksimal (derajat).")]
-    [SerializeField] private float maxYawAngle = 60f;
-    [Tooltip("Sudut rotasi vertikal maksimal (derajat).")]
-    [SerializeField] private float maxPitchAngle = 35f;
+    [Header("Look-At Settings")]
+    [Tooltip("Batas sudut maksimal tatapan kepala (derajat) terhadap arah hadap tubuh.")]
+    [Range(10f, 90f)] [SerializeField] private float maxLookAngle = 65f;
     [Tooltip("Kecepatan lerp penghalusan tatapan.")]
     [SerializeField] private float lookSpeed = 8.0f;
     [Range(0f, 1f)] [SerializeField] private float overallWeight = 1.0f;
 
-    [Header("Inversion / Calibration")]
-    [Tooltip("Pembalikan sumbu pitch (atas/bawah).")]
-    [SerializeField] private bool invertPitch = true;
-    [Tooltip("Pembalikan sumbu yaw (kiri/kanan).")]
-    [SerializeField] private bool invertYaw = false;
-
     private Transform _target;
     private float _currentWeight = 0f;
     private bool _lookAtEnabled = true;
-    private Quaternion _initialHeadLocalRot = Quaternion.identity;
-    private Quaternion _initialNeckLocalRot = Quaternion.identity;
-    private bool _hasInitialRot = false;
 
     public bool IsLookAtEnabled
     {
@@ -48,42 +38,18 @@ public class AvatarLookAtController : MonoBehaviour
     public Transform HeadBone
     {
         get => headBone;
-        set
-        {
-            headBone = value;
-            if (headBone != null)
-            {
-                _initialHeadLocalRot = headBone.localRotation;
-                _hasInitialRot = true;
-            }
-        }
+        set => headBone = value;
     }
 
     public Transform NeckBone
     {
         get => neckBone;
-        set
-        {
-            neckBone = value;
-            if (neckBone != null)
-            {
-                _initialNeckLocalRot = neckBone.localRotation;
-            }
-        }
+        set => neckBone = value;
     }
 
     private void Awake()
     {
         ResolveTarget();
-        if (headBone != null && !_hasInitialRot)
-        {
-            _initialHeadLocalRot = headBone.localRotation;
-            _hasInitialRot = true;
-        }
-        if (neckBone != null)
-        {
-            _initialNeckLocalRot = neckBone.localRotation;
-        }
     }
 
     private void OnEnable()
@@ -110,62 +76,56 @@ public class AvatarLookAtController : MonoBehaviour
             ResolveTarget();
         }
 
+        // Penghalusan transisi bobot tatapan (fade in / out)
         float targetWeight = (_lookAtEnabled && _target != null) ? overallWeight : 0f;
         _currentWeight = Mathf.MoveTowards(_currentWeight, targetWeight, Time.deltaTime * lookSpeed);
     }
 
+    /// <summary>
+    /// Eksekusi di LateUpdate() setelah seluruh kalkulasi skinning/glTF selesai.
+    /// Menggunakan delta rotasi World Space dari transform.forward ke target direction.
+    /// </summary>
     private void LateUpdate()
     {
-        if (headBone == null || _target == null || _currentWeight < 0.01f) return;
+        if (headBone == null || _target == null || _currentWeight < 0.001f) return;
 
-        if (!_hasInitialRot)
+        // Vektor dari kepala ke target kamera
+        Vector3 headPos = headBone.position;
+        Vector3 targetPos = _target.position;
+        Vector3 dirToTarget = (targetPos - headPos).normalized;
+
+        if (dirToTarget.sqrMagnitude < 0.001f) return;
+
+        // Arah hadap tubuh avatar di world space
+        Vector3 bodyForward = transform.forward;
+
+        // Batasi sudut maksimal agar leher tidak berputar ke belakang
+        float angle = Vector3.Angle(bodyForward, dirToTarget);
+        Vector3 clampedDir = dirToTarget;
+        if (angle > maxLookAngle)
         {
-            _initialHeadLocalRot = headBone.localRotation;
-            if (neckBone != null) _initialNeckLocalRot = neckBone.localRotation;
-            _hasInitialRot = true;
+            clampedDir = Vector3.RotateTowards(bodyForward, dirToTarget, Mathf.Deg2Rad * maxLookAngle, 0f);
         }
 
-        ApplyNaturalHeadLookAt();
-    }
+        // Hitung delta rotasi world space yang dibutuhkan dari arah hadap tubuh ke arah target
+        Quaternion lookDelta = Quaternion.FromToRotation(bodyForward, clampedDir);
 
-    private void ApplyNaturalHeadLookAt()
-    {
-        Vector3 headWorldPos = headBone.position;
-        Vector3 targetWorldPos = _target.position;
-        Vector3 dirToTargetWorld = (targetWorldPos - headWorldPos).normalized;
-
-        if (dirToTargetWorld.sqrMagnitude < 0.001f) return;
-
-        // Gunakan parent dari head bone sebagai referensi lokal
-        Transform refTransform = headBone.parent != null ? headBone.parent : transform;
-        Vector3 dirLocal = refTransform.InverseTransformDirection(dirToTargetWorld);
-
-        // Yaw: Kiri / Kanan
-        float yaw = Mathf.Atan2(dirLocal.x, dirLocal.z) * Mathf.Rad2Deg;
-        // Pitch: Atas / Bawah
-        float pitch = Mathf.Asin(Mathf.Clamp(dirLocal.y, -1f, 1f)) * Mathf.Rad2Deg;
-
-        // Terapkan kalibrasi orientasi
-        if (invertPitch) pitch = -pitch;
-        if (invertYaw) yaw = -yaw;
-
-        // Batasi sudut gerak leher
-        yaw = Mathf.Clamp(yaw, -maxYawAngle, maxYawAngle) * _currentWeight;
-        pitch = Mathf.Clamp(pitch, -maxPitchAngle, maxPitchAngle) * _currentWeight;
+        // Interpolasikan delta rotasi dengan bobot aktif
+        Quaternion weightedDelta = Quaternion.Slerp(Quaternion.identity, lookDelta, _currentWeight);
 
         if (neckBone != null)
         {
-            // Leher menanggung 35% rotasi, kepala menanggung 65% rotasi
-            Quaternion neckRotOffset = Quaternion.Euler(pitch * 0.35f, yaw * 0.35f, 0f);
-            Quaternion headRotOffset = Quaternion.Euler(pitch * 0.65f, yaw * 0.65f, 0f);
+            // Bagi rotasi: 35% pada leher, 65% pada kepala
+            Quaternion neckDelta = Quaternion.Slerp(Quaternion.identity, weightedDelta, 0.35f);
+            Quaternion headDelta = Quaternion.Slerp(Quaternion.identity, weightedDelta, 0.65f);
 
-            neckBone.localRotation = Quaternion.Slerp(neckBone.localRotation, neckRotOffset * _initialNeckLocalRot, Time.deltaTime * lookSpeed);
-            headBone.localRotation = Quaternion.Slerp(headBone.localRotation, headRotOffset * _initialHeadLocalRot, Time.deltaTime * lookSpeed);
+            neckBone.rotation = neckDelta * neckBone.rotation;
+            headBone.rotation = headDelta * headBone.rotation;
         }
         else
         {
-            Quaternion headRotOffset = Quaternion.Euler(pitch, yaw, 0f);
-            headBone.localRotation = Quaternion.Slerp(headBone.localRotation, headRotOffset * _initialHeadLocalRot, Time.deltaTime * lookSpeed);
+            // Terapkan seluruh delta pada kepala
+            headBone.rotation = weightedDelta * headBone.rotation;
         }
     }
 }
