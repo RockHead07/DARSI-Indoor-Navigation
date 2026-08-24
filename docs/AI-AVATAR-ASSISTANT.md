@@ -38,11 +38,27 @@
 > yang sungguhan (27 chunk) — SAH untuk dilaporkan**, lihat
 > `docs/RETRIEVAL-EVALUATION.md` §3.1 di repo `darsi-backend`. Sisa utang yang
 > masih harus diberesin dulu:
-> - `POI_SYNC_TOKEN` di server belum dirotasi dari default.
-> - `eval_llm_judge.py` (klaim 100% pass) masih punya 3 cacat metodologi belum
->   diperbaiki — lihat catatan koreksi di ADR-028, `docs/DECISIONS.md`.
-> - Cloudflare Tunnel masih quick tunnel (URL berubah tiap restart), belum
->   Named Tunnel permanen — lihat `docs/BACKEND-SERVER-OPERATIONS.md` Metode B.
+> - ~~`POI_SYNC_TOKEN` di server belum dirotasi dari default~~ **SELESAI
+>   (2026-08-24)**, sudah dirotasi + diverifikasi (token lama ditolak 401).
+> - `eval_llm_judge.py` — kodenya sudah diperbaiki (4 cacat, bukan 3: ERROR
+>   dipisah dari PASS/FAIL, `GROQ_API_KEY` kosong = `SystemExit`, retry+backoff
+>   untuk rate-limit 429, rubrik "Tolak/Informasi" diperhalus). **Tapi masih
+>   BELUM ada angka final** — 3 percobaan run 52 skenario semuanya terhenti di
+>   tengah jalan (restart server, rate-limit Groq, lalu gangguan sesi + 503
+>   gateway Bifrost tidak stabil). Dari hasil PARSIAL run-run itu ketemu 3
+>   celah konten/kosakata nyata (jadwal dokter tanpa lokasi poli, "spiral
+>   KB"/"implan"/"susuk" tidak dikenali, chunk "cara bikin janji temu" yang
+>   terhapus saat corpus ditulis ulang) — **sudah diperbaiki di kode/corpus
+>   lokal repo `darsi-backend` tapi BELUM DI-DEPLOY ke server**. Sesi
+>   berikutnya: deploy dulu (`git push`+`pull`+`docker compose up -d --build`+
+>   ingest ulang corpus), baru jalankan `eval_llm_judge.py` sampai tuntas
+>   52/52 untuk angka yang sah dikutip.
+> - ~~Cloudflare Tunnel masih quick tunnel~~ **SELESAI (2026-08-24)**: Named
+>   Tunnel permanen aktif di `https://api-darsi.rockhead07.tech` (domain
+>   `rockhead07.tech`, dibuat lewat CLI `cloudflared tunnel login/create/route
+>   dns` — BUKAN dashboard Zero Trust, itu minta aktivasi produk berbayar
+>   yang butuh kartu), jalan sebagai systemd service, survive restart/reboot.
+>   Sudah dipasang ke `AssistantClient.baseUrl` di scene `TestingHCM.unity`.
 > - **Belum pernah dites di device Android fisik pakai mic asli** — seluruh
 >   verifikasi sejauh ini lewat Unity Editor Play mode.
 > - Gerbang skor retrieval (`MIN_TOP_SCORE=0.22`) masih dikenal menolak
