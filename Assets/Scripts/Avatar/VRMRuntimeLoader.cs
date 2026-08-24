@@ -5,7 +5,8 @@ using GLTFast;
 
 /// <summary>
 /// Komponen otomatis untuk memuat file .vrm (GLTF 2.0 Binary) langsung ke dalam karakter Avatar.
-/// Menggunakan glTFast yang sudah terpasang di proyek untuk me-render 3D avatar seutuhnya.
+/// Mengatur orientasi hadap avatar ke arah kamera, menghubungkan tulang leher/kepala ke LookAt,
+/// serta merelaksasikan lengan dari T-Pose kaku menjadi pose berdiri santai (Natural Idle).
 /// </summary>
 [DisallowMultipleComponent]
 public class VRMRuntimeLoader : MonoBehaviour
@@ -14,11 +15,30 @@ public class VRMRuntimeLoader : MonoBehaviour
     [Tooltip("Path relatif dari file .vrm di dalam Assets.")]
     [SerializeField] private string vrmRelativePath = "Assets/3d-Models-Char-VRM/AvatarSample_A.vrm";
 
+    [Header("Visual & Orientation Settings")]
+    [Tooltip("Offset rotasi model VRM agar bagian depan (wajah/dada) menghadap ke kamera.")]
+    [SerializeField] private Vector3 vrmRotationOffset = new Vector3(0, 180f, 0);
+
     [Tooltip("GameObject placeholder/stylized yang akan disembunyikan saat model VRM berhasil dimuat.")]
     [SerializeField] private GameObject fallbackVisual;
 
+    [Header("Natural Pose Settings")]
+    [Tooltip("Otomatis menurunkan lengan dari T-Pose ke pose berdiri santai.")]
+    [SerializeField] private bool relaxArmTPose = true;
+    [SerializeField] private float armDropAngle = 65f;
+    [SerializeField] private bool enableBreathingSway = true;
+
     private GltfImport _gltfImport;
     private GameObject _vrmInstance;
+    private Transform _leftUpperArm;
+    private Transform _rightUpperArm;
+    private Transform _leftLowerArm;
+    private Transform _rightLowerArm;
+    private Quaternion _leftArmInitRot = Quaternion.identity;
+    private Quaternion _rightArmInitRot = Quaternion.identity;
+    private Quaternion _leftForearmInitRot = Quaternion.identity;
+    private Quaternion _rightForearmInitRot = Quaternion.identity;
+    private bool _bonesCached = false;
 
     private async void Awake()
     {
@@ -42,8 +62,6 @@ public class VRMRuntimeLoader : MonoBehaviour
         Debug.Log($"[VRMRuntimeLoader] Memuat model VRM dari: {fullPath} ...");
 
         _gltfImport = new GltfImport();
-        
-        // Muat file GLTF/VRM
         bool success = await _gltfImport.Load($"file://{fullPath.Replace('\\', '/')}");
 
         if (!success)
@@ -52,13 +70,13 @@ public class VRMRuntimeLoader : MonoBehaviour
             return false;
         }
 
-        // Buat GameObject penampung di bawah objek ini
+        // Buat GameObject penampung
         _vrmInstance = new GameObject("VRM_Character_Model");
         _vrmInstance.transform.SetParent(transform, false);
         _vrmInstance.transform.localPosition = Vector3.zero;
-        _vrmInstance.transform.localRotation = Quaternion.identity;
+        _vrmInstance.transform.localRotation = Quaternion.Euler(vrmRotationOffset);
 
-        // Instansiasi scene 3D dari GLTF/VRM
+        // Instansiasi hierarki 3D dari GLTF/VRM
         bool instantiated = await _gltfImport.InstantiateMainSceneAsync(_vrmInstance.transform);
 
         if (instantiated)
@@ -71,19 +89,29 @@ public class VRMRuntimeLoader : MonoBehaviour
                 fallbackVisual.SetActive(false);
             }
 
-            // Hubungkan Head bone & Look-At Controller
+            // Temukan tulang-tulang utama VRM
+            CacheBones(_vrmInstance.transform);
+
+            // Hubungkan Head bone & Neck bone ke AvatarLookAtController
             var lookAt = GetComponentInParent<AvatarLookAtController>();
             if (lookAt != null)
             {
-                Transform headBone = FindHeadBone(_vrmInstance.transform);
+                Transform headBone = FindBoneByName(_vrmInstance.transform, "head");
+                Transform neckBone = FindBoneByName(_vrmInstance.transform, "neck");
+
                 if (headBone != null)
                 {
                     lookAt.HeadBone = headBone;
                     Debug.Log($"[VRMRuntimeLoader] Head Bone terhubung ke: {headBone.name}");
                 }
+                if (neckBone != null)
+                {
+                    lookAt.NeckBone = neckBone;
+                    Debug.Log($"[VRMRuntimeLoader] Neck Bone terhubung ke: {neckBone.name}");
+                }
             }
 
-            // Perbarui target renderer pada AvatarSafetyFade
+            // Perbarui renderer pada AvatarSafetyFade
             var safetyFade = GetComponentInParent<AvatarSafetyFade>();
             if (safetyFade != null)
             {
@@ -96,15 +124,68 @@ public class VRMRuntimeLoader : MonoBehaviour
         return false;
     }
 
-    private Transform FindHeadBone(Transform root)
+    private void CacheBones(Transform root)
     {
-        // Cari bone dengan nama Head / J_Bip_C_Head (standar VRM)
+        _leftUpperArm = FindBoneByName(root, "leftupperarm", "bip_l_upperarm", "arm_l");
+        _rightUpperArm = FindBoneByName(root, "rightupperarm", "bip_r_upperarm", "arm_r");
+        _leftLowerArm = FindBoneByName(root, "leftlowerarm", "bip_l_lowerarm", "forearm_l");
+        _rightLowerArm = FindBoneByName(root, "rightlowerarm", "bip_r_lowerarm", "forearm_r");
+
+        if (_leftUpperArm != null) _leftArmInitRot = _leftUpperArm.localRotation;
+        if (_rightUpperArm != null) _rightArmInitRot = _rightUpperArm.localRotation;
+        if (_leftLowerArm != null) _leftForearmInitRot = _leftLowerArm.localRotation;
+        if (_rightLowerArm != null) _rightForearmInitRot = _rightLowerArm.localRotation;
+
+        _bonesCached = true;
+    }
+
+    private void LateUpdate()
+    {
+        if (!_bonesCached || !relaxArmTPose) return;
+
+        // Pose relaksasi lengan (menurunkan tangan dari T-Pose)
+        float breathe = enableBreathingSway ? Mathf.Sin(Time.time * 2.0f) * 1.5f : 0f;
+
+        if (_leftUpperArm != null)
+        {
+            // Turunkan lengan kiri ke samping tubuh
+            Quaternion relaxLeft = Quaternion.Euler(0, 0, -(armDropAngle + breathe));
+            _leftUpperArm.localRotation = relaxLeft * _leftArmInitRot;
+        }
+
+        if (_rightUpperArm != null)
+        {
+            // Turunkan lengan kanan ke samping tubuh
+            Quaternion relaxRight = Quaternion.Euler(0, 0, (armDropAngle + breathe));
+            _rightUpperArm.localRotation = relaxRight * _rightArmInitRot;
+        }
+
+        if (_leftLowerArm != null)
+        {
+            // Sedikit lekukan siku alami
+            Quaternion bendLeft = Quaternion.Euler(0, 10f, -5f);
+            _leftLowerArm.localRotation = bendLeft * _leftForearmInitRot;
+        }
+
+        if (_rightLowerArm != null)
+        {
+            // Sedikit lekukan siku alami
+            Quaternion bendRight = Quaternion.Euler(0, -10f, 5f);
+            _rightLowerArm.localRotation = bendRight * _rightForearmInitRot;
+        }
+    }
+
+    private Transform FindBoneByName(Transform root, params string[] matchPatterns)
+    {
         foreach (var t in root.GetComponentsInChildren<Transform>(true))
         {
             string n = t.name.ToLower();
-            if (n == "head" || n.Contains("bip_c_head") || n.Contains("head_bone") || n == "j_sec_c_head")
+            foreach (var pattern in matchPatterns)
             {
-                return t;
+                if (n.Contains(pattern.ToLower()))
+                {
+                    return t;
+                }
             }
         }
         return null;

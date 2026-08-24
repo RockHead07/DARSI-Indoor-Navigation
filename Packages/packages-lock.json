@@ -414,25 +414,6 @@
       "source": "embedded",
       "dependencies": {}
     },
-    "com.vrmc.gltf": {
-      "version": "0.127.2",
-      "depth": 1,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.modules.animation": "1.0.0"
-      },
-      "url": "https://package.openupm.com"
-    },
-    "com.vrmc.univrm": {
-      "version": "0.127.2",
-      "depth": 0,
-      "source": "registry",
-      "dependencies": {
-        "com.vrmc.gltf": "0.127.2",
-        "com.unity.ugui": "1.0.0"
-      },
-      "url": "https://package.openupm.com"
-    },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
       "depth": 0,
