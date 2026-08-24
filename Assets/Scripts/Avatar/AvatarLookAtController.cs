@@ -62,11 +62,6 @@ public class AvatarLookAtController : MonoBehaviour
         }
     }
 
-    private void OnEnable()
-    {
-        ResolveTarget();
-    }
-
     private void ResolveTarget()
     {
         if (targetOverride != null)

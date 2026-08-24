@@ -97,8 +97,6 @@ public class VRMRuntimeLoader : MonoBehaviour
             if (lookAt != null)
             {
                 Transform headBone = FindBoneByName(_vrmInstance.transform, "bip_c_head", "head");
-                Transform neckBone = FindBoneByName(_vrmInstance.transform, "bip_c_neck", "neck");
-
                 if (headBone != null)
                 {
                     lookAt.HeadBone = headBone;
