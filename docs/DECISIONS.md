@@ -525,6 +525,22 @@ PASS, dan model juri = model generator (`openai/gpt-oss-20b` dua-duanya, jadi
 sistem menilai dirinya sendiri). Jangan kutip 100% pass rate ini di laporan
 mana pun sampai ketiganya diperbaiki dan diukur ulang.
 
+**UPDATE 2026-08-24 — kode-nya sudah diperbaiki, angka 100% (52/52) LAMA tetap
+tidak boleh dikutip sampai diukur ulang.** Perbaikan di `scripts/eval_llm_judge.py`
+(repo `darsi-backend`): (1) kegagalan panggilan juri sekarang verdict `ERROR`
+eksplisit, dipisah dari PASS/FAIL, tidak lagi otomatis lolos; (2) `GROQ_API_KEY`
+kosong sekarang `SystemExit`, bukan lolos otomatis; (3) juri (`gpt-oss-20b` via
+Groq) dan generator SEKARANG BEDA MODEL sejak ADR-029 (Bifrost/medgemma jadi
+primer) — masalah "menilai diri sendiri" berkurang untuk kasus normal, TAPI
+kalau Bifrost gagal dan jatuh ke fallback Groq, generator ikut jadi `gpt-oss-20b`
+lagi (skrip belum bisa mendeteksi kapan ini terjadi, karena `generation.py`
+tidak mengembalikan info provider mana yang menjawab). URL target default yang
+lama (quick tunnel mati) juga dihapus — sekarang wajib diisi eksplisit lewat
+`TARGET_URL`, tidak lagi diam-diam menguji host yang sudah tidak ada.
+**Belum dijalankan ulang** — 52/52 (100%) LAMA masih angka dari kode yang
+rusak, dan angka BARU belum ada sampai `python -m scripts.eval_llm_judge`
+benar-benar dieksekusi dan hasilnya dicatat di sini.
+
 ---
 
 ### ADR-029 — Provider LLM Utama Pindah dari Qwen-Lokal-di-`vm-amma` ke Bifrost Gateway Eksternal (2026-08-23)
@@ -581,3 +597,25 @@ ditulis). Prioritas lapangan berikutnya: satu panggilan uji manual dari
 - Menyimpan service `ollama` di `docker-compose.yml` dalam keadaan nonaktif
   "untuk jaga-jaga" — kode mati untuk hardware yang tidak akan pernah ada di
   server ini cuma menambah kebingungan pembaca berikutnya.
+
+---
+
+### ADR-030 — Isolasi Pengembangan Eksperimental AI 3D Avatar di Branch Terpisah (`feature/vrm-avatar-assistant`) (2026-08-24)
+
+**Konteks.**
+Modul RAG Assistant backend saat ini sedang dalam fase pematangan dan evaluasi klinis/retrieval (pengujian performa, akurasi jadwal dokter terstruktur, dan validasi device fisik). Di saat bersamaan, kebutuhan untuk memulai pembuatan dan integrasi visual 3D Avatar Assistant (VRM, Mecanim, Look-At, Lip-Sync) mulai disiapkan.
+
+Sesuai prinsip arsitektur, RAG adalah "otak" dan Avatar 3D adalah "kulit". Mencampur pengembangan visual 3D ke dalam branch utama saat RAG masih diverifikasi berisiko merusak kestabilan scene navigasi aktif (`WholePSDKU`) dan mengaburkan pengujian lapangan.
+
+**Keputusan.**
+1. **Branch Terisolasi:** Seluruh pengembangan aset 3D, paket UniVRM, skrip pengontrol avatar, dan pipeline visual dilakukan di branch terpisah: `feature/vrm-avatar-assistant`.
+2. **Pengembangan Bertahap (MVP Incremental):**
+   - **Tahap 1 (Visual Companion / Passive):** Fokus pada kemunculan avatar saat dipicu (*trigger spawn*), tatapan dinamis ke kamera (`VRMLookAtHead`), animasi dasar (*Idle, Wave, Pointing*), dan *fade-out despawn* tanpa dependensi TTS/audio streaming (pola *Mita/Pokemon GO*).
+   - **Tahap 2 (Audio & Viseme Lip-Sync):** Integrasi TTS dan sinkronisasi bibir berbasis *mock data/contract-first*.
+3. **Sandbox Scene Terpisah:** Dilarang mengubah scene produksi `WholePSDKU` di branch utama selama eksplorasi awal. Semua pengujian avatar dilakukan di scene sandbox (mis. `Assets/Scenes/Sandbox_AvatarCompanion.unity`).
+4. **Merge Gate:** Branch `feature/vrm-avatar-assistant` baru diizinkan untuk di-merge ke branch `main` setelah RAG backend terbukti 100% stabil pada pengujian perangkat Android fisik.
+
+**Yang Ditolak:**
+- Mengembangkan avatar 3D langsung di branch `main` saat RAG masih dalam proses pematangan dan belum diuji di device fisik.
+- Menghubungkan avatar langsung ke endpoint RAG yang belum stabil tanpa melalui tahap *mock data / contract-first*.
+

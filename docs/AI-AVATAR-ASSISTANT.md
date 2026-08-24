@@ -50,6 +50,12 @@
 >   dioptimalkan, sengaja ditunda supaya tidak membakar set uji `test-2`.
 > Selesaikan daftar ini dulu sebelum membuka pekerjaan avatar 3D di bawah —
 > avatar butuh RAG yang stabil sebagai fondasi jawabannya, bukan sebaliknya.
+>
+> 📌 **Update 2026-08-24 (ADR-030):** Eksplorasi visual & aset avatar 3D (Tahap 1: Visual Companion)
+> diizinkan berjalan secara paralel dan terisolasi pada branch terpisah `feature/vrm-avatar-assistant`
+> dengan scene sandbox `Sandbox_AvatarCompanion.unity` tanpa mengganggu branch `main` atau
+> scene produksi `WholePSDKU`.
+
 
 ---
 
