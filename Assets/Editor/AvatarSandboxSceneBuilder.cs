@@ -1,12 +1,14 @@
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
 /// Tool otomatis untuk membuat dan menyiapkan Scene Sandbox Avatar Companion (Tahap 1 MVP - ADR-030).
-/// Menu: Tools > DARSI Avatar > Setup Sandbox Scene.
+/// Menu: DARSI > Avatar > Setup Sandbox Scene / Tools > Avatar > Setup Sandbox Scene.
 /// </summary>
 public static class AvatarSandboxSceneBuilder
 {
@@ -19,7 +21,10 @@ public static class AvatarSandboxSceneBuilder
         // 1. Buat scene baru
         var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
-        // 2. Setup Kamera & Cahaya
+        // 2. Setup EventSystem (Wajib untuk UI Button Clicks)
+        var eventSystemGo = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+
+        // 3. Setup Kamera Bebas (WASD + Mouse Look) & Cahaya
         var mainCam = Camera.main;
         if (mainCam != null)
         {
@@ -27,20 +32,26 @@ public static class AvatarSandboxSceneBuilder
             mainCam.transform.rotation = Quaternion.identity;
             mainCam.clearFlags = CameraClearFlags.SolidColor;
             mainCam.backgroundColor = new Color(0.12f, 0.14f, 0.18f);
+
+            // Pasang SimpleSandboxFreeCam untuk navigasi mudah di PC Editor
+            if (mainCam.GetComponent<SimpleSandboxFreeCam>() == null)
+            {
+                mainCam.gameObject.AddComponent<SimpleSandboxFreeCam>();
+            }
         }
 
-        // 3. Buat Lantai Grid (Simulasi Ruangan RS)
+        // 4. Buat Lantai Grid (Simulasi Ruangan RS)
         var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
         floor.name = "Floor_Grid";
         floor.transform.position = Vector3.zero;
         floor.transform.localScale = new Vector3(2f, 1f, 2f);
 
-        // 4. Buat Avatar Companion GameObject
+        // 5. Buat Avatar Companion GameObject
         var avatarRoot = new GameObject("Avatar_Companion");
         avatarRoot.transform.position = new Vector3(0, 0, 1.8f);
         avatarRoot.transform.rotation = Quaternion.Euler(0, 180f, 0);
 
-        // Pasang Visual Model (Placeholder Humanoid jika model fbx ada)
+        // Pasang Visual Model (Humanoid Model)
         GameObject visualModel = null;
         string[] modelGuids = AssetDatabase.FindAssets("Idle t:Model");
         if (modelGuids.Length > 0)
@@ -53,6 +64,22 @@ public static class AvatarSandboxSceneBuilder
                 visualModel.name = "Model_Visual";
                 visualModel.transform.localPosition = Vector3.zero;
                 visualModel.transform.localRotation = Quaternion.identity;
+
+                // Pasang Animator Controller jika ada
+                var animator = visualModel.GetComponent<Animator>();
+                if (animator != null)
+                {
+                    string[] controllerGuids = AssetDatabase.FindAssets("Idle t:AnimatorController");
+                    if (controllerGuids.Length > 0)
+                    {
+                        string ctrlPath = AssetDatabase.GUIDToAssetPath(controllerGuids[0]);
+                        var runtimeCtrl = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(ctrlPath);
+                        if (runtimeCtrl != null)
+                        {
+                            animator.runtimeAnimatorController = runtimeCtrl;
+                        }
+                    }
+                }
             }
         }
 
@@ -64,7 +91,6 @@ public static class AvatarSandboxSceneBuilder
             visualModel.transform.SetParent(avatarRoot.transform, false);
             visualModel.transform.localPosition = new Vector3(0, 0.9f, 0);
 
-            // Visor mata
             var visor = GameObject.CreatePrimitive(PrimitiveType.Cube);
             visor.name = "Visor_Eyes";
             visor.transform.SetParent(visualModel.transform, false);
@@ -76,7 +102,7 @@ public static class AvatarSandboxSceneBuilder
         var safetyFade = avatarRoot.AddComponent<AvatarSafetyFade>();
         var companionCtrl = avatarRoot.AddComponent<AvatarCompanionController>();
 
-        // 5. Buat Canvas UI Sandbox
+        // 6. Buat Canvas UI Sandbox
         var canvasGo = new GameObject("Canvas_SandboxUI");
         var canvas = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -92,7 +118,7 @@ public static class AvatarSandboxSceneBuilder
         panelRect.pivot = new Vector2(0.5f, 0f);
         panelRect.anchoredPosition = new Vector2(0, 30f);
         panelRect.sizeDelta = new Vector2(500f, 180f);
-        panelGo.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.12f, 0.85f);
+        panelGo.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.12f, 0.88f);
 
         // Status Text
         var txtStatusGo = new GameObject("Txt_Status", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -146,7 +172,7 @@ public static class AvatarSandboxSceneBuilder
         so.FindProperty("txtDistance").objectReferenceValue = txtDist;
         so.ApplyModifiedProperties();
 
-        // 6. Simpan Scene
+        // 7. Simpan Scene
         EditorSceneManager.SaveScene(scene, ScenePath);
         Debug.Log($"[AvatarSandboxSceneBuilder] Scene berhasil dibuat dan disimpan di: {ScenePath}");
     }
