@@ -164,6 +164,19 @@ Berdasarkan panduan resmi **Google ARCore** dan keputusan arsitektur proyek ([`F
 | **Mini Floating Companion (Pojok HUD)** | ✅ **Aman:** Berukuran kecil di sudut pandang, tidak memblokir jalur jalan, tetap memberikan reaksi suara dan visual. | **Disetujui** sebagai opsi pemandu AR. |
 | **Virtual Info Kiosk (Lobi / Titik Statis)** | ✅ **Aman:** Avatar hanya berdiri di titik awal (seperti meja informasi lobi), menghilang saat user mulai berjalan. | **Disetujui** sebagai opsi resepsionis digital. |
 | **Pre-AR Assistant (Layar Home / WebView)** | ✅ **Sangat Aman & Ringan:** Interaksi penuh tanya jawab konsultasi terjadi sebelum user berjalan di koridor. | **Sangat Direkomendasikan** untuk tahap awal. |
+| **Lead-Follow Guide (berjalan memimpin di rute)** | ⚠️ **Sedang, bisa dikelola:** Avatar bergerak *menjauh* sambil memimpin sehingga tidak parkir di depan wajah, tetapi bisa membelok di tikungan dan muncul mendadak di jarak dekat. | **Disetujui bersyarat** (ADR-034), wajib dengan safety fade yang **terbukti menyala** dan gate lokalisasi. |
+
+> 📌 **Update 2026-08-24 (ADR-034).** Baris *Lead-Follow Guide* adalah model penempatan yang
+> dipilih untuk pengembangan lanjutan, menggantikan spawn statis Tahap 1. Dua batasan yang
+> mengikat dan tidak boleh dilewati: (1) avatar **tidak memiliki `NavMeshAgent` sendiri**, ia
+> menyusuri polyline rute yang sudah dihitung MultiSet SDK; (2) locomotion **tidak boleh
+> diaktifkan** sebelum `AvatarSafetyFade` terbukti bekerja lewat observasi Play mode sungguhan;
+> (3) **informasi rute dibawa audio**, visual hanya penguat, sehingga lead-follow tidak boleh
+> dirilis sebelum TTS (ADR-033) berfungsi. Tanpa lapisan audio, model ini berubah jadi "pengguna
+> berjalan di koridor sambil menatap layar", persis bahaya yang tabel di atas ingin cegah.
+> Baca ADR-034 di `docs/DECISIONS.md` sebelum menyentuh kode avatar. State machine §5 di bawah
+> masih menggambarkan alur Tahap 1 (statis) dan akan menyusul diperbarui ke FSM Lead-Follow;
+> kalau keduanya berbeda, **ADR-034 yang berlaku**.
 
 ---
 

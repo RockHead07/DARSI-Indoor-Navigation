@@ -686,3 +686,341 @@ Pada Milestone 2 AI Avatar Assistant DARSI, dibutuhkan modul Text-to-Speech (TTS
 - Menggunakan **Kokoro TTS** untuk bahasa Indonesia karena belum memiliki phonemizer native ID.
 - Menggunakan **Supertonic / Supertone Play Cloud** karena transisi penutupan layanan cloud per Agustus 2026 dan minimnya korpus intonasi medis bahasa Indonesia.
 - Menggunakan **XTTS v2 / Generative Voice Cloning** di fase awal karena kebutuhan GPU VRAM besar ($\ge 6\,\text{GB}$) dan latensi yang lebih tinggi untuk respon interaktif.
+
+---
+
+### ADR-034 — Model Penempatan Avatar: *Lead-Follow Guide* di Atas Path MultiSet (2026-08-24)
+
+**Konteks.**
+Tahap 1 ADR-030 menghasilkan `AvatarCompanionController` yang memunculkan avatar berukuran
+penuh secara statis di depan kamera (`spawnDistance = 1.8`). Padahal `AI-AVATAR-ASSISTANT.md`
+§4.1 secara eksplisit **menolak** model "Spawn Besar 1.5m di Depan Kamera" untuk sesi navigasi
+berjalan, karena menutupi pandangan koridor fisik. Yang disetujui di tabel itu hanya *Mini
+Floating Companion* dan *Virtual Info Kiosk*. Jadi implementasi Tahap 1 secara formal
+bertentangan dengan dokumen keselamatannya sendiri.
+
+Arah yang dipilih pemilik proyek (referensi karakter *MiSide*): avatar **berjalan di atas
+NavMesh, memimpin pengguna ke tujuan, dan menjawab pertanyaan seputar navigasi indoor**.
+Ini adalah model penempatan **keempat** yang belum tercatat di §4.1, dan secara keselamatan
+justru lebih baik daripada yang ditolak: avatar bergerak menjauh sambil memimpin, tidak
+pernah parkir diam di depan wajah pengguna. Rancangannya sudah ada sebagai Task 6
+(`AIAvatarGuideController`, FSM Lead-Follow) di
+`docs/superpowers/plans/2026-08-24-ai-avatar-assistant-guide.md`.
+
+Audit branch `feature/vrm-avatar-assistant` (2026-08-24) menemukan tiga hal yang mengubah
+bentuk keputusan ini:
+
+1. **Rute sudah punya pemilik.** `NavigationController.instance.agent` dari MultiSet SDK
+   **sudah** berupa `NavMeshAgent` yang menghitung rute, dan `ShowPath` sudah menggambar
+   garisnya. Terverifikasi di `Assets/Scripts/Multiplayer/NavigationControllerExtension.cs`
+   baris 29 dan 79. Draft Task 6 menambahkan `NavMeshAgent` **kedua** yang menghitung ulang
+   rute yang sama.
+2. **Protokol keselamatan §4 belum pernah benar-benar menyala.** `AvatarSafetyFade` gagal
+   karena tiga sebab sekaligus: array `targetRenderers` ter-serialize di edit time berisi
+   renderer placeholder (sehingga `CacheRenderers()` runtime ter-guard `Length == 0`), jarak
+   diukur dari root di telapak kaki (Y=0) terhadap kamera setinggi ~1.4m sehingga ambang
+   0.9m mustahil tercapai, dan alpha di-set lewat `MaterialPropertyBlock` ke material opaque.
+3. **Rig humanoid tidak ada.** UniVRM tidak pernah benar-benar terpasang (`Packages/manifest.json`
+   tidak punya `com.vrmc.*`); model dimuat runtime lewat glTFast yang hanya menghasilkan
+   Generic rig tanpa pemetaan `HumanBodyBones`.
+
+**Keputusan.**
+
+1. **Model penempatan resmi: *Lead-Follow Guide*.** Tambahkan baris keempat pada tabel
+   `AI-AVATAR-ASSISTANT.md` §4.1: avatar berjalan memimpin di depan pengguna sepanjang rute
+   aktif, berhenti dan menoleh saat pengguna tertinggal, menunjuk saat tiba di tujuan.
+   Status: **Disetujui untuk sesi navigasi berjalan**, dengan syarat keputusan 4 dan 5
+   di bawah terpenuhi.
+
+2. **Avatar TIDAK memiliki `NavMeshAgent` sendiri.** Avatar berjalan dengan menginterpolasi
+   posisinya sepanjang polyline rute yang **sudah dihitung SDK**, dengan offset `leadDistance`
+   di depan pengguna. Satu pemilik untuk pertanyaan "rutenya lewat mana", yaitu MultiSet SDK.
+   Ini penerapan langsung prinsip ADR-021: data diturunkan dari satu pemilik sah, tidak disalin
+   atau dihitung ulang.
+
+   **Sumber rute yang benar adalah `ShowPath.instance`, bukan `navController.agent.path`.**
+   Revisi pertama ADR ini menulis `navController.agent.path.corners`, itu **keliru**. Verifikasi
+   refleksi (2026-08-24) menunjukkan `ShowPath` memegang field privat `NavMeshPath path` sendiri
+   yang dihitung antara dua Transform (`SetPositionFrom` → `a`, `SetPositionTo` → `b`) dan
+   digambar lewat `DrawPath(NavMeshPath)`. Artinya polyline yang **dilihat pengguna** berasal
+   dari `ShowPath.path`. Menaiki `agent.path` berisiko menghasilkan jalur yang berbeda dari
+   garis di lantai, yaitu persis kegagalan yang keputusan ini ingin cegah.
+
+   **Terbukti terukur di Play mode (2026-08-24, scene produksi).** Setelah
+   `SetPOIForNavigation()` dipanggil dan `IsCurrentlyNavigating() == true`:
+
+   | Sumber | corners | status | keterangan |
+   |---|---:|---|---|
+   | `ShowPath.path` (privat) | **3** | `PathComplete`, 17,35 m | sama persis dengan `LineRenderer.positionCount = 3` |
+   | `navController.agent.path` | **1** | `hasPath = false` | hanya titik posisi agent sendiri, rute KOSONG |
+
+   Jadi bukan sekadar "lebih rapi": kalau avatar menaiki `agent.path.corners` seperti revisi
+   pertama ADR ini, ia akan menerima **satu titik** dan tidak bergerak ke mana-mana. Pada alur
+   POI normal, SDK tidak pernah mengisi `agent` dengan rute; `agent.destination` hanya di-set
+   oleh `NavigationControllerExtension` untuk fitur navigasi-ke-teman. Kesamaan
+   `ShowPath.path.corners` dengan `LineRenderer.positionCount` juga mengonfirmasi bahwa
+   field itulah yang benar-benar digambar sebagai garis yang dilihat pengguna.
+
+   Catatan operasional dari uji yang sama: `SetPOIForNavigation()` **tidak** di-gate oleh
+   keberhasilan localize, jadi rute bisa diuji di Editor tanpa device. Ini menyangkut
+   pengujian saja dan tidak mencabut keputusan 5, yang mengatur kapan avatar boleh
+   **bergerak**, bukan kapan rute boleh dihitung.
+
+   **Titik sudut rute sudah disediakan SDK, jangan hitung sendiri.** `ShowPath` punya
+   `cornerVisualizationPrefab`, `visibleCorners[]`, `isCornersVisible`, dan
+   `UpdateVisibleCorner(int, Vector3)`. Ini melengkapi keputusan 7: titik keputusan
+   (persimpangan) tidak perlu diturunkan ulang oleh kode avatar.
+
+   **Peran `navController.agent` sudah terverifikasi: proxy posisi pengguna, bukan pejalan.**
+   Di scene produksi, GameObject `NavMeshAgent` adalah **anak dari `ARCamera`** dengan
+   `localPosition (0, -1.2, 0)`, yaitu posisi pengguna yang dijatuhkan ke lantai. Diperkuat oleh
+   field `lastAgentPosition` + `positionUpdateThreshold` pada `NavigationController`, pola
+   "pantau pergerakan pengguna lalu hitung ulang rute". Jadi agent SDK **tidak** berjalan
+   menyusuri rute, dan avatar tidak berebut peran dengannya.
+
+3. **Rig: impor UniVRM di Editor, bukan pemuatan runtime.** Impor `.vrm` sekali menjadi prefab
+   humanoid yang ikut build. `VRMRuntimeLoader.cs` dihapus seluruhnya.
+
+   **Target format: VRM 0.x**, karena aset yang ada memang VRM 0.x (terverifikasi dari header
+   glTF: `extensions.VRM`, `specVersion 0.0`, exporter VRoid Studio 1.26.0), VRoid mengekspor
+   0.x secara baku, dan §2.1 serta plan doc sudah ditulis terhadap API 0.x (`VRMBlendShapeProxy`).
+   Tidak ada kebutuhan DARSI yang dilayani lebih baik oleh VRM 1.0: look-at memakai implementasi
+   sendiri (ADR-032), dan SpringBone dibatasi/dimatikan oleh guardrail §2.2. Kalau nanti pindah
+   ke VRM 1.0, ongkosnya adalah tukar paket dan ekspor ulang dari VRoid, murah selama model RS
+   sungguhan belum diauthor.
+
+   Paket yang benar (dua-duanya wajib, UPM git URL tidak menarik dependency otomatis):
+   ```
+   "com.vrmc.gltf":   "https://github.com/vrm-c/UniVRM.git?path=/Packages/UniGLTF#v0.131.2"
+   "com.vrmc.univrm": "https://github.com/vrm-c/UniVRM.git?path=/Packages/VRM#v0.131.2"
+   ```
+   **Koreksi:** revisi pertama ADR ini menulis `com.vrmc.vrm`, itu **keliru**. `com.vrmc.vrm`
+   adalah paket VRM **1.0**; paket VRM 0.x adalah `com.vrmc.univrm`. Versi dipatok **v0.131.2**
+   secara sadar: release itu yang memperbaiki *import exception* dan obsolete warning pada
+   Unity 6.2 sampai 6.5, dan project ini di Unity 6000.3.14f1 (Unity 6.3) jatuh di rentang itu.
+
+   Catatan koeksistensi: `com.vrmc.gltf` (UniGLTF) berbeda dari `com.unity.cloud.gltfast` yang
+   sudah ada sebagai dependency transitif MultiSet. Keduanya assembly dan namespace terpisah,
+   jadi bisa hidup berdampingan.
+
+   Konsekuensinya, **ADR-032 poin 2 dan poin 4
+   dicabut**: `vrmRotationOffset` dan relaksasi T-Pose prosedural tidak lagi berlaku karena
+   keduanya adalah kompensasi terhadap keterbatasan glTFast. ADR-032 poin 1 dan poin 3
+   (rest pose absolut anti-spinning dan sinkronisasi ke `headBone.parent`) **tetap berlaku**
+   dan tetap dipakai. Alasan rig humanoid menjadi syarat, bukan preferensi: tanpa clip
+   `Walk_Forward` yang di-drive rig humanoid, avatar yang digeser sepanjang rute akan
+   terlihat mengesot di lantai.
+
+4. **`AvatarSafetyFade` yang terbukti menyala adalah *gate*, bukan pekerjaan susulan.**
+   Locomotion tidak boleh diaktifkan sebelum fade terbukti bekerja, karena avatar yang
+   berjalan bisa membelok di tikungan dan muncul tepat di muka pengguna. Tiga syarat wajib:
+   (a) renderer yang di-fade adalah renderer model VRM sungguhan, (b) jarak diukur dari bone
+   dada/kepala, bukan root di telapak kaki, (c) material avatar memakai surface type
+   transparan sehingga alpha benar-benar dihormati shader. **Bukti yang diterima adalah
+   rekaman/observasi Play mode saat fade betul-betul terlihat**, bukan pembacaan kode.
+   Alasannya ada presedennya di proyek ini: lihat catatan koreksi ADR-028, di mana sebuah
+   mekanisme keselamatan yang ADR-nya sudah percaya diri menyatakan "sudah benar" ternyata
+   masih gagal pada skenario persis yang menjadi alasan ADR itu ditulis.
+
+5. **Locomotion di-gate ke keberhasilan lokalisasi MultiSet.** Sesuai ADR-007 dan ADR-011,
+   posisi hanya sah setelah localize berhasil. `StartLeading()` tidak boleh dipanggil sebelum
+   itu, dan saat terjadi re-localize avatar wajib di-`Warp()` ulang ke titik valid pada rute.
+   Kegagalan mode ini berbahaya karena senyap: `NavMeshAgent`/sampling yang jatuh di luar
+   NavMesh tidak melempar error, avatar hanya diam membeku.
+
+6. **Sandbox dulu, lalu `TestingHCM`, dan scene produksi TIDAK dipakai sebagai lahan uji.**
+   ADR-030 poin 3 tetap berlaku: pengembangan visual/look-at/fade diuji di
+   `Sandbox_AvatarCompanion.unity`. Untuk uji integrasi dengan navmesh dan
+   `NavigationController`, dipakai `TestingHCM.unity`, bukan
+   `DARSi-Indoor Navigation.unity`.
+
+   **⚠️ Peringatan wajib dibaca sebelum menyimpulkan apa pun dari `TestingHCM`.** Kedua scene
+   **tidak berperilaku sama** persis pada dimensi yang paling menentukan untuk lead-follow.
+   Terukur 2026-08-24, rute `[Ground] Parkir Mobil` → `[Lantai1] IGD`:
+
+   | Scene | Status rute lintas lantai | OffMeshLink |
+   |---|---|---:|
+   | `DARSi-Indoor Navigation` (produksi) | `PathPartial`, 2 corner, 0,90 m | 0 |
+   | `TestingHCM` | **`PathComplete`, 17 corner**, naik 4,21 m | 0 |
+
+   Di `TestingHCM` kedua lantai **tersambung di dalam navmesh hasil bake** (lompatan Y 2,04 m
+   di corner 5, tanpa OffMeshLink), yang berarti bake-nya kemungkinan besar mendahului
+   amandemen 020-B. Akibatnya `TestingHCM` akan **meluluskan uji yang gagal di produksi**:
+   avatar tampak mulus naik lantai, padahal di produksi ia berhenti setelah 90 cm, dan
+   `ShowPath` di sana akan menggambar garis menembus plafon persis seperti yang 020-B cegah.
+
+   Aturannya: **`TestingHCM` sah untuk lead-follow DALAM SATU LANTAI** (bagian terbesar
+   pekerjaan controller). **Serah terima lift dan seluruh perilaku lintas lantai (keputusan 9)
+   WAJIB divalidasi terhadap navmesh produksi**, tidak boleh disimpulkan dari `TestingHCM`.
+
+7. **Informasi rute dibawa audio; visual adalah penguat, bukan syarat.** Instruksi arah wajib
+   lengkap dan bisa dipahami **tanpa pengguna menatap layar** ("lurus terus ya, nanti belok
+   kanan di ujung koridor").
+
+   **Avatar berjalan memimpin secara terus-menerus sepanjang rute dan tidak pernah menghilang
+   di tengah jalan.** Yang bersifat sesekali adalah **gestur penekanannya**, bukan kehadirannya:
+   di koridor lurus ia sekadar berjalan di depan pengguna, sedangkan di titik keputusan
+   (persimpangan, transisi lantai, tiba di tujuan) ia berhenti, menoleh, menunjuk, dan menunggu.
+   Yang hilang dari pengguna hanyalah *kewajiban menatap layar*, bukan pemandunya. Jangan
+   membaca poin ini sebagai "avatar hanya muncul di checkpoint", model itu justru ditolak
+   secara eksplisit di bawah.
+
+   **Titik keputusan diturunkan, bukan ditanam manual.** Persimpangan adalah `corners` dari
+   polyline rute yang sudah dihasilkan pathfinder, jadi tidak ada aset checkpoint yang perlu
+   ditandai per koridor maupun di-maintain terpisah (prinsip ADR-021). Jangan membangun tool
+   penanda checkpoint.
+
+   Pembagian kendali: **rutenya ditentukan penuh** (lewat mana, belok di mana), sedangkan
+   **tempo dan perhatiannya reaktif** terhadap pengguna (kapan menunggu saat pengguna
+   tertinggal, kapan melanjutkan, ke mana kepala menoleh, kapan memudar karena terlalu dekat).
+   Avatar tidak pernah melakukan pathfinding atau steering atas kehendaknya sendiri.
+
+   Alasannya adalah pemisahan dua hal yang mudah tertukar: **kehadiran avatar** membebani
+   *frame budget GPU*, sedangkan **informasi yang hanya tersedia secara visual** membebani
+   *atensi pengguna*. Hanya yang kedua yang berbahaya di koridor RS. Trade-off yang dipilih
+   secara sadar: bayar GPU, jangan bayar atensi orang sakit. Ini juga meniru perilaku pemandu
+   manusia sungguhan, yang berbicara sepanjang jalan dan menunjuk di tikungan, tanpa menuntut
+   wajahnya ditatap terus-menerus.
+
+   Konsekuensi turunan: lead-follow **tidak boleh** dirilis sebelum TTS (ADR-033) berfungsi.
+   Tanpa lapisan audio, model ini berubah menjadi "pengguna berjalan di koridor RS sambil
+   menatap layar", yaitu persis bahaya yang §4.1 ingin cegah.
+
+8. **Occlusion mesh diaktifkan sebagai bagian dari pekerjaan lead-follow.** Map mesh dari
+   MultiSet sudah tersedia di project (`Assets/MultiSet/MapData/MAP_*.glb`, GameObject
+   `Map Space` di scene produksi), jadi oklusi statis adalah **pekerjaan wiring yang belum
+   dilakukan**, bukan keterbatasan bawaan AR. Map mesh dirender *depth-only* (`ColorMask 0`,
+   `ZWrite On`) sehingga menulis depth buffer tanpa terlihat, dan avatar otomatis tertutup
+   tembok, pintu, serta furnitur tetap.
+
+   Catatan status saat ini, supaya tidak disalahpahami sesi berikutnya: satu-satunya skrip yang
+   menyentuh hal ini, `MapMeshColliderSetup.cs`, justru ditulis untuk **mengeluarkan** mesh dari
+   culling mask kamera (komentarnya harfiah: *"no depth writes, no visual occlusion"*), skrip itu
+   **tidak dipakai** di scene produksi, dan layer `CollisionMesh` yang dibutuhkannya **tidak ada**
+   di `TagManager.asset`. Jadi jangan berasumsi oklusi sudah menyala hanya karena mesh-nya ada.
+
+   **Batas jujur:** ini hanya menutup occluder **statis**. Orang berjalan, brankar, kursi roda,
+   dan troli **tidak** tertutup, padahal di koridor RS justru itu yang sering lewat di antara
+   pengguna dan avatar. Occluder dinamis (ARCore Depth API) **di luar cakupan** keputusan ini dan
+   belum diputuskan. Kualitas oklusi juga terikat kualitas scan, dan scan RSI sungguhan belum
+   dikerjakan (masih di backlog Sprint 2).
+
+9. **Avatar tunduk pada rute tersegmentasi ADR-020; TIDAK PERNAH satu polyline lintas lantai.**
+   Keputusan 2 di atas menyebut "polyline rute" dalam bentuk tunggal, dan itu hanya benar
+   **di dalam satu lantai**. ADR-020 (dengan amandemen 020-B) menetapkan tiap lantai adalah
+   pulau NavMesh terpisah tanpa `NavMeshLink`, jadi rute lintas lantai secara struktural
+   berupa dua segmen yang disambung serah terima di lift.
+
+   Konsekuensinya untuk lead-follow:
+   - Avatar hanya memimpin **segmen lantai saat ini**. Sampai di lift, ia berhenti, tidak
+     menembus plafon, dan tidak berpura-pura tahu jalan ke atas.
+   - Serah terima lift: avatar mengantar ke lift → berhenti/menghilang selama transisi →
+     muncul kembali di lift lantai tujuan **hanya setelah re-localize berhasil** (ADR-020
+     poin 4, konsisten dengan keputusan 5 di ADR ini).
+   - Avatar mengikuti penyaringan lantai ADR-018 sama seperti marker POI: kalau pengguna
+     tidak sedang di lantai avatar, avatar tidak dirender.
+
+   **Pakai `FloorTransitionController` yang sudah ada, jangan bangun mesin state kedua.**
+   Script itu sudah mengimplementasikan fase ADR-020 (`Idle`, `ToConnector`,
+   `AwaitingRelocalize`, `ToDestination`). Avatar menjadi **penampil** fase tersebut, bukan
+   pemilik kedua atas "sekarang lagi tahap apa" — alasan yang sama dengan keputusan 2 soal
+   rute. Perubahan aditif yang diperlukan: fase tersebut saat ini `private`, jadi perlu
+   diekspos (property read-only atau UnityEvent perubahan fase). Itu satu-satunya sentuhan
+   yang dibenarkan; jangan menduplikasi logikanya ke `AIAvatarGuideController`.
+
+   **Bukti terukur (Edit mode, 2026-08-24, scene produksi):** dalam Lantai Dasar
+   `PathComplete` 3 corner / 11,30 m; dalam Lantai 1 `PathComplete` 12 corner / 26,04 m;
+   Lift Ground → Lift Lantai1 `PathPartial` 2 corner / 0,90 m; `OffMeshLink` di scene = 0.
+   Artinya rel per-lantai memang tersedia dan terbaca untuk dinaiki avatar, dan pemisahan
+   antar lantai sesuai 020-B benar-benar terimplementasi di scene, bukan sekadar tertulis.
+
+**Yang Ditolak:**
+- **`NavMeshAgent` kedua milik avatar** (sebagaimana draft Task 6 Step 2). Dua agent di NavMesh
+  yang sama menghitung rute yang sama berarti avatar bisa memilih jalur berbeda dari garis
+  `ShowPath` yang dilihat pengguna, yaitu pemandu yang jalannya tidak sama dengan panah di lantai.
+- **Draft `AvatarSafetyFade` pada Task 6 Step 1.** Draft itu memakai `r.material.color`, yang
+  meng-*clone* material instance setiap frame per renderer. Ini regresi dari kode yang sudah
+  ada di branch, bukan perbaikan.
+- **Spawn statis berukuran penuh di depan kamera untuk sesi berjalan.** Tetap ditolak sesuai
+  §4.1. `AvatarCompanionController` diperlakukan sebagai stub Tahap 1 yang digantikan
+  `AIAvatarGuideController`, bukan sebagai fondasi yang dikembangkan lebih lanjut.
+- **Menunda perbaikan safety fade sampai locomotion jalan lebih dulu.** Urutan itu berarti
+  menguji avatar berjalan di koridor tanpa proteksi pandangan yang berfungsi.
+- **Avatar hanya muncul di titik keputusan lalu menghilang di koridor lurus.** Sempat diusulkan
+  (2026-08-24) dengan alasan menghemat frame budget, oklusi, dan waktu HP terangkat. **Ditolak**
+  setelah ditimbang dari sisi penggunanya: pengguna DARSI adalah orang sakit, lansia, dan
+  pendamping pasien yang sedang cemas, dan pemandu yang lenyap di antara persimpangan justru
+  menimbulkan keraguan ("tadi dia ke mana, aku masih benar tidak?") tepat saat orangnya paling
+  butuh kepastian. Usulan itu mengoptimalkan ongkos engineering, bukan pengalaman pengguna.
+  Kekhawatiran yang melatarinya sah, tetapi jawabannya adalah keputusan 7 (pindahkan informasi
+  rute ke audio), bukan menghilangkan kehadiran avatar.
+- **Mengasumsikan oklusi sebagai keterbatasan inheren AR.** Sempat dinyatakan demikian pada
+  diskusi yang sama dan itu **keliru**: map mesh MultiSet sudah tersedia di project dan oklusi
+  statis tinggal di-wiring (keputusan 8).
+- **Memasang `NavMeshLink` antar-lantai supaya avatar dapat satu polyline utuh.** Ini jebakan
+  yang sangat mungkin muncul: siapa pun yang menguji lead-follow akan melihat rute lintas lantai
+  mengembalikan `PathPartial` dan menyimpulkan NavMesh-nya rusak. **Bukan rusak** — itu
+  amandemen 020-B yang bekerja sebagaimana mestinya. Memasang link akan mencabut 020-B
+  diam-diam dan menghidupkan lagi dua akibat yang ditolak di sana: `ShowPath` menggambar garis
+  menembus plafon, dan **setiap** `NavMesh.CalculatePath` di proyek (termasuk kode SDK yang
+  belum diaudit) mendadak menganggap dua lantai sebagai satu ruang berjalan.
+- **Menduplikasi mesin state transisi lantai ke dalam `AIAvatarGuideController`.**
+  `FloorTransitionController` sudah memilikinya; avatar menampilkan fasenya, tidak memilikinya
+  sendiri (keputusan 9).
+
+**Status verifikasi:**
+- ✅ **SELESAI (2026-08-24).** Peran `navController.agent` sudah terjawab: proxy posisi
+  pengguna, bukan pejalan otonom. Bukti dan konsekuensinya dicatat di keputusan 2.
+- ⬜ **BELUM.** Apakah NavMesh hasil bake ikut berpindah saat MultiSet melakukan re-localize,
+  atau tetap diam di koordinat bake. Ini menentukan seberapa berat penanganan keputusan 5.
+  Perlu dicek sebelum locomotion diuji di device.
+- ✅ **SELESAI (2026-08-24, Play mode).** `ShowPath.path` terisi `PathComplete` 3 corner /
+  17,35 m saat navigasi aktif, sementara `agent.path` kosong (`hasPath=false`, 1 corner).
+  Angka dan konsekuensinya dicatat di keputusan 2. Polyline-nya terbukti terbaca dan layak
+  dinaiki avatar.
+
+### ADR-035 — Tidak Membangun Dashboard Admin Custom; Supabase Dashboard Cukup (2026-08-24)
+
+**Konteks.**
+Muncul pertanyaan apakah DARSI membutuhkan dashboard admin custom untuk analisis aplikasi
+(statistik navigasi, log AI assistant, manajemen POI) yang bisa diakses admin/atasan.
+
+Proyek sudah memiliki backend FastAPI + Supabase (PostgreSQL). Supabase menyediakan dashboard
+bawaan: table viewer, SQL editor, log viewer — semuanya sudah berfungsi tanpa development
+tambahan. Kondisi proyek saat ini: 11 POI, 1 gedung, belum production, VPS accuracy belum
+diukur di device, field test RSI belum dilakukan, AI Avatar masih brainstorming.
+
+**Keputusan.**
+
+1. **Tidak membangun dashboard admin custom pada fase ini.** DARSI adalah *wayfinding tool*,
+   bukan *analytics platform*. Admin rumah sakit/kampus tidak akan mengecek dashboard
+   analitik navigasi secara rutin — mereka punya urusan operasional yang lebih mendesak.
+   Development time lebih baik dipakai untuk mematangkan fitur inti (akurasi VPS, navigasi
+   lintas lantai, AI companion).
+
+2. **Supabase Dashboard sebagai alat monitoring default.** Untuk kebutuhan developer
+   (memeriksa data, debug, query) dan kebutuhan akademik (mengumpulkan metrik untuk
+   skripsi/laporan), Supabase Dashboard yang sudah ada lebih dari cukup. Data riset
+   diekspor via SQL query → CSV, divisualisasikan di spreadsheet.
+
+3. **Eskalasi: route `/admin` di Next.js yang sudah ada**, hanya jika dan ketika DARSI
+   sudah production di RSI dan stakeholder non-teknis (staf humas/resepsionis) membutuhkan
+   akses mandiri — misalnya mengubah status POI ("Poli Jantung tutup hari ini"). Bukan
+   dashboard analitik, melainkan form operasional sederhana. Satu codebase, satu deployment,
+   proteksi password sederhana.
+
+4. **Telemetri ringan tetap ditambahkan saat fitur-fitur inti sudah stabil.** Endpoint
+   `POST /api/analytics/event` sederhana untuk mencatat event navigasi dan query AI ke
+   tabel Postgres. Tujuannya bukan dashboard, melainkan data mentah untuk laporan akademik
+   dan tuning. Ini ditambahkan bersamaan atau setelah AI assistant dan navigasi berjalan
+   end-to-end, bukan sebelumnya.
+
+**Yang Ditolak:**
+- **Dashboard admin custom (Next.js + chart library) sebagai subsistem terpisah.** Scope
+  creep: menambah surface area development dan maintenance tanpa menyelesaikan masalah inti
+  mana pun. Pada skala DARSI saat ini, marginal benefit dashboard custom di atas Supabase
+  Dashboard mendekati nol.
+- **Self-hosted Metabase/Grafana.** Menambah infrastruktur baru yang harus di-host dan
+  di-maintain, tidak sebanding dengan skala proyek.
+- **Menunda telemetri sama sekali.** Data empiris tetap penting untuk evaluasi akademik,
+  tapi dikumpulkan lewat logging sederhana, bukan arsitektur dashboard.

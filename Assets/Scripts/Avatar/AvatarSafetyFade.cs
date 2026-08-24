@@ -67,7 +67,14 @@ public class AvatarSafetyFade : MonoBehaviour
             if (targetRenderers == null || targetRenderers.Length == 0) return;
         }
 
-        float distance = Vector3.Distance(transform.position, _cameraTransform.position);
+        // Jarak diukur HORIZONTAL saja. Root avatar ada di telapak kaki (Y=0) sedangkan
+        // kamera AR setinggi ~1.4-1.6m, jadi jarak 3D tidak pernah bisa turun di bawah
+        // tinggi kamera dan ambang fade mustahil tercapai (ADR-034 keputusan 4b).
+        // Yang relevan untuk keselamatan memang seberapa dekat badan avatar di bidang
+        // jalan pengguna, bukan selisih tingginya.
+        Vector3 flatDelta = transform.position - _cameraTransform.position;
+        flatDelta.y = 0f;
+        float distance = flatDelta.magnitude;
 
         // Hitung target alpha berdasarkan jarak ke kamera
         float targetAlpha = 1.0f;
@@ -93,6 +100,12 @@ public class AvatarSafetyFade : MonoBehaviour
     {
         if (targetRenderers == null) return;
 
+        // ponytail: fungsi keselamatannya ada di rend.enabled di bawah, BUKAN di alpha.
+        // Material MToon hasil impor VRM ber-_BlendMode 1 (Cutout, _ALPHATEST_ON), jadi
+        // _Color.a tidak memudar halus, dan MaterialPropertyBlock tidak bisa mengubah
+        // keyword/render queue. Konsekuensinya avatar HILANG mendadak, tidak memudar.
+        // Upgrade path kalau pop-nya mengganggu: set material MToon ke _BlendMode 2
+        // (Transparent) saat impor, baru alpha di bawah ini jadi berarti.
         bool shouldRender = alpha > 0.02f;
 
         foreach (var rend in targetRenderers)

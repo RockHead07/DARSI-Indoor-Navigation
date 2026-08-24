@@ -8,7 +8,7 @@
         "com.unity.inputsystem": "1.1.1",
         "com.unity.cloud.gltfast": "6.12.1"
       },
-      "hash": "80a27c71362179181f3a7419314c5ebe9b64a19f"
+      "hash": "db62e8066418bf6dddabbac64dce847560652f4f"
     },
     "com.coplaydev.unity-mcp": {
       "version": "file:com.coplaydev.unity-mcp",
@@ -413,6 +413,29 @@
       "depth": 0,
       "source": "embedded",
       "dependencies": {}
+    },
+    "com.vrmc.gltf": {
+      "version": "https://github.com/vrm-c/UniVRM.git?path=/Packages/UniGLTF#v0.131.2",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.modules.animation": "1.0.0",
+        "com.unity.modules.imgui": "1.0.0",
+        "com.unity.modules.imageconversion": "1.0.0",
+        "com.unity.test-framework": "1.4.6",
+        "com.unity.mathematics": "1.2.6"
+      },
+      "hash": "a4711bbf8c4d10659d3e5568c2e3d7d595005e51"
+    },
+    "com.vrmc.univrm": {
+      "version": "https://github.com/vrm-c/UniVRM.git?path=/Packages/VRM#v0.131.2",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.vrmc.gltf": "0.131.2",
+        "com.unity.ugui": "1.0.0"
+      },
+      "hash": "a4711bbf8c4d10659d3e5568c2e3d7d595005e51"
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",

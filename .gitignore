@@ -117,3 +117,18 @@ __pycache__/
 
 # Tooling / IDE
 .mcp.json
+
+# Placeholder avatar VRM (ADR-034) — AvatarSample_A dari UniVRM, 57 MB dengan aset
+# hasil generate importer. Melebihi guardrail mobile §2.2 dan akan diganti model RS
+# sungguhan. Sengaja TIDAK di-track supaya blob-nya tidak masuk history main.
+# Model asli nanti masuk lewat Git LFS (rule *.vrm sudah ada di .gitattributes).
+/Assets/Avatar/Model/AvatarSample_A.vrm
+/Assets/Avatar/Model/AvatarSample_A.vrm.meta
+/Assets/Avatar/Model/AvatarSample_A.prefab
+/Assets/Avatar/Model/AvatarSample_A.prefab.meta
+/Assets/Avatar/Model/AvatarSample_A.*/
+/Assets/Avatar/Model/AvatarSample_A.*.meta
+# Meta folder ikut diabaikan: seluruh isi folder ini placeholder, jadi meta-nya
+# akan yatim di clone bersih. Folder + meta lahir lagi saat model asli masuk.
+/Assets/Avatar.meta
+/Assets/Avatar/Model.meta

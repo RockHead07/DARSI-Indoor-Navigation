@@ -93,6 +93,9 @@ Packages/packages-lock.json linguist-generated
 *.mb                    lfs
 *.obj                   lfs
 *.ply                   lfs
+*.vrm                   lfs
+*.glb                   lfs
+*.gltf                  lfs
 *.skp                   lfs
 *.stl                   lfs
 *.ztl                   lfs
