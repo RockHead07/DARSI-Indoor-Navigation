@@ -651,3 +651,38 @@ backend tests — hanya `pr-validation.yml` yang menjalankan keduanya.
   test minimal agar gate bermakna).
 - Menambahkan `run-backend-tests` sebagai `needs:` dependency dari `build-unity-uaal`
   (backend dan Unity build independent — tidak perlu saling menunggu).
+
+### ADR-032 — Arsitektur Look-At Head Tracking & Runtime VRM Coordinate Alignment (2026-08-24)
+
+**Konteks.**
+Pada sandbox avatar (`Sandbox_AvatarCompanion.unity`), ditemukan tiga isu pada sistem tatapan kepala VRM:
+1. **Frame Accumulation (Spinning 360°):** Di `LateUpdate()`, operasi `headBone.rotation = delta * headBone.rotation` mengalikan delta secara kumulatif setiap frame tanpa reset bind pose, menyebabkan kepala berputar terus-menerus.
+2. **Koordinat GLTF/VRM vs Unity (Karakter Membelakangi Kamera):** Format GLTF 2.0 (Right-Handed) diimpor glTFast dengan orientasi lokal yang membelakangi kamera saat parent dirotasi $180^\circ$.
+3. **Pemisahan Hierarki Parent Tulang (Wajah Terputar $180^\circ$):** Menggunakan `transform.rotation * _headRestLocalRot` melewatkan rotasi $180^\circ$ dari GameObject `VRM_Character_Model` sehingga wajah menghadap ke belakang meskipun badan menghadap ke depan.
+
+**Keputusan.**
+1. **Penyimpanan Base Rest Pose (Anti-Spinning):** Menyimpan `_headRestLocalRot` sekali saat bone terhubung dan menghitung rotasi absolut setiap frame dari rest pose:
+   $$\text{targetHeadWorldRot} = \text{lookOffset} \times (\text{headBone.parent.rotation} \times \text{\_headRestLocalRot})$$
+2. **VRM Rotation Offset:** Menyetel `vrmRotationOffset = (0, 180, 0)` pada `VRMRuntimeLoader` agar arah hadap model visual glTF sinkron menghadap kamera.
+3. **Sinkronisasi Langsung ke Parent Bone (`headBone.parent`):** Basis orientasi kepala dihitung dari parent tulang leher langsung (`J_Bip_C_Neck`), menjamin wajah selalu menghadap ke depan seirama dengan badan.
+4. **Relaksasi T-Pose Lengan:** Menurunkan `J_Bip_L_UpperArm` dan `J_Bip_R_UpperArm` sebesar $65^\circ$ dengan *breathing sway* halus saat runtime.
+
+
+### ADR-033 — Strategi Pemilihan Teknologi TTS: Hybrid Edge-TTS & On-Premises Sherpa-ONNX (2026-08-24)
+
+**Konteks.**
+Pada Milestone 2 AI Avatar Assistant DARSI, dibutuhkan modul Text-to-Speech (TTS) untuk menyuarakan asisten pemandu RS Islam A. Yani. Kriteria utama mencakup: keluwesan intonasi bahasa Indonesia, pelafalan istilah medis formal, latensi rendah, efisiensi beban server, dan keandalan operasional jika jaringan internet terputus.
+
+**Keputusan.**
+1. **Backend Abstraction Contract:** Endpoint TTS diisolasi pada FastAPI backend (`POST /api/assistant/tts`). Unity Client hanya mengirimkan teks dan menerima stream audio (MP3/WAV) tanpa ketergantungan pada engine TTS internal.
+2. **Tier 1 — Primary Engine (Edge-TTS):**
+   - Menggunakan model *Neural Voice* `id-ID-GadisNeural` (suara asisten rumah sakit yang santun, artikulatif, dan natural).
+   - Beban server mendekati 0% (tidak butuh GPU dedicated), latensi $< 250\,\text{ms}$, tanpa biaya API komersial.
+3. **Tier 2 — On-Premises Offline Fallback (Sherpa-ONNX / Piper):**
+   - Jika koneksi internet server terputus (*air-gapped* intranet RS), backend otomatis mengalihkan sintesis suara ke model lokal ONNX bahasa Indonesia (`vits-icefall-id-indonesian` / Piper `id_ID`).
+   - Berjalan mandiri di CPU server dengan latensi $\approx 50-80\,\text{ms}$.
+
+**Yang Ditolak:**
+- Menggunakan **Kokoro TTS** untuk bahasa Indonesia karena belum memiliki phonemizer native ID.
+- Menggunakan **Supertonic / Supertone Play Cloud** karena transisi penutupan layanan cloud per Agustus 2026 dan minimnya korpus intonasi medis bahasa Indonesia.
+- Menggunakan **XTTS v2 / Generative Voice Cloning** di fase awal karena kebutuhan GPU VRAM besar ($\ge 6\,\text{GB}$) dan latensi yang lebih tinggi untuk respon interaktif.
