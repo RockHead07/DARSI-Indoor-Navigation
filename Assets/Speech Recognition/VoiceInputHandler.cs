@@ -228,23 +228,33 @@ public class VoiceInputHandler : MonoBehaviour
 
                 POIData matchedPoi = null;
 
-                // A. Match via poi_id (GUID exact match dari metadata RAG)
-                if (!string.IsNullOrEmpty(ragAnswer.poi_id) && poiManager != null)
+                // A. PRIORITAS UTAMA (diperbaiki 2026-08-24, bug lapangan): scan teks jawaban
+                // AI dulu, BUKAN metadata poi_id/poi_name. Root cause yang terbukti: poi_id/
+                // poi_name diturunkan HANYA dari chunk retrieval rank-1 (ADR-026), backend
+                // tidak tahu apa-apa soal triase. Query "Anakku habis ketabrak motor" bikin
+                // retrieval salah pilih chunk "Parkir Motor Karyawan" (match kata "motor"),
+                // jadi metadata-nya ikut salah walau jawaban teksnya sudah benar ("...menuju
+                // IGD..."). Urutan lama menaruh metadata di atas scan jawaban, jadi tahap ini
+                // (yang justru didesain sebagai prioritas utama) tidak pernah sempat jalan.
+                // Aman karena FindBestMatch di sini scan JAWABAN AI (sudah disaring lewat
+                // aturan triase system prompt), bukan ucapan mentah pengguna -- kata pemicu
+                // salah arah ("motor") tidak pernah muncul di jawaban yang benar.
+                if (poiManager != null)
+                {
+                    matchedPoi = poiManager.FindBestMatch(ragAnswer.answer);
+                }
+
+                // B. Match via poi_id (GUID exact match dari metadata RAG) -- fallback kalau
+                // jawaban teksnya tidak menyebut nama fasilitas spesifik apa pun.
+                if (matchedPoi == null && !string.IsNullOrEmpty(ragAnswer.poi_id) && poiManager != null)
                 {
                     matchedPoi = poiManager.FindById(ragAnswer.poi_id);
                 }
 
-                // B. Match via poi_name yang diekstrak RAG
+                // C. Match via poi_name yang diekstrak RAG
                 if (matchedPoi == null && !string.IsNullOrEmpty(ragAnswer.poi_name) && poiManager != null)
                 {
                     matchedPoi = poiManager.FindBestMatch(ragAnswer.poi_name);
-                }
-
-                // C. PRIORITAS UTAMA RAG: Cari POI yang direkomendasikan AI di dalam kalimat jawaban!
-                // Contoh: Pengguna bilang "anakku ketabrak motor", RAG menjawab "...segera ke IGD" -> "IGD" ditemukan!
-                if (matchedPoi == null && poiManager != null)
-                {
-                    matchedPoi = poiManager.FindBestMatch(ragAnswer.answer);
                 }
 
                 // D. Cek apakah query awal pengguna cocok dengan POI lokal (jika RAG tidak menyebut POI spesifik)

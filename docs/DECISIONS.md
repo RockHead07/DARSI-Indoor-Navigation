@@ -480,11 +480,11 @@ Pengujian suara pengguna di lapangan memunculkan ambiguitas semantik dan *false 
 
 **Keputusan 1 — Arsitektur Hybrid: RAG AI sebagai Primary Interpreter & Heuristik Lokal sebagai Fallback.**
 - **Primary Route (Cloud/Server RAG):** `VoiceInputHandler.cs` mengutamakan pengiriman teks ke `AssistantClient` (`POST /api/assistant/query`). AI memproses konteks kalimat menggunakan model Transformer dan Groq LLM.
-- **Hierarki Resolusi POI Presisi:**
-  1. *Metadata Binding:* Cek `ragAnswer.poi_id` (GUID exact match via `POIManager.FindById`).
-  2. *Entity Name Extraction:* Cek `ragAnswer.poi_name`.
-  3. *Clinical Triage Priority:* Pindai teks jawaban AI (`ragAnswer.answer`). Jika AI menyarankan rujukan medis (misal: *"segera ke IGD"*), sistem mengunci tujuan ke **`IGD`** dan mengabaikan kata kendaraan seperti motor/mobil.
-  4. *Direct Keyword Match:* Jika AI tidak menyebutkan POI fisik, gunakan pencocokan lokal dari ucapan pengguna.
+- **Hierarki Resolusi POI Presisi (dikoreksi 2026-08-24 — lihat catatan bug di bawah):**
+  1. *Clinical/Answer-Text Priority:* Pindai teks jawaban AI (`ragAnswer.answer`) lebih dulu lewat `POIManager.FindBestMatch`. Ini PRIORITAS UTAMA, bukan langkah ke-3 seperti draf awal ADR ini.
+  2. *Metadata Binding:* Fallback ke `ragAnswer.poi_id` (GUID exact match via `POIManager.FindById`) kalau teks jawaban tidak menyebut fasilitas spesifik.
+  3. *Entity Name Extraction:* Fallback ke `ragAnswer.poi_name`.
+  4. *Direct Keyword Match:* Kalau semua di atas gagal, gunakan pencocokan lokal dari ucapan mentah pengguna.
 - **Graceful Offline Fallback:** Jika server offline atau timeout, sistem otomatis beralih ke `POIManager.FindBestMatch` dan `OllamaConnector` lokal tanpa memblokir aplikasi.
 
 **Keputusan 2 — Sinkronisasi GUID POI Statis (11 Titik POI RS Islam A. Yani).**
@@ -502,6 +502,21 @@ Pengujian suara pengguna di lapangan memunculkan ambiguitas semantik dan *false 
 **Yang Ditolak:**
 - Mengandalkan *single word matching* untuk memutuskan tujuan navigasi tanpa memeriksa intensi semantik kalimat.
 - Menghapus total modul pencocokan lokal (harus tetap dipertahankan sebagai *fallback resiliency*).
+
+**Catatan koreksi (2026-08-24) — bug lapangan nyata di Keputusan 1, sudah diperbaiki.**
+Skenario yang jadi alasan dibangunnya ADR ini ("Anakku habis ketabrak motor")
+justru masih gagal saat dites sungguhan lewat Bifrost live: jawaban teksnya
+sudah benar ("Silakan langsung menuju IGD..."), tapi `poi_id` yang dikembalikan
+tetap "Parkir Motor Karyawan". Penyebab: `poi_id`/`poi_name` diturunkan HANYA
+dari chunk retrieval rank-1 (ADR-026) yang tidak tahu apa-apa soal triase —
+untuk query ini retrieval salah pilih chunk parkir (match kata "motor").
+Kode `VoiceInputHandler.cs` menaruh cek metadata (tahap 1-2 draf awal) SEBELUM
+scan teks jawaban (tahap 3 draf awal), jadi begitu metadata "berhasil"
+menemukan POI manapun (walau salah), scan teks jawaban tidak pernah sempat
+jalan. Diperbaiki dengan menukar urutan: scan teks jawaban AI sekarang jalan
+duluan (lihat hierarki terkoreksi di atas). Trade-off yang disadari: jawaban
+tanpa nama fasilitas eksplisit tetap fallback ke metadata seperti sebelumnya,
+jadi tidak ada regresi untuk kasus informasi umum.
 
 **Catatan koreksi (2026-08-23) — angka 100% pada Keputusan 4 belum boleh dipercaya.**
 `eval_llm_judge.py` punya 3 cacat metodologi belum diperbaiki: kegagalan panggilan
