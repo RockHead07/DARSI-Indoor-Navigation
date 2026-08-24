@@ -5,7 +5,7 @@ using UnityEngine.Events;
 
 /// <summary>
 /// Controller utama untuk Avatar Companion 3D (Tahap 1 MVP - ADR-030).
-/// Mengelola siklus hidup avatar: Spawning di depan kamera -> Wave -> Idle (LookAt aktif) -> Pointing -> Despawn Fade-out.
+/// Mengelola siklus hidup avatar: Spawning tepat di atas lantai -> Wave -> Idle (LookAt aktif) -> Pointing -> Despawn Fade-out.
 /// </summary>
 [DisallowMultipleComponent]
 public class AvatarCompanionController : MonoBehaviour
@@ -30,9 +30,13 @@ public class AvatarCompanionController : MonoBehaviour
     [Header("Spawn Settings")]
     [Tooltip("Otomatis spawn saat scene Play dimulai (memudahkan pengujian cepat).")]
     [SerializeField] private bool autoSpawnOnStart = true;
+    [Tooltip("Kunci posisi spawn tepat di atas lantai (Y = floorHeightY) agar tidak melayang.")]
+    [SerializeField] private bool lockToFloor = true;
+    [Tooltip("Ketinggian lantai (Y). Default 0.")]
+    [SerializeField] private float floorHeightY = 0.0f;
     [Tooltip("Jarak spawn di depan kamera (meter).")]
     [SerializeField] private float spawnDistance = 1.8f;
-    [Tooltip("Offset ketinggian dari posisi kamera (meter).")]
+    [Tooltip("Offset ketinggian jika lockToFloor bernilai false.")]
     [SerializeField] private float spawnHeightOffset = -0.5f;
     [Tooltip("Durasi animasi wave/menyapa awal sebelum masuk ke Idle (detik).")]
     [SerializeField] private float greetingDuration = 1.5f;
@@ -65,7 +69,6 @@ public class AvatarCompanionController : MonoBehaviour
         
         if (visualRoot == null)
         {
-            // Ambil child pertama sebagai visual root jika belum di-assign
             if (transform.childCount > 0)
                 visualRoot = transform.GetChild(0).gameObject;
         }
@@ -86,7 +89,7 @@ public class AvatarCompanionController : MonoBehaviour
     }
 
     /// <summary>
-    /// Memunculkan avatar di depan kamera AR pengguna dan memulai gestur sapaan (Wave).
+    /// Memunculkan avatar di depan kamera AR pengguna tepat di atas lantai dan memulai gestur sapaan (Wave).
     /// </summary>
     public void SpawnCompanion()
     {
@@ -106,11 +109,23 @@ public class AvatarCompanionController : MonoBehaviour
             if (camForwardFlat.sqrMagnitude < 0.01f) camForwardFlat = cam.forward;
 
             Vector3 spawnPos = cam.position + (camForwardFlat * spawnDistance);
-            spawnPos.y += spawnHeightOffset;
+            
+            if (lockToFloor)
+            {
+                spawnPos.y = floorHeightY;
+            }
+            else
+            {
+                spawnPos.y += spawnHeightOffset;
+            }
 
             transform.position = spawnPos;
-            // Menghadap ke arah kamera
             transform.rotation = Quaternion.LookRotation(-camForwardFlat, Vector3.up);
+        }
+        else
+        {
+            transform.position = new Vector3(0, floorHeightY, spawnDistance);
+            transform.rotation = Quaternion.Euler(0, 180f, 0);
         }
 
         SetVisualActive(true);
@@ -127,7 +142,6 @@ public class AvatarCompanionController : MonoBehaviour
         onSpawned?.Invoke();
         SetState(AvatarState.Greeting);
 
-        // Tunggu durasi greeting/wave
         yield return new WaitForSeconds(greetingDuration);
 
         SetState(AvatarState.Idle);
@@ -182,7 +196,6 @@ public class AvatarCompanionController : MonoBehaviour
         if (lookAtController != null) lookAtController.IsLookAtEnabled = false;
         if (animator != null && HasParameter(isVisibleParam)) animator.SetBool(isVisibleParam, false);
 
-        // Fade out visual
         float timer = 0f;
         while (timer < despawnDuration)
         {
@@ -206,7 +219,6 @@ public class AvatarCompanionController : MonoBehaviour
         }
         else
         {
-            // Fallback jika tidak ada visualRoot: aktifkan/nonaktifkan renderer anak
             var renderers = GetComponentsInChildren<Renderer>(true);
             foreach (var r in renderers)
             {

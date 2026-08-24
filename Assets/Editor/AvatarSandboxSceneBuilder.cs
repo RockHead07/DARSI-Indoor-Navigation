@@ -9,7 +9,7 @@ using TMPro;
 
 /// <summary>
 /// Tool otomatis untuk membuat dan menyiapkan Scene Sandbox Avatar Companion (Tahap 1 MVP - ADR-030).
-/// Mendukung model VRM (AvatarSample_A.vrm) maupun procedural hospital assistant avatar.
+/// Mendukung model VRM / Prefab maupun stylized hospital assistant avatar.
 /// Menu: DARSI > Avatar > Setup Sandbox Scene / Tools > Avatar > Setup Sandbox Scene.
 /// </summary>
 public static class AvatarSandboxSceneBuilder
@@ -69,43 +69,36 @@ public static class AvatarSandboxSceneBuilder
             floorRend.sharedMaterial = floorMat;
         }
 
-        // 5. Buat Avatar Companion GameObject
+        // 5. Buat Avatar Companion GameObject tepat di atas lantai (Y = 0)
         var avatarRoot = new GameObject("Avatar_Companion");
-        avatarRoot.transform.position = new Vector3(0, 0, 1.8f);
+        avatarRoot.transform.position = new Vector3(0, 0f, 1.8f);
         avatarRoot.transform.rotation = Quaternion.Euler(0, 180f, 0);
 
         GameObject visualModel = null;
         Transform headTransform = null;
         Animator animator = null;
 
-        // Cek apakah file VRM ada dan bisa di-load sebagai GameObject
-        GameObject vrmPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(VRMPath);
-        if (vrmPrefab == null)
+        // Cek apakah ada prefab avatar di folder 3d-Models-Char-VRM
+        string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/3d-Models-Char-VRM" });
+        if (prefabGuids.Length > 0)
         {
-            // Cari prefab atau asset model VRM lainnya di 3d-Models-Char-VRM
-            string[] vrmGuids = AssetDatabase.FindAssets("t:GameObject", new[] { "Assets/3d-Models-Char-VRM" });
-            if (vrmGuids.Length > 0)
+            var prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(prefabGuids[0]));
+            if (prefabAsset != null)
             {
-                vrmPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(vrmGuids[0]));
+                visualModel = (GameObject)PrefabUtility.InstantiatePrefab(prefabAsset, avatarRoot.transform);
+                visualModel.name = "Model_Visual_VRM";
+                visualModel.transform.localPosition = Vector3.zero;
+                visualModel.transform.localRotation = Quaternion.identity;
+
+                animator = visualModel.GetComponent<Animator>() ?? visualModel.GetComponentInChildren<Animator>(true);
+                if (animator != null && animator.isHuman)
+                {
+                    headTransform = animator.GetBoneTransform(HumanBodyBones.Head);
+                }
             }
         }
 
-        if (vrmPrefab != null)
-        {
-            visualModel = (GameObject)PrefabUtility.InstantiatePrefab(vrmPrefab, avatarRoot.transform);
-            visualModel.name = "Model_Visual_VRM";
-            visualModel.transform.localPosition = Vector3.zero;
-            visualModel.transform.localRotation = Quaternion.identity;
-
-            animator = visualModel.GetComponent<Animator>() ?? visualModel.GetComponentInChildren<Animator>(true);
-            if (animator != null && animator.isHuman)
-            {
-                headTransform = animator.GetBoneTransform(HumanBodyBones.Head);
-            }
-            Debug.Log($"[AvatarSandboxSceneBuilder] Berhasil menginstansiasi model VRM dari: {AssetDatabase.GetAssetPath(vrmPrefab)}");
-        }
-
-        // Jika VRM belum di-convert atau tidak ada, buat model 3D stylized companion assistant
+        // Jika belum ada prefab VRM yang diekstrak, buat model 3D stylized assistant dengan kaki tepat di lantai Y = 0
         if (visualModel == null)
         {
             visualModel = CreateStylizedAssistantVisual(avatarRoot.transform, out headTransform);
@@ -129,6 +122,8 @@ public static class AvatarSandboxSceneBuilder
         var ctrlSo = new SerializedObject(companionCtrl);
         ctrlSo.FindProperty("visualRoot").objectReferenceValue = visualModel;
         ctrlSo.FindProperty("autoSpawnOnStart").boolValue = true;
+        ctrlSo.FindProperty("lockToFloor").boolValue = true;
+        ctrlSo.FindProperty("floorHeightY").floatValue = 0.0f;
         ctrlSo.FindProperty("lookAtController").objectReferenceValue = lookAt;
         ctrlSo.FindProperty("safetyFade").objectReferenceValue = safetyFade;
         if (animator != null)
@@ -224,6 +219,9 @@ public static class AvatarSandboxSceneBuilder
         var medicalTealMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
         medicalTealMat.color = new Color(0.0f, 0.65f, 0.60f);
 
+        var darkFootMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+        darkFootMat.color = new Color(0.15f, 0.18f, 0.22f);
+
         var visorGlowMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
         visorGlowMat.color = new Color(0.1f, 0.85f, 1.0f);
         if (visorGlowMat.HasProperty("_EmissionColor"))
@@ -232,12 +230,30 @@ public static class AvatarSandboxSceneBuilder
             visorGlowMat.SetColor("_EmissionColor", new Color(0.1f, 0.85f, 1.0f) * 1.5f);
         }
 
-        // Badan / Torso (Capsule)
+        // Kaki Kiri (Menyentuh lantai Y = 0)
+        var leftLeg = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        leftLeg.name = "Left_Leg";
+        leftLeg.transform.SetParent(visualModel.transform, false);
+        leftLeg.transform.localPosition = new Vector3(-0.16f, 0.25f, 0);
+        leftLeg.transform.localScale = new Vector3(0.18f, 0.25f, 0.18f);
+        leftLeg.GetComponent<MeshRenderer>().sharedMaterial = darkFootMat;
+        Object.DestroyImmediate(leftLeg.GetComponent<Collider>());
+
+        // Kaki Kanan (Menyentuh lantai Y = 0)
+        var rightLeg = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        rightLeg.name = "Right_Leg";
+        rightLeg.transform.SetParent(visualModel.transform, false);
+        rightLeg.transform.localPosition = new Vector3(0.16f, 0.25f, 0);
+        rightLeg.transform.localScale = new Vector3(0.18f, 0.25f, 0.18f);
+        rightLeg.GetComponent<MeshRenderer>().sharedMaterial = darkFootMat;
+        Object.DestroyImmediate(rightLeg.GetComponent<Collider>());
+
+        // Badan / Torso (Capsule berdiri di atas kaki, Y = 0.90)
         var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         body.name = "Body_Torso";
         body.transform.SetParent(visualModel.transform, false);
-        body.transform.localPosition = new Vector3(0, 0.85f, 0);
-        body.transform.localScale = new Vector3(0.55f, 0.65f, 0.45f);
+        body.transform.localPosition = new Vector3(0, 0.90f, 0);
+        body.transform.localScale = new Vector3(0.55f, 0.50f, 0.45f);
         body.GetComponent<MeshRenderer>().sharedMaterial = whiteMat;
         Object.DestroyImmediate(body.GetComponent<Collider>());
 
@@ -250,17 +266,17 @@ public static class AvatarSandboxSceneBuilder
         belt.GetComponent<MeshRenderer>().sharedMaterial = medicalTealMat;
         Object.DestroyImmediate(belt.GetComponent<Collider>());
 
-        // Kepala (Head Bone untuk Look-At Tracking)
+        // Kepala (Head Bone untuk Look-At Tracking pada Y = 1.45)
         var headBone = new GameObject("Head_Bone");
         headBone.transform.SetParent(visualModel.transform, false);
-        headBone.transform.localPosition = new Vector3(0, 1.55f, 0);
+        headBone.transform.localPosition = new Vector3(0, 1.45f, 0);
         headTransform = headBone.transform;
 
         var headMesh = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         headMesh.name = "Head_Mesh";
         headMesh.transform.SetParent(headBone.transform, false);
         headMesh.transform.localPosition = Vector3.zero;
-        headMesh.transform.localScale = new Vector3(0.48f, 0.52f, 0.48f);
+        headMesh.transform.localScale = new Vector3(0.46f, 0.50f, 0.46f);
         headMesh.GetComponent<MeshRenderer>().sharedMaterial = whiteMat;
         Object.DestroyImmediate(headMesh.GetComponent<Collider>());
 
@@ -268,8 +284,8 @@ public static class AvatarSandboxSceneBuilder
         var visor = GameObject.CreatePrimitive(PrimitiveType.Cube);
         visor.name = "Visor_Eyes";
         visor.transform.SetParent(headBone.transform, false);
-        visor.transform.localPosition = new Vector3(0, 0.05f, 0.22f);
-        visor.transform.localScale = new Vector3(0.36f, 0.12f, 0.15f);
+        visor.transform.localPosition = new Vector3(0, 0.05f, 0.21f);
+        visor.transform.localScale = new Vector3(0.34f, 0.12f, 0.15f);
         visor.GetComponent<MeshRenderer>().sharedMaterial = visorGlowMat;
         Object.DestroyImmediate(visor.GetComponent<Collider>());
 
@@ -277,8 +293,8 @@ public static class AvatarSandboxSceneBuilder
         var cap = GameObject.CreatePrimitive(PrimitiveType.Cube);
         cap.name = "Nurse_Cap";
         cap.transform.SetParent(headBone.transform, false);
-        cap.transform.localPosition = new Vector3(0, 0.26f, -0.05f);
-        cap.transform.localScale = new Vector3(0.32f, 0.12f, 0.25f);
+        cap.transform.localPosition = new Vector3(0, 0.25f, -0.05f);
+        cap.transform.localScale = new Vector3(0.30f, 0.10f, 0.22f);
         cap.GetComponent<MeshRenderer>().sharedMaterial = medicalTealMat;
         Object.DestroyImmediate(cap.GetComponent<Collider>());
 
@@ -286,8 +302,8 @@ public static class AvatarSandboxSceneBuilder
         var leftArm = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         leftArm.name = "Left_Arm";
         leftArm.transform.SetParent(visualModel.transform, false);
-        leftArm.transform.localPosition = new Vector3(-0.38f, 0.85f, 0);
-        leftArm.transform.localScale = new Vector3(0.16f, 0.45f, 0.16f);
+        leftArm.transform.localPosition = new Vector3(-0.36f, 0.88f, 0);
+        leftArm.transform.localScale = new Vector3(0.15f, 0.40f, 0.15f);
         leftArm.transform.localRotation = Quaternion.Euler(0, 0, -10f);
         leftArm.GetComponent<MeshRenderer>().sharedMaterial = whiteMat;
         Object.DestroyImmediate(leftArm.GetComponent<Collider>());
@@ -296,8 +312,8 @@ public static class AvatarSandboxSceneBuilder
         var rightArm = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         rightArm.name = "Right_Arm";
         rightArm.transform.SetParent(visualModel.transform, false);
-        rightArm.transform.localPosition = new Vector3(0.38f, 0.85f, 0);
-        rightArm.transform.localScale = new Vector3(0.16f, 0.45f, 0.16f);
+        rightArm.transform.localPosition = new Vector3(0.36f, 0.88f, 0);
+        rightArm.transform.localScale = new Vector3(0.15f, 0.40f, 0.15f);
         rightArm.transform.localRotation = Quaternion.Euler(0, 0, 10f);
         rightArm.GetComponent<MeshRenderer>().sharedMaterial = whiteMat;
         Object.DestroyImmediate(rightArm.GetComponent<Collider>());
