@@ -17,7 +17,7 @@ public class VRMRuntimeLoader : MonoBehaviour
 
     [Header("Visual & Orientation Settings")]
     [Tooltip("Offset rotasi model VRM agar bagian depan (wajah/dada) menghadap ke kamera.")]
-    [SerializeField] private Vector3 vrmRotationOffset = Vector3.zero;
+    [SerializeField] private Vector3 vrmRotationOffset = new Vector3(0, 180f, 0);
 
     [Tooltip("GameObject placeholder/stylized yang akan disembunyikan saat model VRM berhasil dimuat.")]
     [SerializeField] private GameObject fallbackVisual;

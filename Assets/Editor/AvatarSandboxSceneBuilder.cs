@@ -81,6 +81,7 @@ public static class AvatarSandboxSceneBuilder
         var vrmLoader = avatarRoot.AddComponent<VRMRuntimeLoader>();
         var vrmSo = new SerializedObject(vrmLoader);
         vrmSo.FindProperty("vrmRelativePath").stringValue = VRMPath;
+        vrmSo.FindProperty("vrmRotationOffset").vector3Value = new Vector3(0, 180f, 0);
         vrmSo.FindProperty("fallbackVisual").objectReferenceValue = visualModel;
         vrmSo.ApplyModifiedProperties();
 
