@@ -9,7 +9,7 @@ using TMPro;
 
 /// <summary>
 /// Tool otomatis untuk membuat dan menyiapkan Scene Sandbox Avatar Companion (Tahap 1 MVP - ADR-030).
-/// Mendukung model VRM / Prefab maupun stylized hospital assistant avatar.
+/// Menggunakan VRMRuntimeLoader untuk me-render AvatarSample_A.vrm secara otomatis saat Play mode.
 /// Menu: DARSI > Avatar > Setup Sandbox Scene / Tools > Avatar > Setup Sandbox Scene.
 /// </summary>
 public static class AvatarSandboxSceneBuilder
@@ -74,35 +74,15 @@ public static class AvatarSandboxSceneBuilder
         avatarRoot.transform.position = new Vector3(0, 0f, 1.8f);
         avatarRoot.transform.rotation = Quaternion.Euler(0, 180f, 0);
 
-        GameObject visualModel = null;
         Transform headTransform = null;
-        Animator animator = null;
+        var visualModel = CreateStylizedAssistantVisual(avatarRoot.transform, out headTransform);
 
-        // Cek apakah ada prefab avatar di folder 3d-Models-Char-VRM
-        string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/3d-Models-Char-VRM" });
-        if (prefabGuids.Length > 0)
-        {
-            var prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(prefabGuids[0]));
-            if (prefabAsset != null)
-            {
-                visualModel = (GameObject)PrefabUtility.InstantiatePrefab(prefabAsset, avatarRoot.transform);
-                visualModel.name = "Model_Visual_VRM";
-                visualModel.transform.localPosition = Vector3.zero;
-                visualModel.transform.localRotation = Quaternion.identity;
-
-                animator = visualModel.GetComponent<Animator>() ?? visualModel.GetComponentInChildren<Animator>(true);
-                if (animator != null && animator.isHuman)
-                {
-                    headTransform = animator.GetBoneTransform(HumanBodyBones.Head);
-                }
-            }
-        }
-
-        // Jika belum ada prefab VRM yang diekstrak, buat model 3D stylized assistant dengan kaki tepat di lantai Y = 0
-        if (visualModel == null)
-        {
-            visualModel = CreateStylizedAssistantVisual(avatarRoot.transform, out headTransform);
-        }
+        // Pasang VRMRuntimeLoader untuk memuat AvatarSample_A.vrm saat Play Mode
+        var vrmLoader = avatarRoot.AddComponent<VRMRuntimeLoader>();
+        var vrmSo = new SerializedObject(vrmLoader);
+        vrmSo.FindProperty("vrmRelativePath").stringValue = VRMPath;
+        vrmSo.FindProperty("fallbackVisual").objectReferenceValue = visualModel;
+        vrmSo.ApplyModifiedProperties();
 
         // Pasang Controller & Look-At ke Head Bone
         var lookAt = avatarRoot.AddComponent<AvatarLookAtController>();
@@ -126,10 +106,6 @@ public static class AvatarSandboxSceneBuilder
         ctrlSo.FindProperty("floorHeightY").floatValue = 0.0f;
         ctrlSo.FindProperty("lookAtController").objectReferenceValue = lookAt;
         ctrlSo.FindProperty("safetyFade").objectReferenceValue = safetyFade;
-        if (animator != null)
-        {
-            ctrlSo.FindProperty("animator").objectReferenceValue = animator;
-        }
         ctrlSo.ApplyModifiedProperties();
 
         // 6. Buat Canvas UI Sandbox
@@ -157,7 +133,7 @@ public static class AvatarSandboxSceneBuilder
         statusRect.anchoredPosition = new Vector2(0, 60f);
         statusRect.sizeDelta = new Vector2(460f, 30f);
         var txtStatus = txtStatusGo.GetComponent<TextMeshProUGUI>();
-        txtStatus.text = "State: <b>Idle</b>";
+        txtStatus.text = "State: <b>Idle</b> (VRM Active)";
         txtStatus.alignment = TextAlignmentOptions.Center;
         txtStatus.fontSize = 18;
         txtStatus.color = Color.white;

@@ -40,6 +40,12 @@ public class AvatarLookAtController : MonoBehaviour
         set => _lookAtEnabled = value;
     }
 
+    public Transform HeadBone
+    {
+        get => headBone;
+        set => headBone = value;
+    }
+
     private void Awake()
     {
         _animator = GetComponent<Animator>();
