@@ -32,17 +32,22 @@
 >
 > **⛔ Keputusan urutan kerja (2026-08-24): JANGAN mulai avatar 3D/VRM sebelum RAG
 > backend ini benar-benar matang.** RAG sudah live di produksi (Bifrost + Groq
-> fallback, ADR-029) dan terverifikasi end-to-end dari Unity, tapi masih ada
-> utang nyata yang harus diberesin dulu:
+> fallback, ADR-029) dan terverifikasi end-to-end dari Unity, bug navigasi
+> parkir-vs-IGD sudah ketemu dan diperbaiki (lihat ADR-028), dan angka
+> **recall@3 = 71,9% sudah diukur ULANG (2026-08-24) terhadap corpus produksi
+> yang sungguhan (27 chunk) — SAH untuk dilaporkan**, lihat
+> `docs/RETRIEVAL-EVALUATION.md` §3.1 di repo `darsi-backend`. Sisa utang yang
+> masih harus diberesin dulu:
 > - `POI_SYNC_TOKEN` di server belum dirotasi dari default.
-> - Angka recall@3 (71,9%) sudah basi — corpus produksi berubah bentuk
->   (25→27 chunk, ADR-028) setelah angka itu diukur, belum ada pengukuran ulang.
 > - `eval_llm_judge.py` (klaim 100% pass) masih punya 3 cacat metodologi belum
 >   diperbaiki — lihat catatan koreksi di ADR-028, `docs/DECISIONS.md`.
 > - Cloudflare Tunnel masih quick tunnel (URL berubah tiap restart), belum
 >   Named Tunnel permanen — lihat `docs/BACKEND-SERVER-OPERATIONS.md` Metode B.
 > - **Belum pernah dites di device Android fisik pakai mic asli** — seluruh
 >   verifikasi sejauh ini lewat Unity Editor Play mode.
+> - Gerbang skor retrieval (`MIN_TOP_SCORE=0.22`) masih dikenal menolak
+>   sebagian query valid (lihat `RETRIEVAL-EVALUATION.md` §6) — belum
+>   dioptimalkan, sengaja ditunda supaya tidak membakar set uji `test-2`.
 > Selesaikan daftar ini dulu sebelum membuka pekerjaan avatar 3D di bawah —
 > avatar butuh RAG yang stabil sebagai fondasi jawabannya, bukan sebaliknya.
 
