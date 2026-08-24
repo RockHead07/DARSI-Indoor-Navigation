@@ -58,6 +58,12 @@ public class AvatarCompanionController : MonoBehaviour
     private AvatarState _currentState = AvatarState.Hidden;
     private Coroutine _activeRoutine;
 
+    public GameObject VisualRoot
+    {
+        get => visualRoot;
+        set => visualRoot = value;
+    }
+
     public AvatarState CurrentState => _currentState;
     public bool IsVisible => _currentState != AvatarState.Hidden && _currentState != AvatarState.Despawning;
 

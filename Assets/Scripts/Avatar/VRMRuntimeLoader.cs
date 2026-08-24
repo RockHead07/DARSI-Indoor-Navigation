@@ -83,10 +83,17 @@ public class VRMRuntimeLoader : MonoBehaviour
         {
             Debug.Log("[VRMRuntimeLoader] 🎉 BERHASIL memuat dan merender model VRM!");
 
-            // Sembunyikan fallback visual (dummy)
+            // Sembunyikan fallback visual (dummy) secara permanen
             if (fallbackVisual != null)
             {
                 fallbackVisual.SetActive(false);
+            }
+
+            // Hubungkan model VRM ke AvatarCompanionController sebagai visual utama saat Spawn/Dismiss!
+            var companion = GetComponentInParent<AvatarCompanionController>();
+            if (companion != null)
+            {
+                companion.VisualRoot = _vrmInstance;
             }
 
             // Temukan tulang-tulang utama VRM
