@@ -24,19 +24,22 @@ public class AvatarCompanionController : MonoBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private AvatarLookAtController lookAtController;
     [SerializeField] private AvatarSafetyFade safetyFade;
-    [SerializeField] private GameObject avatarRoot;
+    [Tooltip("GameObject visual anak yang di-enable/disable. JANGAN masukkan GameObject ini sendiri agar controller tetap aktif.")]
+    [SerializeField] private GameObject visualRoot;
 
     [Header("Spawn Settings")]
+    [Tooltip("Otomatis spawn saat scene Play dimulai (memudahkan pengujian cepat).")]
+    [SerializeField] private bool autoSpawnOnStart = true;
     [Tooltip("Jarak spawn di depan kamera (meter).")]
     [SerializeField] private float spawnDistance = 1.8f;
     [Tooltip("Offset ketinggian dari posisi kamera (meter).")]
     [SerializeField] private float spawnHeightOffset = -0.5f;
     [Tooltip("Durasi animasi wave/menyapa awal sebelum masuk ke Idle (detik).")]
-    [SerializeField] private float greetingDuration = 2.0f;
+    [SerializeField] private float greetingDuration = 1.5f;
     [Tooltip("Durasi animasi menunjuk sebelum kembali ke Idle (detik).")]
-    [SerializeField] private float pointingDuration = 2.5f;
+    [SerializeField] private float pointingDuration = 2.0f;
     [Tooltip("Durasi transisi fade out saat despawn (detik).")]
-    [SerializeField] private float despawnDuration = 0.8f;
+    [SerializeField] private float despawnDuration = 0.5f;
 
     [Header("Animator Parameter Names")]
     [SerializeField] private string triggerWaveParam = "Wave";
@@ -59,11 +62,27 @@ public class AvatarCompanionController : MonoBehaviour
         if (animator == null) animator = GetComponentInChildren<Animator>(true);
         if (lookAtController == null) lookAtController = GetComponentInChildren<AvatarLookAtController>(true);
         if (safetyFade == null) safetyFade = GetComponentInChildren<AvatarSafetyFade>(true);
-        if (avatarRoot == null) avatarRoot = gameObject;
+        
+        if (visualRoot == null)
+        {
+            // Ambil child pertama sebagai visual root jika belum di-assign
+            if (transform.childCount > 0)
+                visualRoot = transform.GetChild(0).gameObject;
+        }
 
-        // Mulai dalam keadaan tersembunyi
-        SetState(AvatarState.Hidden);
-        if (avatarRoot != null) avatarRoot.SetActive(false);
+        if (!autoSpawnOnStart)
+        {
+            SetVisualActive(false);
+            SetState(AvatarState.Hidden);
+        }
+    }
+
+    private void Start()
+    {
+        if (autoSpawnOnStart)
+        {
+            SpawnCompanion();
+        }
     }
 
     /// <summary>
@@ -94,9 +113,9 @@ public class AvatarCompanionController : MonoBehaviour
             transform.rotation = Quaternion.LookRotation(-camForwardFlat, Vector3.up);
         }
 
-        if (avatarRoot != null) avatarRoot.SetActive(true);
+        SetVisualActive(true);
 
-        if (safetyFade != null) safetyFade.SetAlphaInstant(0f);
+        if (safetyFade != null) safetyFade.SetAlphaInstant(1f);
         if (lookAtController != null) lookAtController.IsLookAtEnabled = true;
 
         if (animator != null)
@@ -173,10 +192,27 @@ public class AvatarCompanionController : MonoBehaviour
             yield return null;
         }
 
-        if (avatarRoot != null) avatarRoot.SetActive(false);
+        SetVisualActive(false);
         SetState(AvatarState.Hidden);
         onDismissed?.Invoke();
         _activeRoutine = null;
+    }
+
+    private void SetVisualActive(bool active)
+    {
+        if (visualRoot != null)
+        {
+            visualRoot.SetActive(active);
+        }
+        else
+        {
+            // Fallback jika tidak ada visualRoot: aktifkan/nonaktifkan renderer anak
+            var renderers = GetComponentsInChildren<Renderer>(true);
+            foreach (var r in renderers)
+            {
+                r.enabled = active;
+            }
+        }
     }
 
     private void SetState(AvatarState newState)

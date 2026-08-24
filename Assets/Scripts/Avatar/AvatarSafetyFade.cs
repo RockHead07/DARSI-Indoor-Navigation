@@ -10,8 +10,8 @@ public class AvatarSafetyFade : MonoBehaviour
 {
     [Header("Distance Thresholds (Meters)")]
     [Tooltip("Jarak di mana avatar mulai memudar (fade-out).")]
-    [SerializeField] private float fadeStartDistance = 1.0f;
-    [Tooltip("Jarak di mana avatar menjadi sepenuhnya transparan (invisible).")]
+    [SerializeField] private float fadeStartDistance = 0.9f;
+    [Tooltip("Jarak di mana avatar menjadi sepenuhnya transparan / disembunyikan.")]
     [SerializeField] private float fadeEndDistance = 0.5f;
 
     [Header("Fade Smoothing")]
@@ -34,6 +34,11 @@ public class AvatarSafetyFade : MonoBehaviour
     private void Awake()
     {
         _propBlock = new MaterialPropertyBlock();
+        CacheRenderers();
+    }
+
+    public void CacheRenderers()
+    {
         if (targetRenderers == null || targetRenderers.Length == 0)
         {
             targetRenderers = GetComponentsInChildren<Renderer>(true);
@@ -56,6 +61,12 @@ public class AvatarSafetyFade : MonoBehaviour
             else return;
         }
 
+        if (targetRenderers == null || targetRenderers.Length == 0)
+        {
+            CacheRenderers();
+            if (targetRenderers == null || targetRenderers.Length == 0) return;
+        }
+
         float distance = Vector3.Distance(transform.position, _cameraTransform.position);
 
         // Hitung target alpha berdasarkan jarak ke kamera
@@ -76,19 +87,28 @@ public class AvatarSafetyFade : MonoBehaviour
     }
 
     /// <summary>
-    /// Menerapkan nilai alpha ke seluruh target renderer via MaterialPropertyBlock untuk menghemat alokasi memori.
+    /// Menerapkan nilai alpha ke seluruh target renderer.
     /// </summary>
     private void ApplyAlpha(float alpha)
     {
         if (targetRenderers == null) return;
 
+        bool shouldRender = alpha > 0.02f;
+
         foreach (var rend in targetRenderers)
         {
             if (rend == null) continue;
 
+            // Jika sangat dekat (alpha ~ 0), sembunyikan renderer sepenuhnya untuk keselamatan
+            if (rend.enabled != shouldRender)
+            {
+                rend.enabled = shouldRender;
+            }
+
+            if (!shouldRender) continue;
+
             rend.GetPropertyBlock(_propBlock);
             
-            // Coba update _BaseColor (URP / modern shaders) atau _Color (Standard / Legacy shaders)
             if (rend.sharedMaterial != null)
             {
                 Color c = rend.sharedMaterial.HasProperty(BaseColorId) ? rend.sharedMaterial.GetColor(BaseColorId) : 

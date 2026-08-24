@@ -1,5 +1,4 @@
 using UnityEditor;
-using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -31,7 +30,7 @@ public static class AvatarSandboxSceneBuilder
             mainCam.transform.position = new Vector3(0, 1.6f, 0);
             mainCam.transform.rotation = Quaternion.identity;
             mainCam.clearFlags = CameraClearFlags.SolidColor;
-            mainCam.backgroundColor = new Color(0.12f, 0.14f, 0.18f);
+            mainCam.backgroundColor = new Color(0.15f, 0.17f, 0.22f);
 
             // Pasang SimpleSandboxFreeCam untuk navigasi mudah di PC Editor
             if (mainCam.GetComponent<SimpleSandboxFreeCam>() == null)
@@ -40,11 +39,33 @@ public static class AvatarSandboxSceneBuilder
             }
         }
 
+        // Setup Directional Light
+        var lightObj = GameObject.Find("Directional Light");
+        if (lightObj != null)
+        {
+            var light = lightObj.GetComponent<Light>();
+            if (light != null)
+            {
+                light.color = new Color(1f, 0.96f, 0.9f);
+                light.intensity = 1.2f;
+                light.transform.rotation = Quaternion.Euler(50f, -30f, 0);
+            }
+        }
+
         // 4. Buat Lantai Grid (Simulasi Ruangan RS)
         var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
         floor.name = "Floor_Grid";
         floor.transform.position = Vector3.zero;
         floor.transform.localScale = new Vector3(2f, 1f, 2f);
+        
+        // Buat material lantai netral
+        var floorRend = floor.GetComponent<MeshRenderer>();
+        if (floorRend != null)
+        {
+            var floorMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+            floorMat.color = new Color(0.3f, 0.35f, 0.4f);
+            floorRend.sharedMaterial = floorMat;
+        }
 
         // 5. Buat Avatar Companion GameObject
         var avatarRoot = new GameObject("Avatar_Companion");
@@ -102,6 +123,19 @@ public static class AvatarSandboxSceneBuilder
         var safetyFade = avatarRoot.AddComponent<AvatarSafetyFade>();
         var companionCtrl = avatarRoot.AddComponent<AvatarCompanionController>();
 
+        // Wire serialized properties on companionCtrl
+        var ctrlSo = new SerializedObject(companionCtrl);
+        ctrlSo.FindProperty("visualRoot").objectReferenceValue = visualModel;
+        ctrlSo.FindProperty("autoSpawnOnStart").boolValue = true;
+        ctrlSo.FindProperty("lookAtController").objectReferenceValue = lookAt;
+        ctrlSo.FindProperty("safetyFade").objectReferenceValue = safetyFade;
+        var modelAnimator = visualModel.GetComponent<Animator>();
+        if (modelAnimator != null)
+        {
+            ctrlSo.FindProperty("animator").objectReferenceValue = modelAnimator;
+        }
+        ctrlSo.ApplyModifiedProperties();
+
         // 6. Buat Canvas UI Sandbox
         var canvasGo = new GameObject("Canvas_SandboxUI");
         var canvas = canvasGo.AddComponent<Canvas>();
@@ -127,7 +161,7 @@ public static class AvatarSandboxSceneBuilder
         statusRect.anchoredPosition = new Vector2(0, 60f);
         statusRect.sizeDelta = new Vector2(460f, 30f);
         var txtStatus = txtStatusGo.GetComponent<TextMeshProUGUI>();
-        txtStatus.text = "State: Hidden";
+        txtStatus.text = "State: Spawning...";
         txtStatus.alignment = TextAlignmentOptions.Center;
         txtStatus.fontSize = 18;
         txtStatus.color = Color.white;
@@ -139,7 +173,7 @@ public static class AvatarSandboxSceneBuilder
         distRect.anchoredPosition = new Vector2(0, 30f);
         distRect.sizeDelta = new Vector2(460f, 25f);
         var txtDist = txtDistGo.GetComponent<TextMeshProUGUI>();
-        txtDist.text = "Jarak Kamera: -";
+        txtDist.text = "Jarak Kamera: 1.80 m (Aman)";
         txtDist.alignment = TextAlignmentOptions.Center;
         txtDist.fontSize = 14;
         txtDist.color = new Color(0.8f, 0.8f, 0.8f);
