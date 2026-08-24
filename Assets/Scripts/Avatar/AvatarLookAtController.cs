@@ -2,8 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Kontroler tatapan kepala Avatar 3D (Look-At Tracking) yang stabil, presisi, dan natural.
-/// Menggunakan kalkulasi sudut yaw/pitch berbasis vektor proyeksi relatif terhadap sumbu avatar (Up & Right),
-/// sehingga tidak pernah mengakumulasi rotasi (anti-spinning) dan selalu menatap ke target kamera secara presisi.
+/// Menyelaraskan rotasi dasar kepala dengan tulang leher/tubuh avatar (headBone.parent),
+/// sehingga wajah selalu menghadap ke depan dan tatapan presisi 100%.
 /// </summary>
 [DisallowMultipleComponent]
 public class AvatarLookAtController : MonoBehaviour
@@ -142,10 +142,12 @@ public class AvatarLookAtController : MonoBehaviour
         Quaternion pitchRot = Quaternion.AngleAxis(clampedPitch, right);
         Quaternion lookOffset = yawRot * pitchRot;
 
-        // 7. Hitung rotasi kepala dasar (Base Rest Pose mengikuti orientasi badan avatar)
-        Quaternion baseHeadWorldRot = transform.rotation * _headRestLocalRot;
+        // 7. Base rest pose yang selalu sinkron dengan leher & tubuh avatar
+        Quaternion baseHeadWorldRot = headBone.parent != null 
+            ? (headBone.parent.rotation * _headRestLocalRot) 
+            : (transform.rotation * _headRestLocalRot);
 
-        // 8. Rotasi akhir absolut untuk frame ini (Bebas dari efek akumulasi/spinning)
+        // 8. Rotasi akhir absolut untuk frame ini (Bebas dari efek terbalik / terputar 180)
         Quaternion targetHeadWorldRot = lookOffset * baseHeadWorldRot;
 
         // Interpolasikan rotasi kepala secara halus
