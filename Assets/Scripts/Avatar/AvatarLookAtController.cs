@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Mengendalikan tatapan kepala dan leher Avatar 3D agar menatap ke Camera.main secara akurat dan natural.
-/// Dijalankan pada LateUpdate() agar tidak ditimpa oleh evaluasi rig/skinning glTFast atau Animator.
+/// Mendukung kalibrasi pitch (atas-bawah) dan yaw (kiri-kanan) secara presisi.
 /// </summary>
 [DisallowMultipleComponent]
 public class AvatarLookAtController : MonoBehaviour
@@ -12,23 +12,25 @@ public class AvatarLookAtController : MonoBehaviour
     [SerializeField] private Transform targetOverride;
 
     [Header("Bone References")]
-    [Tooltip("Transform tulang leher/kepala.")]
+    [Tooltip("Transform tulang kepala.")]
     [SerializeField] private Transform headBone;
-    [Tooltip("Transform tulang leher (opsional, untuk distribusi rotasi lebih natural).")]
+    [Tooltip("Transform tulang leher (opsional).")]
     [SerializeField] private Transform neckBone;
 
     [Header("Angle Limits & Tuning")]
-    [Tooltip("Sudut rotasi horizontal maksimal (derajat). Mencegah leher berputar ke belakang.")]
+    [Tooltip("Sudut rotasi horizontal maksimal (derajat).")]
     [SerializeField] private float maxYawAngle = 60f;
     [Tooltip("Sudut rotasi vertikal maksimal (derajat).")]
     [SerializeField] private float maxPitchAngle = 35f;
     [Tooltip("Kecepatan lerp penghalusan tatapan.")]
-    [SerializeField] private float lookSpeed = 6.0f;
+    [SerializeField] private float lookSpeed = 8.0f;
     [Range(0f, 1f)] [SerializeField] private float overallWeight = 1.0f;
 
-    [Header("Forward Axis Offset")]
-    [Tooltip("Arah forward lokal tulang kepala (biasanya Vector3.forward atau Vector3.up tergantung rig).")]
-    [SerializeField] private Vector3 headForwardLocalAxis = Vector3.forward;
+    [Header("Inversion / Calibration")]
+    [Tooltip("Pembalikan sumbu pitch (atas/bawah).")]
+    [SerializeField] private bool invertPitch = true;
+    [Tooltip("Pembalikan sumbu yaw (kiri/kanan).")]
+    [SerializeField] private bool invertYaw = false;
 
     private Transform _target;
     private float _currentWeight = 0f;
@@ -108,14 +110,10 @@ public class AvatarLookAtController : MonoBehaviour
             ResolveTarget();
         }
 
-        // Smooth fade-in/fade-out bobot tatapan
         float targetWeight = (_lookAtEnabled && _target != null) ? overallWeight : 0f;
         _currentWeight = Mathf.MoveTowards(_currentWeight, targetWeight, Time.deltaTime * lookSpeed);
     }
 
-    /// <summary>
-    /// Eksekusi di LateUpdate() WAJIB untuk manipulasi tulang setelah update skinning/glTF.
-    /// </summary>
     private void LateUpdate()
     {
         if (headBone == null || _target == null || _currentWeight < 0.01f) return;
@@ -138,37 +136,36 @@ public class AvatarLookAtController : MonoBehaviour
 
         if (dirToTargetWorld.sqrMagnitude < 0.001f) return;
 
-        // Vektor arah relatif terhadap koordinat avatar root
-        Vector3 dirLocalToAvatar = transform.InverseTransformDirection(dirToTargetWorld);
+        // Gunakan parent dari head bone sebagai referensi lokal
+        Transform refTransform = headBone.parent != null ? headBone.parent : transform;
+        Vector3 dirLocal = refTransform.InverseTransformDirection(dirToTargetWorld);
 
-        // Hitung sudut yaw (horizontal) dan pitch (vertikal) dalam derajat
-        float yaw = Mathf.Atan2(dirLocalToAvatar.x, dirLocalToAvatar.z) * Mathf.Rad2Deg;
-        float pitch = -Mathf.Asin(Mathf.Clamp(dirLocalToAvatar.y, -1f, 1f)) * Mathf.Rad2Deg;
+        // Yaw: Kiri / Kanan
+        float yaw = Mathf.Atan2(dirLocal.x, dirLocal.z) * Mathf.Rad2Deg;
+        // Pitch: Atas / Bawah
+        float pitch = Mathf.Asin(Mathf.Clamp(dirLocal.y, -1f, 1f)) * Mathf.Rad2Deg;
 
-        // Batasi sudut agar kepala tidak berputar ke belakang atau terpelintir
-        yaw = Mathf.Clamp(yaw, -maxYawAngle, maxYawAngle);
-        pitch = Mathf.Clamp(pitch, -maxPitchAngle, maxPitchAngle);
+        // Terapkan kalibrasi orientasi
+        if (invertPitch) pitch = -pitch;
+        if (invertYaw) yaw = -yaw;
 
-        // Terapkan bobot tatapan (fade halus saat menjauh/mendekat)
-        yaw *= _currentWeight;
-        pitch *= _currentWeight;
+        // Batasi sudut gerak leher
+        yaw = Mathf.Clamp(yaw, -maxYawAngle, maxYawAngle) * _currentWeight;
+        pitch = Mathf.Clamp(pitch, -maxPitchAngle, maxPitchAngle) * _currentWeight;
 
-        // Rotasi tambahan offset tatapan
-        Quaternion lookOffset = Quaternion.Euler(pitch, yaw, 0f);
-
-        // Jika ada tulang leher, bagi separuh rotasi ke leher dan separuh ke kepala
         if (neckBone != null)
         {
-            Quaternion neckOffset = Quaternion.Euler(pitch * 0.4f, yaw * 0.4f, 0f);
-            Quaternion headOnlyOffset = Quaternion.Euler(pitch * 0.6f, yaw * 0.6f, 0f);
+            // Leher menanggung 35% rotasi, kepala menanggung 65% rotasi
+            Quaternion neckRotOffset = Quaternion.Euler(pitch * 0.35f, yaw * 0.35f, 0f);
+            Quaternion headRotOffset = Quaternion.Euler(pitch * 0.65f, yaw * 0.65f, 0f);
 
-            neckBone.localRotation = Quaternion.Slerp(neckBone.localRotation, neckOffset * _initialNeckLocalRot, Time.deltaTime * lookSpeed);
-            headBone.localRotation = Quaternion.Slerp(headBone.localRotation, headOnlyOffset * _initialHeadLocalRot, Time.deltaTime * lookSpeed);
+            neckBone.localRotation = Quaternion.Slerp(neckBone.localRotation, neckRotOffset * _initialNeckLocalRot, Time.deltaTime * lookSpeed);
+            headBone.localRotation = Quaternion.Slerp(headBone.localRotation, headRotOffset * _initialHeadLocalRot, Time.deltaTime * lookSpeed);
         }
         else
         {
-            // Terapkan seluruh rotasi ke tulang kepala
-            headBone.localRotation = Quaternion.Slerp(headBone.localRotation, lookOffset * _initialHeadLocalRot, Time.deltaTime * lookSpeed);
+            Quaternion headRotOffset = Quaternion.Euler(pitch, yaw, 0f);
+            headBone.localRotation = Quaternion.Slerp(headBone.localRotation, headRotOffset * _initialHeadLocalRot, Time.deltaTime * lookSpeed);
         }
     }
 }
