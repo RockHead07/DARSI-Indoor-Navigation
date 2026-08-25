@@ -36,7 +36,7 @@ public class AIAvatarGuideController : MonoBehaviour
     [Tooltip("Seberapa jauh avatar berjalan di DEPAN pengguna sepanjang rute.")]
     [SerializeField] private float leadDistance = 2.0f;
     [Tooltip("Berapa lama pengguna boleh tidak maju sebelum avatar berhenti dan menoleh (detik).")]
-    [SerializeField] private float stallSecondsBeforeWaiting = 1.5f;
+    [SerializeField] private float stallSecondsBeforeWaiting = 0.8f;
     [Tooltip("Pergerakan sekecil ini masih dianggap diam. Meredam derau tracking kamera AR.")]
     [SerializeField] private float advanceEpsilon = 0.05f;
     [Tooltip("Sisa rute sependek ini dianggap sudah tiba.")]
@@ -47,9 +47,11 @@ public class AIAvatarGuideController : MonoBehaviour
     [SerializeField] private float moveSpeed = 1.4f;
     [Tooltip("Tambahan kecepatan per meter ketinggalan dari titik bidik. Tanpa ini avatar " +
              "tidak akan pernah menyusul pengguna yang berjalan lebih cepat dari moveSpeed.")]
-    [SerializeField] private float catchUpGain = 1.0f;
-    [Tooltip("Batas atas kecepatan mengejar, supaya avatar tidak terlihat meluncur.")]
-    [SerializeField] private float maxSpeed = 3.0f;
+    [SerializeField] private float catchUpGain = 0.8f;
+    [Tooltip("Batas atas kecepatan mengejar. Dipatok mendekati kecepatan klip jalan " +
+             "(BlendTree Walk @1.4) supaya kaki tidak selip: di atas itu klip tetap diputar " +
+             "kecepatan normal sementara badan melesat, dan avatar terlihat mengesot.")]
+    [SerializeField] private float maxSpeed = 2.0f;
     [SerializeField] private float turnSpeed = 6.0f;
 
     [Header("Animator")]
@@ -65,6 +67,7 @@ public class AIAvatarGuideController : MonoBehaviour
     private int _speedHash;
     private Vector3 _lastUserPos;  // posisi pengguna terakhir (datar), acuan deteksi berhenti
     private float _stalledFor;  // sudah berapa lama pengguna tidak maju
+    private bool _needsSnap;    // pindahkan ke posisi memimpin di frame pertama, jangan menyalip
 
     public GuideState CurrentState => _state;
     public bool IsLeading => _leading;
@@ -86,6 +89,7 @@ public class AIAvatarGuideController : MonoBehaviour
         u.y = 0f;
         _lastUserPos = u;   // reset, kalau tidak sisa sesi lama bikin avatar langsung mengira pengguna mandek
         _stalledFor = 0f;
+        _needsSnap = true;
         SetState(GuideState.LeadingPath);
     }
 
@@ -164,6 +168,22 @@ public class AIAvatarGuideController : MonoBehaviour
         SetState(GuideState.LeadingPath);
 
         Vector3 target = PathPolyline.PointAt(_points, Mathf.Min(userS + leadDistance, pathLength));
+
+        // Frame pertama setelah StartLeading: PINDAHKAN langsung ke posisi memimpin.
+        // Tanpa ini avatar mulai dari posisi pengguna dengan gap = leadDistance penuh,
+        // sehingga rumus kejar langsung mentok maxSpeed dan ia terlihat MENYALIP dari kaki
+        // pengguna dengan kecepatan lari. Pemandu memang seharusnya sudah di depan saat mulai.
+        if (_needsSnap)
+        {
+            _needsSnap = false;
+            transform.position = target;
+            Vector3 ahead = PathPolyline.PointAt(_points, Mathf.Min(userS + leadDistance + 0.5f, pathLength));
+            if ((ahead - target).sqrMagnitude > 1e-6f)
+                transform.rotation = Quaternion.LookRotation(new Vector3(ahead.x - target.x, 0f, ahead.z - target.z));
+            Drive(0f);
+            return;
+        }
+
         Vector3 before = transform.position;
 
         // Kecepatan naik sebanding jarak ke titik bidik. Dengan kecepatan tetap, pengguna
