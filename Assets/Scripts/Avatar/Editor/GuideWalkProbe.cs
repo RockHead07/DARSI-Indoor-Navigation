@@ -102,18 +102,26 @@ public static class GuideWalkProbe
     static void CaptureUserRoute()
     {
         var pts = RoutePoints();
-        if (pts == null || pts.Count < 2) return;
+        if (pts == null || pts.Count < 2) { Sb.AppendLine("GAGAL tangkap rute: LineRenderer kosong"); return; }
         _userRoute = pts;
         var cam = Camera.main;
-        if (cam == null) return;
+        if (cam == null) { Sb.AppendLine("GAGAL tangkap rute: Camera.main null"); return; }
         _camHeight = cam.transform.position.y - pts[0].y;
+        Sb.AppendLine($"rute pengguna ditangkap: {pts.Count} corner, {PathPolyline.Length(pts):F2} m, tinggi kamera {_camHeight:F2} m");
 
         // Walker hidup DI DALAM Play mode supaya Time.deltaTime-nya sama dengan avatar.
-        var go = new GameObject("~ProbeUserWalker");
-        _walker = go.AddComponent<ProbeUserWalker>();
-        _walker.Init(cam.transform, pts, UserWalkSpeed, _camHeight);
-
-        Sb.AppendLine($"rute pengguna ditangkap: {pts.Count} corner, {PathPolyline.Length(pts):F2} m, tinggi kamera {_camHeight:F2} m");
+        // Kegagalan di sini dulu senyap total (probe jalan, pengguna diam, tanpa jejak apa pun).
+        try
+        {
+            var go = new GameObject("~ProbeUserWalker");
+            _walker = go.AddComponent<ProbeUserWalker>();
+            _walker.Init(cam.transform, pts, UserWalkSpeed, _camHeight);
+            Sb.AppendLine("ProbeUserWalker aktif");
+        }
+        catch (System.Exception e)
+        {
+            Sb.AppendLine("GAGAL membuat ProbeUserWalker: " + e.Message);
+        }
     }
 
     // Di Editor tidak ada device, jadi ARCamera diam. Kita simulasikan pengguna berjalan
