@@ -24,6 +24,10 @@ public class AvatarLookAtController : MonoBehaviour
     [Tooltip("Kecepatan lerp interpolasi tatapan.")]
     [SerializeField] private float lookSpeed = 6.0f;
     [Range(0f, 1f)] [SerializeField] private float overallWeight = 1.0f;
+    [Tooltip("Bobot tatapan saat pengguna berada di BELAKANG avatar (kondisi normal lead-follow). " +
+             "Bukan 0, supaya kepala tetap melirik lewat bahu; bukan 1, supaya leher tidak " +
+             "terlihat terkunci maksimal sepanjang perjalanan.")]
+    [Range(0f, 1f)] [SerializeField] private float behindWeight = 0.6f;
 
     private Transform _target;
     private float _currentWeight = 0f;
@@ -118,10 +122,19 @@ public class AvatarLookAtController : MonoBehaviour
         float y = Vector3.Dot(dirToTarget, up);      // Jarak vertikal (+ atas, - bawah)
         float z = Vector3.Dot(dirToTarget, forward); // Jarak ke depan
 
-        // Jika target berada di belakang avatar (z <= 0.05), jangan paksa memutar leher
+        // Target di belakang avatar. DULU look-at dimatikan total di sini, dan itu keliru untuk
+        // pola lead-follow (ADR-034): pemandu berjalan di DEPAN, jadi penggunanya hampir selalu
+        // berada di belakang. Akibatnya kepala tidak pernah menoleh sepanjang perjalanan dan
+        // avatar terasa mengabaikan penggunanya. Dilaporkan langsung dari uji manual.
+        //
+        // Sekarang look-at TETAP aktif dan dibiarkan dibatasi maxYawAngle di bawah, sehingga
+        // menghasilkan lirikan lewat bahu sejauh anatomi mengizinkan, bukan kepala yang
+        // menghadap lurus ke depan seolah tidak peduli. Bobotnya diturunkan sebagian saja
+        // supaya tidak terlihat seperti leher terkunci maksimal terus-menerus.
         if (z <= 0.05f)
         {
-            _currentWeight = Mathf.MoveTowards(_currentWeight, 0f, Time.deltaTime * lookSpeed * 2f);
+            _currentWeight = Mathf.MoveTowards(_currentWeight, overallWeight * behindWeight,
+                                               Time.deltaTime * lookSpeed);
         }
 
         // 4. Hitung sudut yaw dan pitch dalam derajat

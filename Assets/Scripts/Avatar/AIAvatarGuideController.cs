@@ -52,6 +52,9 @@ public class AIAvatarGuideController : MonoBehaviour
              "(BlendTree Walk @1.4) supaya kaki tidak selip: di atas itu klip tetap diputar " +
              "kecepatan normal sementara badan melesat, dan avatar terlihat mengesot.")]
     [SerializeField] private float maxSpeed = 2.0f;
+    [Tooltip("Selisih ke titik bidik di bawah ini diabaikan. Meredam koreksi mikro yang " +
+             "membuat avatar terlihat gelisah saat pengguna bergerak sedikit saja.")]
+    [SerializeField] private float repositionDeadzone = 0.35f;
     [SerializeField] private float turnSpeed = 6.0f;
 
     [Header("Animator")]
@@ -190,6 +193,17 @@ public class AIAvatarGuideController : MonoBehaviour
         // yang berjalan lebih cepat dari moveSpeed tidak akan pernah tersusul, dan avatar
         // berubah dari pemandu menjadi pengekor.
         float gap = Vector3.Distance(before, target);
+
+        // Zona mati: jangan mengoreksi selisih sekecil ini. Titik bidik dihitung ulang tiap
+        // frame dari userS, dan userS bergetar karena ShowPath menghitung ulang rute dari
+        // posisi pengguna. Tanpa zona mati avatar ikut bergeser untuk gerakan sekecil apa pun
+        // dan terlihat gelisah, bukan seperti orang berjalan. Dilaporkan dari uji manual.
+        if (gap < repositionDeadzone)
+        {
+            Drive(0f);
+            return;
+        }
+
         float speed = Mathf.Min(moveSpeed + gap * catchUpGain, maxSpeed);
         transform.position = Vector3.MoveTowards(before, target, speed * Time.deltaTime);
 
