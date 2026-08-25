@@ -4071,6 +4071,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AIAvatarGuideController
   showPath: {fileID: 798593642}
   navigation: {fileID: 0}
+  floorTransition: {fileID: 0}
+  visualRoot: {fileID: 0}
   leadDistance: 2
   stallSecondsBeforeWaiting: 1.5
   advanceEpsilon: 0.05
@@ -4082,6 +4084,10 @@ MonoBehaviour:
   turnSpeed: 6
   animator: {fileID: 1458944694}
   speedParam: Speed
+  walkClipSpeed: 1.589
+  waveParam: Wave
+  pointParam: Point
+  pointDirParam: PointDir
 --- !u!114 &807412538
 MonoBehaviour:
   m_ObjectHideFlags: 0
