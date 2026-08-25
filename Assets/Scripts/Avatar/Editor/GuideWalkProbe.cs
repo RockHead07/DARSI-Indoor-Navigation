@@ -32,7 +32,7 @@ public static class GuideWalkProbe
     {
         if (s != PlayModeStateChange.EnteredPlayMode || !EditorPrefs.GetBool(FlagKey, false)) return;
         EditorPrefs.SetBool(FlagKey, false);
-        _frames = 0; _running = true; _travelled = 0f; _maxDeviation = 0f;
+        _frames = 0; _running = true; _travelled = 0f; _maxDeviation = 0f; _waitingSeenAt = -1;
         Sb.Clear();
         EditorApplication.update += Tick;
     }
@@ -55,7 +55,22 @@ public static class GuideWalkProbe
         // rute pengguna ditangkap, supaya tidak menangkap garis default yang basi.
         if (_frames == 90) { CaptureUserRoute(); return; }
         if (_frames > 90 && _guide != null) { WalkUser(); Sample(); }
-        if (_frames < 600) return;   // beri waktu setelah pengguna berhenti di frame 300
+
+        // Berhenti begitu jawabannya ketahuan, jangan menunggu jatah frame habis.
+        // Jendela tetap 600 frame dulu ternyata terlalu pendek: Play mode berjalan jauh
+        // lebih lambat dari tick editor saat Game view tidak dirender, sehingga 300 frame
+        // probe hanya setara ~0,46 detik Time.deltaTime, padahal ambangnya 1,5 detik.
+        bool menunggu = _guide != null && _guide.CurrentState == AIAvatarGuideController.GuideState.WaitingForUser;
+        if (menunggu && _waitingSeenAt < 0 && _frames > 320)
+        {
+            _waitingSeenAt = _frames;
+            Sb.AppendLine($"\n>>> frame {_frames}: WaitingForUser MENYALA <<<");
+        }
+
+        // Setelah menyala, beri jeda supaya avatar sempat MENOLEH dan pengukuran arah
+        // hadapnya punya sampel. Tanpa jeda, probe berhenti sebelum putarannya terjadi.
+        bool selesai = (_waitingSeenAt > 0 && _frames >= _waitingSeenAt + 900) || _frames >= 4000;
+        if (!selesai) return;
 
         Finish();
         _running = false;
@@ -157,6 +172,7 @@ public static class GuideWalkProbe
 
     static AIAvatarGuideController.GuideState _lastState = (AIAvatarGuideController.GuideState)(-1);
     static int _facingSamples, _facingUserSamples;
+    static int _waitingSeenAt = -1;   // frame saat WaitingForUser pertama terlihat
 
     static void Sample()
     {
@@ -191,7 +207,10 @@ public static class GuideWalkProbe
         }
 
         // Setelah pengguna berhenti, apakah avatar MENOLEH ke arahnya?
-        if (_walker != null && _frames > 300)
+        // Hanya dihitung SETELAH WaitingForUser menyala. Sebelum itu avatar memang harus
+        // menghadap arah jalan, jadi memasukkannya membuat persentase bohong (pernah melaporkan
+        // 4/1149 "tidak menoleh" padahal pengukuran langsung menunjukkan 0,0 derajat).
+        if (_waitingSeenAt > 0 && _frames > _waitingSeenAt)
         {
             var cam1 = Camera.main;
             if (cam1 != null)
@@ -246,15 +265,20 @@ public static class GuideWalkProbe
         Sb.AppendLine($"perpindahan neto = {Vector3.Distance(_startPos, _guide.transform.position):F2} m");
         Sb.AppendLine($"simpangan maks dari garis = {_maxDeviation:F3} m");
 
-        Sb.AppendLine("\n--- setelah pengguna BERHENTI ---");
+        Sb.AppendLine("\n--- setelah WaitingForUser MENYALA ---");
+        if (_guide != null && Camera.main != null)
+        {
+            Vector3 toU = Camera.main.transform.position - _guide.transform.position; toU.y = 0f;
+            Vector3 fw = _guide.transform.forward; fw.y = 0f;
+            Sb.AppendLine($"sudut hadap akhir: {Vector3.Angle(fw, toU):F1} derajat (0 = menghadap pengguna)");
+        }
         if (_facingSamples > 0)
         {
             float pct = 100f * _facingUserSamples / _facingSamples;
-            Sb.AppendLine($"avatar menoleh ke pengguna: {_facingUserSamples}/{_facingSamples} sampel ({pct:F0}%)");
-            Sb.AppendLine(pct > 80f ? "-> MENOLEH ke pengguna (perilaku pemandu yang benar)"
-                                    : "-> TIDAK menoleh, avatar tetap menghadap arah jalan");
+            Sb.AppendLine($"sampel menoleh (<45 derajat): {_facingUserSamples}/{_facingSamples} ({pct:F0}%)");
+            Sb.AppendLine("catatan: persentase rendah di awal itu WAJAR, avatar butuh waktu berputar 180 derajat.");
         }
-        else Sb.AppendLine("(tidak ada sampel setelah berhenti)");
+        else Sb.AppendLine("(WaitingForUser tidak pernah menyala, tidak ada sampel)");
 
         Sb.AppendLine($"\n--- pengguna disimulasikan berjalan {UserWalkSpeed} m/s ---");
         Sb.AppendLine($"pengguna menempuh = {_maxUserS:F2} m sepanjang rute");
