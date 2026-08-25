@@ -26,7 +26,12 @@ using UnityEngine.UI;
 /// </summary>
 public class FloorTransitionController : MonoBehaviour
 {
-    private enum Phase { Idle, ToConnector, AwaitingRelocalize, ToDestination }
+    /// <summary>
+    /// Fase serah terima lintas lantai (ADR-020). Dibuat PUBLIK supaya pemandu avatar bisa
+    /// MENAMPILKAN fase ini tanpa memiliki mesin state kedua (ADR-034 keputusan 9).
+    /// Yang boleh mengubahnya tetap hanya kelas ini.
+    /// </summary>
+    public enum Phase { Idle, ToConnector, AwaitingRelocalize, ToDestination }
 
     [SerializeField] private FloorVisibilityManager floorVisibility;
     [SerializeField] private POIManager poiManager;
@@ -51,6 +56,16 @@ public class FloorTransitionController : MonoBehaviour
     [SerializeField] private bool logChanges = true;
 
     private Phase _phase = Phase.Idle;
+
+    /// <summary>
+    /// Fase transisi saat ini, hanya-baca. Selama <see cref="Phase.AwaitingRelocalize"/>
+    /// posisi pengguna TIDAK SAH (ADR-007): tracking AR putus saat berpindah lantai,
+    /// jadi apa pun yang bergantung pada posisi harus berhenti dulu.
+    /// </summary>
+    public Phase CurrentPhase => _phase;
+
+    /// <summary>Sedang dalam serah terima lintas lantai (bukan Idle).</summary>
+    public bool IsTransitioning => _phase != Phase.Idle;
     private POI _finalDestination;
     private POI _connector;
     private POI _lastSeenDestination;

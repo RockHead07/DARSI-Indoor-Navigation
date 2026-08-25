@@ -990,6 +990,36 @@ bentuk keputusan ini:
    diekspos (property read-only atau UnityEvent perubahan fase). Itu satu-satunya sentuhan
    yang dibenarkan; jangan menduplikasi logikanya ke `AIAvatarGuideController`.
 
+   > **Status implementasi (2026-08-25): INTI SELESAI, BELUM TERVALIDASI.**
+   >
+   > `FloorTransitionController.Phase` dijadikan publik beserta `CurrentPhase` dan
+   > `IsTransitioning` (hanya-baca; yang boleh mengubah tetap kelas itu sendiri). Ini
+   > satu-satunya sentuhan yang dibenarkan keputusan ini, dan tidak ada mesin state
+   > kedua yang dibuat.
+   >
+   > `AIAvatarGuideController` menyembunyikan avatar selama fase `AwaitingRelocalize`
+   > dan menandai `_needsSnap` supaya saat muncul kembali ia melompat ke rute lantai
+   > baru, bukan melanjutkan dari posisi lama yang sudah tidak bermakna. Avatar
+   > **disembunyikan**, bukan sekadar dihentikan: pemandu yang mengambang di lantai lama
+   > sementara penggunanya sudah pindah lebih menyesatkan daripada tidak ada pemandu.
+   >
+   > **Fase `ToConnector` dan `ToDestination` sengaja TIDAK diperlakukan khusus.** Rute
+   > yang digambar `ShowPath` memang sudah segmen lantai yang sedang berlaku, jadi avatar
+   > cukup menaikinya seperti biasa. Menambah penanganan khusus untuk keduanya berarti
+   > menduplikasi keputusan yang sudah dibuat `FloorTransitionController`.
+   >
+   > **Penyaringan lantai eksplisit ala ADR-018 TIDAK ditambahkan**, dan ini penyederhanaan
+   > yang disadari, bukan kelalaian. Kombinasi gerbang `AwaitingRelocalize` plus snap-ulang
+   > sudah menjamin avatar tidak pernah tertinggal di lantai yang salah. Menambah
+   > perbandingan indeks lantai berarti sumber kebenaran kedua untuk pertanyaan yang sama.
+   > Kalau uji lapangan menemukan celah, itu yang ditambahkan lebih dulu.
+   >
+   > **BELUM DIVALIDASI, dan tidak bisa divalidasi di `TestingHCM`.** Sesuai peringatan
+   > keputusan 6, `TestingHCM` memiliki lantai yang TERSAMBUNG di navmesh (terukur ulang
+   > 2026-08-25: `PathComplete`, 17 corner), sehingga serah terima lift di sana tidak
+   > pernah terpicu. Validasi wajib memakai navmesh produksi dan perangkat sungguhan,
+   > karena `AwaitingRelocalize` hanya muncul saat localize benar-benar putus lalu pulih.
+
    **Bukti terukur (Edit mode, 2026-08-24, scene produksi):** dalam Lantai Dasar
    `PathComplete` 3 corner / 11,30 m; dalam Lantai 1 `PathComplete` 12 corner / 26,04 m;
    Lift Ground → Lift Lantai1 `PathPartial` 2 corner / 0,90 m; `OffMeshLink` di scene = 0.

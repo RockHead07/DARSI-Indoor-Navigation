@@ -31,6 +31,12 @@ public class AIAvatarGuideController : MonoBehaviour
     [SerializeField] private ShowPath showPath;
     [Tooltip("Dipakai untuk memastikan rute yang dibaca sungguhan, bukan sisa garis lama.")]
     [SerializeField] private NavigationController navigation;
+    [Tooltip("Kosongkan untuk mencari otomatis. Avatar MENAMPILKAN fase milik komponen ini, " +
+             "tidak punya mesin state lintas lantai sendiri (ADR-034 keputusan 9).")]
+    [SerializeField] private FloorTransitionController floorTransition;
+    [Tooltip("Bagian visual yang disembunyikan saat transisi lantai. Kosongkan untuk memakai " +
+             "GameObject tempat Animator berada.")]
+    [SerializeField] private GameObject visualRoot;
 
     [Header("Jarak (meter)")]
     [Tooltip("Seberapa jauh avatar berjalan di DEPAN pengguna sepanjang rute.")]
@@ -91,6 +97,11 @@ public class AIAvatarGuideController : MonoBehaviour
         if (navigation == null) navigation = FindFirstObjectByType<NavigationController>();
         if (showPath != null) _line = showPath.GetComponent<LineRenderer>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
+        if (floorTransition == null) floorTransition = FindFirstObjectByType<FloorTransitionController>();
+        // visualRoot diturunkan dari Animator, BUKAN diasumsikan anak pertama. Bug P0-2 dulu
+        // terjadi karena model VRM di-parent di luar visualRoot sehingga Dismiss tidak
+        // menyembunyikan apa pun.
+        if (visualRoot == null && animator != null) visualRoot = animator.gameObject;
         _speedHash = Animator.StringToHash(speedParam);
         _waveHash = Animator.StringToHash(waveParam);
         _pointHash = Animator.StringToHash(pointParam);
@@ -111,12 +122,43 @@ public class AIAvatarGuideController : MonoBehaviour
         if (animator != null && animator.isActiveAndEnabled) animator.SetTrigger(_waveHash);
     }
 
-    public void StopLeading() { _leading = false; SetState(GuideState.IdleStand); Drive(0f); }
+    public void StopLeading()
+    {
+        _leading = false;
+        SetState(GuideState.IdleStand);
+        Drive(0f);
+        // Wajib: kalau navigasi berhenti selagi avatar disembunyikan karena transisi lantai,
+        // tanpa ini dia tersangkut tak terlihat sampai sesi memimpin berikutnya.
+        SetVisible(true);
+    }
 
     private void Update()
     {
         if (_user == null && Camera.main != null) _user = Camera.main.transform;
         if (!_leading || _user == null) { Drive(0f); return; }
+
+        // SERAH TERIMA LINTAS LANTAI (ADR-034 keputusan 9, ADR-020 poin 4).
+        //
+        // Selama AwaitingRelocalize pengguna sedang berpindah lantai: tracking AR putus dan
+        // posisinya TIDAK SAH (ADR-007). Avatar disembunyikan, bukan sekadar dihentikan --
+        // pemandu yang mengambang di tempat lama sementara penggunanya sudah di lantai lain
+        // lebih menyesatkan daripada tidak ada pemandu sama sekali.
+        //
+        // Fase ToConnector dan ToDestination TIDAK diperlakukan khusus: rute yang digambar
+        // ShowPath memang sudah segmen lantai yang sedang berlaku, jadi avatar cukup
+        // menaikinya seperti biasa.
+        if (floorTransition != null &&
+            floorTransition.CurrentPhase == FloorTransitionController.Phase.AwaitingRelocalize)
+        {
+            SetVisible(false);
+            SetState(GuideState.IdleStand);
+            Drive(0f);
+            // Wajib snap ulang saat muncul lagi: rute lantai baru sama sekali berbeda, dan
+            // posisi lama sudah tidak bermakna.
+            _needsSnap = true;
+            return;
+        }
+        SetVisible(true);
 
         // LineRenderer menyimpan garis TERAKHIR yang digambar, termasuk sisa dari sesi
         // sebelumnya, sampai ShowPath sempat menghitung ulang (pathUpdateFrequency 0.5s).
@@ -289,6 +331,11 @@ public class AIAvatarGuideController : MonoBehaviour
         // kecepatan putar dikembalikan normal supaya sapaan dan tunjukan tidak ikut melambat.
         float ratio = (speed > 0.05f && walkClipSpeed > 0.01f) ? speed / walkClipSpeed : 1f;
         animator.speed = Mathf.Clamp(ratio, 0.4f, 1.8f);
+    }
+
+    private void SetVisible(bool v)
+    {
+        if (visualRoot != null && visualRoot.activeSelf != v) visualRoot.SetActive(v);
     }
 
     private void SetState(GuideState s)
