@@ -393,6 +393,16 @@ jarak = path(user → lift lantai user) + path(lift lantai tujuan → POI)
 
 **Pengecualian tercatat terhadap CLAUDE.md:** `OllamaConnector.cs` masuk daftar "jangan diubah tanpa alasan kuat". Perubahan ini disengaja & disetujui pemilik project: prompt-nya faktual salah (konteks kampus di app rumah sakit) dan provider lokal terbukti tidak workable di lapangan. Sama seperti ADR-021 untuk `POIData.cs`, ini dicatat, bukan penyimpangan diam-diam.
 
+#### Amandemen 024-A (2026-08-25) — Ollama-LAN dihapus total dari `OllamaConnector.cs`, Groq jadi satu-satunya fallback klien
+
+**Mencabut** bagian Ollama-lokal dari keputusan pokok di atas ("Ollama cuma dipakai kalau Groq gagal"). Groq tetap seperti semula.
+
+**Pemicu:** setelah RAG Assistant + Bifrost (ADR-026, ADR-029) jadi jalur primer di server, `OllamaConnector` cuma jadi fallback klien level-dua (dipanggil `VoiceInputHandler.cs` kalau RAG Assistant tidak terjangkau). Ollama-LAN di dalamnya sudah didiagnosis sendiri oleh ADR-024 sebagai tidak realistis di lapangan (HP dan laptop harus satu WiFi) — tapi diagnosis itu belum ditindaklanjuti sampai tuntas. Ditemukan aktif merugikan, bukan cuma nganggur: `Start()` memanggil `PreWarmModel()` tanpa syarat setiap kali GameObject aktif, mengirim request ke IP LAN hardcoded dengan timeout 60 detik yang di lapangan pasti gagal — user menunggu sampai semenit tanpa hasil di setiap sesi voice, sebelum akhirnya jatuh ke "Sistem siap (offline mode)".
+
+**Yang berubah di kode:** dihapus seluruhnya — field `ollamaHost`/`ollamaPort`/`modelName`/`useHttps`, konstanta `MAX_ATTEMPTS`/`RETRY_DELAY_SECONDS`/`PREWARM_TIMEOUT`, method `TryOllama()`/`PreWarmModel()`/`Start()`, field `txtStatus` (cuma dipakai `PreWarmModel`), kelas `OllamaRequest`/`OllamaResponse`. `ExtractPOI()` disederhanakan: Groq gagal atau `groqApiKey` kosong → langsung `onConnectionFailed`, tanpa percobaan kedua. Interface publik yang dipakai `VoiceInputHandler.cs` (`OllamaConnector.instance.ExtractPOI(...)`) tidak berubah.
+
+**Yang sengaja TIDAK diubah:** nama kelas tetap `OllamaConnector` meski isinya sekarang murni Groq. Rename akan memaksa menyentuh `VoiceInputHandler.cs` juga (file protected lain) untuk manfaat kosmetik semata — di luar cakupan perbaikan ini.
+
 ---
 
 ### ADR-025 — Validasi akurasi VPS: HUD ground-truth admin-only, ukur manual pakai meteran (2026-08-18)
