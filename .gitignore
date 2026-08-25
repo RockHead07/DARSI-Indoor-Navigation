@@ -128,7 +128,7 @@ __pycache__/
 /Assets/Avatar/Model/AvatarSample_A.prefab.meta
 /Assets/Avatar/Model/AvatarSample_A.*/
 /Assets/Avatar/Model/AvatarSample_A.*.meta
-# Meta folder ikut diabaikan: seluruh isi folder ini placeholder, jadi meta-nya
-# akan yatim di clone bersih. Folder + meta lahir lagi saat model asli masuk.
-/Assets/Avatar.meta
+# Hanya meta folder Model/ yang diabaikan: isinya semua placeholder, jadi meta-nya
+# akan yatim di clone bersih. Assets/Avatar.meta TIDAK diabaikan, karena
+# Assets/Avatar/Animations/ berisi aset sungguhan yang di-track.
 /Assets/Avatar/Model.meta
