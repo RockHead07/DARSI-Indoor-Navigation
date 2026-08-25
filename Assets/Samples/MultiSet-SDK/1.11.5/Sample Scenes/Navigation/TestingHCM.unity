@@ -7368,6 +7368,38 @@ PrefabInstance:
       propertyPath: m_AABB.m_Extent.z
       value: 0.124091595
       objectReference: {fileID: 0}
+    - target: {fileID: 2690294688965999897, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: VerticalUp.CurveXRangeDegree
+      value: 45
+      objectReference: {fileID: 0}
+    - target: {fileID: 2690294688965999897, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: VerticalUp.CurveYRangeDegree
+      value: 12
+      objectReference: {fileID: 0}
+    - target: {fileID: 2690294688965999897, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: VerticalDown.CurveXRangeDegree
+      value: 45
+      objectReference: {fileID: 0}
+    - target: {fileID: 2690294688965999897, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: VerticalDown.CurveYRangeDegree
+      value: 12
+      objectReference: {fileID: 0}
+    - target: {fileID: 2690294688965999897, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: HorizontalInner.CurveXRangeDegree
+      value: 45
+      objectReference: {fileID: 0}
+    - target: {fileID: 2690294688965999897, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: HorizontalInner.CurveYRangeDegree
+      value: 12
+      objectReference: {fileID: 0}
+    - target: {fileID: 2690294688965999897, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: HorizontalOuter.CurveXRangeDegree
+      value: 45
+      objectReference: {fileID: 0}
+    - target: {fileID: 2690294688965999897, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: HorizontalOuter.CurveYRangeDegree
+      value: 16
+      objectReference: {fileID: 0}
     - target: {fileID: 4607873686317489921, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
       propertyPath: m_DirtyAABB
       value: 0
