@@ -29,7 +29,7 @@ jobs:
           lfs: true
 
       - name: Cache Unity Library
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: Library
           key: Library-Standalone-${{ hashFiles('Assets/**', 'Packages/**') }}
