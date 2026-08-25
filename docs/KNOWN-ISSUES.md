@@ -152,3 +152,58 @@ bisa menyala). Menambah satu dokumen wajib yang tidak ditegakkan memperkuat kebi
 Bagian yang **layak diselamatkan** dan dipindah ke `darsi-backend`: §5 (prompt injection),
 §5.4 (RAG security), §37 (LLM output validation), §38 (tool parameter validation). Itu
 relevan nyata karena asisten DARSI menerima input suara dan menarik chunk dari corpus.
+
+---
+
+## ✅ SELESAI — Animasi avatar dulu diambil dari aset demo Photon
+
+**Status:** **SELESAI (2026-08-25).** Seluruh klip sudah diganti ke Mixamo dan
+`AvatarGuide.controller` terverifikasi **nol rujukan** ke `Assets/Photon/`. Dicatat di sini
+sebagai jejak, bukan sebagai utang. Riwayat masalahnya di bawah.
+
+### Apa yang dipakai
+
+`AvatarGuide.controller` (BlendTree Locomotion) memakai dua klip:
+
+```
+Assets/Photon/PhotonUnityNetworking/Demos/Shared Assets/Animations/HumanoidWalk.fbx
+  -> HumanoidIdle  (BlendTree @ 0)
+  -> HumanoidWalk  (BlendTree @ 1.4)
+```
+
+Klip itu dipilih karena **sudah ada di project** dan bertipe Humanoid, sehingga otomatis
+ter-retarget ke rig VRM tanpa perlu aset baru. Ditemukan lewat
+`AssetDatabase.FindAssets("t:AnimationClip")` yang disaring `isHumanMotion`.
+
+### Kenapa ini masalah
+
+Aset di folder `Demos/` umumnya dilisensikan untuk **mempelajari SDK-nya**, bukan untuk
+didistribusikan sebagai bagian dari produk. DARSI menyasar deployment di RS Islam A. Yani
+dan menjadi bagian pengajuan paten DJKI, jadi provenance aset bukan detail administratif.
+
+**Isi lisensi Photon-nya belum dibaca**, jadi status sebenarnya belum diketahui: bisa saja
+diizinkan. Yang pasti adalah **belum diverifikasi**, dan aset itu sudah masuk repo.
+
+Kekeliruan prosesnya: pemilihan aset ini tidak ditandai saat dipilih, padahal
+saat itulah pertanyaan lisensi paling murah dijawab.
+
+### Pilihan pengganti (semuanya gratis, semuanya humanoid)
+
+| Sumber | Catatan |
+|---|---|
+| **Mixamo** (Adobe) | Paling umum. Gratis dengan akun, boleh untuk proyek komersial. Idle, walk, wave, dan point tersedia sekaligus |
+| **Unity Starter Assets** | Gratis di Asset Store, sudah termasuk set locomotion |
+| Rekam sendiri | Paling aman secara hukum, paling mahal secara waktu |
+
+Rekomendasi: **Mixamo**, karena satu sumber menutup seluruh kebutuhan gestur ADR-034
+(Idle, Walk, Wave, Point) dan formatnya humanoid sehingga tidak ada kerja retarget tambahan.
+
+### Yang harus dikerjakan
+
+1. Baca lisensi Photon (`Assets/Photon/PhotonUnityNetworking/readme.txt` dan halaman
+   lisensi resmi Photon) untuk memastikan status aset `Demos/`.
+2. Kalau tidak mengizinkan distribusi, ganti klip di `AvatarGuide.controller`. Karena
+   BlendTree-nya sudah terpasang, penggantian hanya menukar dua `AnimationClip` dan
+   menyesuaikan ambang kecepatan.
+3. Catat sumber dan lisensi aset final di dokumen, supaya laporan KP dan berkas paten
+   punya jejak provenance yang jelas.

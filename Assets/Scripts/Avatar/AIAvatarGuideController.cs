@@ -60,6 +60,16 @@ public class AIAvatarGuideController : MonoBehaviour
     [Header("Animator")]
     [SerializeField] private Animator animator;
     [SerializeField] private string speedParam = "Speed";
+    [Tooltip("Kecepatan yang DIPROGRAM di klip Walk (m/s), diukur dari clip.averageSpeed. " +
+             "Harus sama dengan threshold Walk di BlendTree. Dipakai untuk menyelaraskan " +
+             "kecepatan putar klip dengan kecepatan gerak sesungguhnya supaya kaki tidak selip.")]
+    [SerializeField] private float walkClipSpeed = 1.589f;
+    [Tooltip("Trigger sapaan saat mulai memimpin.")]
+    [SerializeField] private string waveParam = "Wave";
+    [Tooltip("Trigger menunjuk saat tiba di tujuan.")]
+    [SerializeField] private string pointParam = "Point";
+    [Tooltip("Arah menunjuk: -1 kiri, 0 depan, +1 kanan.")]
+    [SerializeField] private string pointDirParam = "PointDir";
 
     private Transform _user;
     private LineRenderer _line;
@@ -67,7 +77,7 @@ public class AIAvatarGuideController : MonoBehaviour
     private readonly List<Vector3> _points = new List<Vector3>();
     private GuideState _state = GuideState.IdleStand;
     private bool _leading;
-    private int _speedHash;
+    private int _speedHash, _waveHash, _pointHash, _pointDirHash;
     private Vector3 _lastUserPos;  // posisi pengguna terakhir (datar), acuan deteksi berhenti
     private float _stalledFor;  // sudah berapa lama pengguna tidak maju
     private bool _needsSnap;    // pindahkan ke posisi memimpin di frame pertama, jangan menyalip
@@ -82,6 +92,9 @@ public class AIAvatarGuideController : MonoBehaviour
         if (showPath != null) _line = showPath.GetComponent<LineRenderer>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
         _speedHash = Animator.StringToHash(speedParam);
+        _waveHash = Animator.StringToHash(waveParam);
+        _pointHash = Animator.StringToHash(pointParam);
+        _pointDirHash = Animator.StringToHash(pointDirParam);
     }
 
     /// <summary>Panggil HANYA setelah localize berhasil. Lihat catatan gate di atas.</summary>
@@ -94,6 +107,8 @@ public class AIAvatarGuideController : MonoBehaviour
         _stalledFor = 0f;
         _needsSnap = true;
         SetState(GuideState.LeadingPath);
+        // Menyapa dulu sebelum jalan, seperti pemandu sungguhan.
+        if (animator != null && animator.isActiveAndEnabled) animator.SetTrigger(_waveHash);
     }
 
     public void StopLeading() { _leading = false; SetState(GuideState.IdleStand); Drive(0f); }
@@ -122,6 +137,18 @@ public class AIAvatarGuideController : MonoBehaviour
         // Tiba: sisa rute di depan pengguna sudah pendek.
         if (pathLength - userS <= arrivalThreshold)
         {
+            // Arah menunjuk diturunkan dari ujung rute relatif arah hadap avatar, bukan
+            // dipilih manual: -1 kiri, 0 depan, +1 kanan. Memakai ketiga klip Point.
+            if (animator != null && animator.isActiveAndEnabled && _points.Count >= 2)
+            {
+                Vector3 toEnd = _points[_points.Count - 1] - transform.position;
+                toEnd.y = 0f;
+                if (toEnd.sqrMagnitude > 1e-4f)
+                {
+                    float signed = Vector3.SignedAngle(transform.forward, toEnd.normalized, Vector3.up);
+                    animator.SetFloat(_pointDirHash, Mathf.Clamp(signed / 60f, -1f, 1f));
+                }
+            }
             SetState(GuideState.ArrivalPointing);
             FaceTowards(_user.position);
             Drive(0f);
@@ -247,14 +274,31 @@ public class AIAvatarGuideController : MonoBehaviour
 
     private void Drive(float speed)
     {
-        if (animator != null && animator.isActiveAndEnabled)
-            animator.SetFloat(_speedHash, speed, 0.1f, Time.deltaTime);
+        if (animator == null || !animator.isActiveAndEnabled) return;
+        animator.SetFloat(_speedHash, speed, 0.1f, Time.deltaTime);
+
+        // Selaraskan kecepatan PUTAR klip dengan kecepatan gerak sesungguhnya.
+        //
+        // Klip Walk dari Mixamo membawa root motion maju 1,589 m/s (terukur lewat
+        // clip.averageSpeed; klip lain semuanya 0 karena "in place"). Avatar digerakkan
+        // AIAvatarGuideController pada kecepatan berbeda, dan selisihnya membuat telapak
+        // kaki menggeser di lantai. Tanpa penyelarasan ini, selisih 1,4 vs 1,589 saja
+        // sudah terasa sebagai langkah yang "tidak pas".
+        //
+        // Klip diam (Idle, Wave, Point) averageSpeed-nya 0, jadi saat tidak berjalan
+        // kecepatan putar dikembalikan normal supaya sapaan dan tunjukan tidak ikut melambat.
+        float ratio = (speed > 0.05f && walkClipSpeed > 0.01f) ? speed / walkClipSpeed : 1f;
+        animator.speed = Mathf.Clamp(ratio, 0.4f, 1.8f);
     }
 
     private void SetState(GuideState s)
     {
         if (_state == s) return;
         _state = s;
+        // Dipicu saat MASUK state saja. Kalau dipanggil tiap frame, klipnya restart terus
+        // dan tangannya tidak pernah selesai mengangkat.
+        if (s == GuideState.ArrivalPointing && animator != null && animator.isActiveAndEnabled)
+            animator.SetTrigger(_pointHash);
         Debug.Log($"[AvatarGuide] state -> {s}");
     }
 }
