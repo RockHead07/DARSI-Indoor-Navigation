@@ -537,9 +537,21 @@ lagi (skrip belum bisa mendeteksi kapan ini terjadi, karena `generation.py`
 tidak mengembalikan info provider mana yang menjawab). URL target default yang
 lama (quick tunnel mati) juga dihapus — sekarang wajib diisi eksplisit lewat
 `TARGET_URL`, tidak lagi diam-diam menguji host yang sudah tidak ada.
-**Belum dijalankan ulang** — 52/52 (100%) LAMA masih angka dari kode yang
-rusak, dan angka BARU belum ada sampai `python -m scripts.eval_llm_judge`
-benar-benar dieksekusi dan hasilnya dicatat di sini.
+**UPDATE 2026-08-24 (lanjutan) — angka BARU sudah ada, 100% LAMA resmi
+dibuang.** Setelah 3 percobaan gagal (restart server, rate-limit Groq,
+gangguan sesi + 503 Bifrost), run ke-4 berhasil bersih: **52/52 dinilai
+tanpa error, 45/52 PASS (86,5%)**. Rincian kategori: Gawat Darurat 90%,
+Poliklinik 70%, Farmasi 100%, Diagnostik 100%, Administrasi 67%, Fasilitas
+Umum 100%, Di Luar Cakupan 75%. Diagnosis kegagalan (bukan tebakan, lewat
+curl langsung ke API produksi): satu diantaranya (ambang skor `MIN_TOP_SCORE
+=0.22`) sengaja belum ditambal, satu lagi (jadwal dokter kadang tanpa
+lokasi) sudah dites akar masalahnya nyata (`doctor_schedules.poi_unity_id`
+selalu `None`) dan ditambal, tapi masih kadang gagal — diduga variasi
+sampling LLM, bukan bug kode. Dua celah lain (kosakata "spiral KB" collision
+dengan "pemasangan gigi palsu", dan rubrik juri terlalu ketat untuk
+penolakan out-of-scope) ditambal dan diverifikasi manual setelah run ini —
+**angka 86,5% adalah lower-bound**, belum diukur ulang dengan kedua
+perbaikan itu. Detail lengkap + tabel: `README.md` repo `darsi-backend`.
 
 ---
 

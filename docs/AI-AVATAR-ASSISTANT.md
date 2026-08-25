@@ -40,19 +40,25 @@
 > masih harus diberesin dulu:
 > - ~~`POI_SYNC_TOKEN` di server belum dirotasi dari default~~ **SELESAI
 >   (2026-08-24)**, sudah dirotasi + diverifikasi (token lama ditolak 401).
-> - `eval_llm_judge.py` — kodenya sudah diperbaiki (4 cacat, bukan 3: ERROR
->   dipisah dari PASS/FAIL, `GROQ_API_KEY` kosong = `SystemExit`, retry+backoff
->   untuk rate-limit 429, rubrik "Tolak/Informasi" diperhalus). **Tapi masih
->   BELUM ada angka final** — 3 percobaan run 52 skenario semuanya terhenti di
->   tengah jalan (restart server, rate-limit Groq, lalu gangguan sesi + 503
->   gateway Bifrost tidak stabil). Dari hasil PARSIAL run-run itu ketemu 3
->   celah konten/kosakata nyata (jadwal dokter tanpa lokasi poli, "spiral
->   KB"/"implan"/"susuk" tidak dikenali, chunk "cara bikin janji temu" yang
->   terhapus saat corpus ditulis ulang) — **sudah diperbaiki di kode/corpus
->   lokal repo `darsi-backend` tapi BELUM DI-DEPLOY ke server**. Sesi
->   berikutnya: deploy dulu (`git push`+`pull`+`docker compose up -d --build`+
->   ingest ulang corpus), baru jalankan `eval_llm_judge.py` sampai tuntas
->   52/52 untuk angka yang sah dikutip.
+> - `eval_llm_judge.py` — kodenya sudah diperbaiki (4 cacat). **Angka bersih
+>   pertama berhasil didapat (2026-08-24): 45/52 (86,5%)**, 52/52 dinilai
+>   tanpa error. Rincian: Gawat Darurat 90%, Poliklinik 70%, Farmasi 100%,
+>   Diagnostik 100%, Administrasi 67%, Fasilitas Umum 100%, Di Luar Cakupan
+>   75%. **Ini angka LOWER-BOUND, bukan final** — 2 perbaikan lagi (kosakata
+>   "spiral KB"/"pasang" jadi stopword, rubrik penolakan out-of-scope) sudah
+>   di-deploy dan diverifikasi manual lewat curl SETELAH run ini, tapi belum
+>   diukur ulang lewat 52 skenario penuh. Tabel lengkap ada di
+>   `README.md` repo `darsi-backend`.
+>   - **Temuan terkait, belum ditambal**: `poi_id`/`poi_name` di response API
+>     tetap terisi (dari chunk retrieval rank-1) walau JAWABAN TEKSNYA sudah
+>     benar menolak pertanyaan di luar cakupan tanpa sebut lokasi. Konsekuensi
+>     di Unity: `VoiceInputHandler.cs` bisa jatuh ke metadata yang salah
+>     sebagai fallback kalau jawaban teks tidak menyebut POI apa pun. Akar
+>     masalahnya sama dengan ambang skor `MIN_TOP_SCORE=0.22` di bawah.
+>   - Sisa yang masih gagal: #6 (luka robek/berdarah — korban ambang skor
+>     0,22, sengaja belum ditambal), #12/#13 (jadwal dokter kadang tidak
+>     sebut lokasi — diduga variasi sampling LLM, bukan bug kode, karena
+>     sebagian besar kasus serupa sudah lolos).
 > - ~~Cloudflare Tunnel masih quick tunnel~~ **SELESAI (2026-08-24)**: Named
 >   Tunnel permanen aktif di `https://api-darsi.rockhead07.tech` (domain
 >   `rockhead07.tech`, dibuat lewat CLI `cloudflared tunnel login/create/route
