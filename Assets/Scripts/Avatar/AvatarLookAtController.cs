@@ -33,6 +33,8 @@ public class AvatarLookAtController : MonoBehaviour
     private float _currentWeight = 0f;
     private bool _lookAtEnabled = true;
 
+    private float _yaw;    // sudut tatapan yang diredam, disimpan antar frame
+    private float _pitch;  // (tulang tidak bisa dipakai menyimpan: Animator menimpanya tiap frame)
     private Quaternion _headRestLocalRot = Quaternion.identity;
     private bool _hasRestPose = false;
 
@@ -145,9 +147,25 @@ public class AvatarLookAtController : MonoBehaviour
         float clampedYaw = Mathf.Clamp(rawYaw, -maxYawAngle, maxYawAngle) * _currentWeight;
         float clampedPitch = Mathf.Clamp(rawPitch, -maxPitchAngle, maxPitchAngle) * _currentWeight;
 
+        // 5b. Peredaman disimpan pada SUDUTNYA, bukan pada rotasi tulang.
+        //
+        // Dulu barisnya: headBone.rotation = Slerp(headBone.rotation, target, deltaTime * lookSpeed).
+        // Itu keliru karena mengandaikan hasil slerp menumpuk antar frame, padahal Animator
+        // MENULIS ULANG tulang kepala ke pose animasi setiap frame sebelum LateUpdate. Jadi
+        // slerp selalu mulai dari nol lagi dan kepala mentok di satu langkah peredaman saja.
+        // Terukur: butuh yaw 55 derajat (setelah clamp), yang terjadi cuma 6,5 derajat --
+        // persis sekitar 10% (deltaTime*lookSpeed = 0,0167*6 = 0,1). Gejalanya: avatar
+        // terlihat "tidak benar-benar menengok".
+        //
+        // Sekarang sudutnya sendiri yang diredam dan disimpan antar frame, lalu rotasi ditulis
+        // ABSOLUT. Hasil akhirnya tidak lagi bergantung pada nilai tulang di frame sebelumnya.
+        float k = 1f - Mathf.Exp(-lookSpeed * Time.deltaTime);   // bebas framerate
+        _yaw = Mathf.Lerp(_yaw, clampedYaw, k);
+        _pitch = Mathf.Lerp(_pitch, clampedPitch, k);
+
         // 6. Buat rotasi offset di World Space: Yaw di sekitar sumbu Up, Pitch di sekitar sumbu Right
-        Quaternion yawRot = Quaternion.AngleAxis(clampedYaw, up);
-        Quaternion pitchRot = Quaternion.AngleAxis(clampedPitch, right);
+        Quaternion yawRot = Quaternion.AngleAxis(_yaw, up);
+        Quaternion pitchRot = Quaternion.AngleAxis(_pitch, right);
         Quaternion lookOffset = yawRot * pitchRot;
 
         // 7. Base rest pose yang selalu sinkron dengan leher & tubuh avatar
@@ -155,10 +173,10 @@ public class AvatarLookAtController : MonoBehaviour
             ? (headBone.parent.rotation * _headRestLocalRot) 
             : (transform.rotation * _headRestLocalRot);
 
-        // 8. Rotasi akhir absolut untuk frame ini (Bebas dari efek terbalik / terputar 180)
-        Quaternion targetHeadWorldRot = lookOffset * baseHeadWorldRot;
-
-        // Interpolasikan rotasi kepala secara halus
-        headBone.rotation = Quaternion.Slerp(headBone.rotation, targetHeadWorldRot, Time.deltaTime * lookSpeed);
+        // 8. Rotasi akhir absolut untuk frame ini (Bebas dari efek terbalik / terputar 180).
+        // Ditulis ABSOLUT, bukan di-slerp dari nilai tulang saat ini. Lihat catatan di 5b:
+        // nilai tulang sudah ditimpa Animator, jadi memakainya sebagai titik awal peredaman
+        // membuat kepala tidak pernah sampai ke sudut yang diminta.
+        headBone.rotation = lookOffset * baseHeadWorldRot;
     }
 }
