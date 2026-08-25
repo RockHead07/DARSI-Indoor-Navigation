@@ -87,9 +87,12 @@ public class AvatarLookAtController : MonoBehaviour
             ResolveTarget();
         }
 
-        // Fade in bobot tatapan saat aktif, fade out saat nonaktif
-        float targetWeight = (_lookAtEnabled && _target != null) ? overallWeight : 0f;
-        _currentWeight = Mathf.MoveTowards(_currentWeight, targetWeight, Time.deltaTime * lookSpeed);
+        // Bobot TIDAK dihitung di sini lagi. Dulu Update() mendorongnya ke overallWeight
+        // sementara ApplyLookAt() mendorongnya ke overallWeight*behindWeight, dua-duanya
+        // dengan laju yang sama, setiap frame. Keduanya saling tarik dan bobot nyangkut di
+        // nilai antara yang tidak diminta siapa pun. Terukur: kepala cuma berputar 19,7 dari
+        // batas 55 derajat, sehingga sisa melesetnya masih 55 derajat dan pupil terlihat
+        // tidak akurat. Sekarang seluruh perhitungan bobot ada di satu tempat, di ApplyLookAt.
     }
 
     private void LateUpdate()
@@ -133,11 +136,10 @@ public class AvatarLookAtController : MonoBehaviour
         // menghasilkan lirikan lewat bahu sejauh anatomi mengizinkan, bukan kepala yang
         // menghadap lurus ke depan seolah tidak peduli. Bobotnya diturunkan sebagian saja
         // supaya tidak terlihat seperti leher terkunci maksimal terus-menerus.
-        if (z <= 0.05f)
-        {
-            _currentWeight = Mathf.MoveTowards(_currentWeight, overallWeight * behindWeight,
-                                               Time.deltaTime * lookSpeed);
-        }
+        // SATU-SATUNYA tempat bobot dihitung. Lihat catatan di Update().
+        float targetWeight = !_lookAtEnabled ? 0f
+                           : (z <= 0.05f ? overallWeight * behindWeight : overallWeight);
+        _currentWeight = Mathf.MoveTowards(_currentWeight, targetWeight, Time.deltaTime * lookSpeed);
 
         // 4. Hitung sudut yaw dan pitch dalam derajat
         float rawYaw = Mathf.Atan2(x, Mathf.Max(0.01f, z)) * Mathf.Rad2Deg;
