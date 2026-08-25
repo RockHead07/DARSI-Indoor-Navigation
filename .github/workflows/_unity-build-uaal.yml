@@ -50,7 +50,7 @@ jobs:
 
       - name: Upload Unity Editor Log on Failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Unity-Editor-Log-Build
           path: ~/.config/unity3d/**/*.log
@@ -62,7 +62,7 @@ jobs:
           zip -r ../../unity-android-uaal-export.zip .
 
       - name: Upload UaaL Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: DARSI-Unity-UaaL-Android
           path: unity-android-uaal-export.zip
