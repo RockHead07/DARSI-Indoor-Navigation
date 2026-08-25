@@ -614,10 +614,47 @@ Sesuai prinsip arsitektur, RAG adalah "otak" dan Avatar 3D adalah "kulit". Menca
    - **Tahap 2 (Audio & Viseme Lip-Sync):** Integrasi TTS dan sinkronisasi bibir berbasis *mock data/contract-first*.
 3. **Sandbox Scene Terpisah:** Dilarang mengubah scene produksi `WholePSDKU` di branch utama selama eksplorasi awal. Semua pengujian avatar dilakukan di scene sandbox (mis. `Assets/Scenes/Sandbox_AvatarCompanion.unity`).
 4. **Merge Gate:** Branch `feature/vrm-avatar-assistant` baru diizinkan untuk di-merge ke branch `main` setelah RAG backend terbukti 100% stabil pada pengujian perangkat Android fisik.
+   > **Dicabut oleh Amandemen 030-A di bawah (2026-08-25).**
 
 **Yang Ditolak:**
 - Mengembangkan avatar 3D langsung di branch `main` saat RAG masih dalam proses pematangan dan belum diuji di device fisik.
 - Menghubungkan avatar langsung ke endpoint RAG yang belum stabil tanpa melalui tahap *mock data / contract-first*.
+
+#### Amandemen 030-A (2026-08-25) — merge gate dicabut lebih awal; alasannya operasional, bukan teknis
+
+**Mencabut poin 4** (Merge Gate). Poin 1, 2, 3 tetap berlaku.
+
+**Gate-nya BELUM terpenuhi saat dicabut, dan itu diakui terang-terangan.** Syaratnya "RAG
+backend terbukti 100% stabil pada pengujian perangkat Android fisik", sementara
+`AI-AVATAR-ASSISTANT.md` masih mencatat *"Belum pernah dites di device Android fisik pakai
+mic asli"*. Jadi ini bukan gate yang lulus, melainkan gate yang **sengaja dicabut**.
+
+**Pemicunya masalah operasional yang tidak terbayang saat ADR-030 ditulis.** Beberapa sesi
+kerja (avatar dan RAG) berjalan bersamaan di **satu working tree fisik yang sama**. Karena
+tiap sesi memakai branch berbeda, setiap perpindahan branch menghapus file milik sesi lain
+dari disk. Dalam satu hari kerja hal ini terjadi **tiga kali**; setiap kali pekerjaan yang
+belum di-commit hilang dari working tree dan hanya selamat karena sesi lain menyimpannya ke
+`git stash`. Sekali kejadiannya di tengah perintah commit berjalan.
+
+Biayanya nyata: waktu kerja habis untuk pemulihan git, bukan untuk fitur, dan ada risiko
+suatu saat penyelamatan itu tidak terjadi.
+
+**Kenapa merge, bukan worktree.** `git worktree` adalah perbaikan yang lebih tepat secara
+teknis dan sempat diusulkan. Ditolak karena ongkos di sisi Unity: tiap worktree butuh
+`Library/` sendiri yang harus dibangun dari nol, dan aset besar yang gitignored (model VRM
+placeholder) harus disalin manual. Untuk tim sekecil ini, satu branch bersama lebih murah.
+
+**Yang HILANG karena pencabutan ini, dan wajib diingat:** alasan asli gate itu adalah
+mencegah kerja avatar mengganggu kestabilan scene navigasi produksi selagi RAG diverifikasi.
+Perlindungan itu sekarang tidak ada lagi. Penggantinya bukan proses baru, melainkan
+kewaspadaan: **setiap perubahan yang menyentuh scene produksi atau jalur navigasi harus
+diperlakukan sebagai perubahan berisiko tinggi**, dan poin 3 (dilarang mengubah scene
+produksi untuk keperluan eksplorasi avatar) justru menjadi **lebih** penting setelah gate
+ini hilang, bukan kurang.
+
+**Yang TIDAK berubah:** avatar tetap tidak boleh dihubungkan langsung ke endpoint RAG yang
+belum stabil (lihat "Yang Ditolak" di atas), dan seluruh gate keselamatan ADR-034
+(keputusan 4 dan 5) tetap berlaku penuh.
 
 
 ### ADR-031 — Audit & Perbaikan CI/CD Pipeline vs Konten Projek Aktual (2026-08-24)
