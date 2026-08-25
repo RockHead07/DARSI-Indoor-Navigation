@@ -13,6 +13,10 @@ public class ProbeUserWalker : MonoBehaviour
     private float _speed, _height, _total;
 
     public float Travelled { get; private set; }
+    private bool _stopped;
+
+    /// <summary>Pengguna berhenti berjalan (mis. bingung, membaca papan petunjuk).</summary>
+    public void Stop() => _stopped = true;
 
     public void Init(Transform cam, List<Vector3> route, float speed, float height)
     {
@@ -23,7 +27,7 @@ public class ProbeUserWalker : MonoBehaviour
     private void Update()
     {
         if (_cam == null || _route == null || _route.Count < 2) return;
-        Travelled = Mathf.Min(Travelled + _speed * Time.deltaTime, _total);
+        if (!_stopped) Travelled = Mathf.Min(Travelled + _speed * Time.deltaTime, _total);
         var p = PathPolyline.PointAt(_route, Travelled);
         p.y += _height;
         _cam.position = p;

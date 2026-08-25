@@ -35,10 +35,10 @@ public class AIAvatarGuideController : MonoBehaviour
     [Header("Jarak (meter)")]
     [Tooltip("Seberapa jauh avatar berjalan di DEPAN pengguna sepanjang rute.")]
     [SerializeField] private float leadDistance = 2.0f;
-    [Tooltip("Kalau pengguna tertinggal lebih jauh dari ini, avatar berhenti menunggu.")]
-    [SerializeField] private float lagDistanceThreshold = 3.8f;
-    [Tooltip("Avatar melanjutkan memimpin setelah pengguna kembali sedekat ini.")]
-    [SerializeField] private float resumeDistanceThreshold = 2.0f;
+    [Tooltip("Berapa lama pengguna boleh tidak maju sebelum avatar berhenti dan menoleh (detik).")]
+    [SerializeField] private float stallSecondsBeforeWaiting = 1.5f;
+    [Tooltip("Kemajuan sekecil ini masih dianggap diam. Meredam derau proyeksi rute.")]
+    [SerializeField] private float advanceEpsilon = 0.05f;
     [Tooltip("Sisa rute sependek ini dianggap sudah tiba.")]
     [SerializeField] private float arrivalThreshold = 1.5f;
 
@@ -63,6 +63,8 @@ public class AIAvatarGuideController : MonoBehaviour
     private GuideState _state = GuideState.IdleStand;
     private bool _leading;
     private int _speedHash;
+    private float _lastUserS;   // kemajuan pengguna terakhir di sepanjang rute
+    private float _stalledFor;  // sudah berapa lama pengguna tidak maju
 
     public GuideState CurrentState => _state;
     public bool IsLeading => _leading;
@@ -77,7 +79,13 @@ public class AIAvatarGuideController : MonoBehaviour
     }
 
     /// <summary>Panggil HANYA setelah localize berhasil. Lihat catatan gate di atas.</summary>
-    public void StartLeading() { _leading = true; SetState(GuideState.LeadingPath); }
+    public void StartLeading()
+    {
+        _leading = true;
+        _lastUserS = 0f;    // reset, kalau tidak sisa sesi lama bikin avatar langsung mengira pengguna mandek
+        _stalledFor = 0f;
+        SetState(GuideState.LeadingPath);
+    }
 
     public void StopLeading() { _leading = false; SetState(GuideState.IdleStand); Drive(0f); }
 
@@ -101,7 +109,6 @@ public class AIAvatarGuideController : MonoBehaviour
 
         float pathLength = PathPolyline.Length(_points);
         float userS = PathPolyline.Project(_points, _user.position);
-        float distToUser = FlatDistance(transform.position, _user.position);
 
         // Tiba: sisa rute di depan pengguna sudah pendek.
         if (pathLength - userS <= arrivalThreshold)
@@ -112,13 +119,24 @@ public class AIAvatarGuideController : MonoBehaviour
             return;
         }
 
-        // Pengguna tertinggal: berhenti dan menoleh, jangan tinggalkan dia.
-        if (_state == GuideState.WaitingForUser)
+        // Pengguna berhenti berjalan: tunggu dan menoleh, jangan biarkan dia bicara ke punggung.
+        //
+        // Pemicunya adalah KEMAJUAN pengguna di sepanjang rute, bukan jarak ke avatar.
+        // Ambang jarak (lagDistanceThreshold) diwarisi dari draft yang mengasumsikan avatar
+        // punya NavMeshAgent sendiri sehingga bisa melesat jauh mendahului. Di desain ini
+        // posisi avatar diikat ke userS + leadDistance, jadi jaraknya TIDAK PERNAH melebihi
+        // leadDistance dan ambang jarak berapa pun di atas itu mustahil tercapai.
+        if (userS > _lastUserS + advanceEpsilon)
         {
-            if (distToUser > resumeDistanceThreshold) { FaceTowards(_user.position); Drive(0f); return; }
-            SetState(GuideState.LeadingPath);
+            _lastUserS = userS;
+            _stalledFor = 0f;
         }
-        else if (distToUser > lagDistanceThreshold)
+        else
+        {
+            _stalledFor += Time.deltaTime;
+        }
+
+        if (_stalledFor >= stallSecondsBeforeWaiting)
         {
             SetState(GuideState.WaitingForUser);
             FaceTowards(_user.position);
@@ -183,12 +201,6 @@ public class AIAvatarGuideController : MonoBehaviour
     {
         if (animator != null && animator.isActiveAndEnabled)
             animator.SetFloat(_speedHash, speed, 0.1f, Time.deltaTime);
-    }
-
-    private static float FlatDistance(Vector3 a, Vector3 b)
-    {
-        a.y = 0f; b.y = 0f;
-        return Vector3.Distance(a, b);
     }
 
     private void SetState(GuideState s)

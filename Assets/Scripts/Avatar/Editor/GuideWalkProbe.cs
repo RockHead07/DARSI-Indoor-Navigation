@@ -42,12 +42,20 @@ public static class GuideWalkProbe
         if (!_running) return;
         _frames++;
 
+        // Pengguna BERHENTI di tengah jalan: inilah pemicu yang seharusnya membuat
+        // pemandu menunggu dan menoleh (ADR-034, state WaitingForUser).
+        if (_frames == 300 && _walker != null)
+        {
+            _walker.Stop();
+            Sb.AppendLine($"\n>>> frame 300: pengguna BERHENTI di {_walker.Travelled:F2} m <<<");
+        }
+
         if (_frames == 30) { Begin(); return; }
         // Beri ShowPath waktu menghitung rute sungguhan (pathUpdateFrequency 0.5s) sebelum
         // rute pengguna ditangkap, supaya tidak menangkap garis default yang basi.
         if (_frames == 90) { CaptureUserRoute(); return; }
         if (_frames > 90 && _guide != null) { WalkUser(); Sample(); }
-        if (_frames < 500) return;
+        if (_frames < 600) return;   // beri waktu setelah pengguna berhenti di frame 300
 
         Finish();
         _running = false;
@@ -147,9 +155,56 @@ public static class GuideWalkProbe
     }
     static ProbeUserWalker _walker;
 
+    static AIAvatarGuideController.GuideState _lastState = (AIAvatarGuideController.GuideState)(-1);
+    static int _facingSamples, _facingUserSamples;
+
     static void Sample()
     {
         var pos = _guide.transform.position;
+
+        // Catat tiap perpindahan state, plus jarak saat itu.
+        if (_guide.CurrentState != _lastState)
+        {
+            var cam0 = Camera.main;
+            float d = cam0 != null ? Vector3.Distance(
+                new Vector3(pos.x, 0, pos.z),
+                new Vector3(cam0.transform.position.x, 0, cam0.transform.position.z)) : -1f;
+            Sb.AppendLine($"    [frame {_frames}] state: {_lastState} -> {_guide.CurrentState}  (jarak ke pengguna {d:F2} m)");
+            _lastState = _guide.CurrentState;
+        }
+
+        // Intip isi controller: jangan berteori soal kenapa WaitingForUser tidak menyala.
+        if (_frames % 60 == 0)
+        {
+            var t = typeof(AIAvatarGuideController);
+            const System.Reflection.BindingFlags F =
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var lastS = t.GetField("_lastUserS", F)?.GetValue(_guide);
+            var stalled = t.GetField("_stalledFor", F)?.GetValue(_guide);
+            var live = _guide != null ? RoutePoints() : null;
+            string liveS = live != null && live.Count >= 2 && Camera.main != null
+                ? PathPolyline.Project(live, Camera.main.transform.position).ToString("F2")
+                : "n/a";
+            string liveLen = live != null && live.Count >= 2 ? PathPolyline.Length(live).ToString("F2") : "n/a";
+            Sb.AppendLine($"    [f{_frames}] userS_live={liveS} panjang={liveLen} corners={(live != null ? live.Count : 0)} " +
+                          $"_lastUserS={lastS} _stalledFor={stalled} state={_guide.CurrentState}");
+        }
+
+        // Setelah pengguna berhenti, apakah avatar MENOLEH ke arahnya?
+        if (_walker != null && _frames > 300)
+        {
+            var cam1 = Camera.main;
+            if (cam1 != null)
+            {
+                Vector3 toUser = cam1.transform.position - pos; toUser.y = 0f;
+                Vector3 fwd = _guide.transform.forward; fwd.y = 0f;
+                if (toUser.sqrMagnitude > 1e-4f && fwd.sqrMagnitude > 1e-4f)
+                {
+                    _facingSamples++;
+                    if (Vector3.Angle(fwd, toUser) < 45f) _facingUserSamples++;
+                }
+            }
+        }
         _travelled += Vector3.Distance(new Vector3(_lastPos.x, 0, _lastPos.z), new Vector3(pos.x, 0, pos.z));
         _lastPos = pos;
 
@@ -190,6 +245,16 @@ public static class GuideWalkProbe
         Sb.AppendLine($"jarak tempuh     = {_travelled:F2} m  (ekspektasi ~leadDistance=2.0 m, lalu berhenti)");
         Sb.AppendLine($"perpindahan neto = {Vector3.Distance(_startPos, _guide.transform.position):F2} m");
         Sb.AppendLine($"simpangan maks dari garis = {_maxDeviation:F3} m");
+
+        Sb.AppendLine("\n--- setelah pengguna BERHENTI ---");
+        if (_facingSamples > 0)
+        {
+            float pct = 100f * _facingUserSamples / _facingSamples;
+            Sb.AppendLine($"avatar menoleh ke pengguna: {_facingUserSamples}/{_facingSamples} sampel ({pct:F0}%)");
+            Sb.AppendLine(pct > 80f ? "-> MENOLEH ke pengguna (perilaku pemandu yang benar)"
+                                    : "-> TIDAK menoleh, avatar tetap menghadap arah jalan");
+        }
+        else Sb.AppendLine("(tidak ada sampel setelah berhenti)");
 
         Sb.AppendLine($"\n--- pengguna disimulasikan berjalan {UserWalkSpeed} m/s ---");
         Sb.AppendLine($"pengguna menempuh = {_maxUserS:F2} m sepanjang rute");

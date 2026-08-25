@@ -3942,6 +3942,7 @@ GameObject:
   - component: {fileID: 807412539}
   - component: {fileID: 807412538}
   - component: {fileID: 807412537}
+  - component: {fileID: 807412541}
   m_Layer: 0
   m_Name: Avatar_Guide
   m_TagString: Untagged
@@ -3964,8 +3965,8 @@ MonoBehaviour:
   showPath: {fileID: 798593642}
   navigation: {fileID: 0}
   leadDistance: 2
-  lagDistanceThreshold: 3.8
-  resumeDistanceThreshold: 2
+  stallSecondsBeforeWaiting: 1.5
+  advanceEpsilon: 0.05
   arrivalThreshold: 1.5
   moveSpeed: 1.4
   catchUpGain: 1
@@ -4026,6 +4027,20 @@ Transform:
   - {fileID: 1458944699}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &807412541
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 807412536}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5520fd3d3dc26ee498e83ac932d06035, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AvatarGuideNavigationBridge
+  guide: {fileID: 807412537}
+  navigation: {fileID: 798593634}
 --- !u!1 &815381363
 GameObject:
   m_ObjectHideFlags: 0
