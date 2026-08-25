@@ -37,7 +37,7 @@ public class AIAvatarGuideController : MonoBehaviour
     [SerializeField] private float leadDistance = 2.0f;
     [Tooltip("Berapa lama pengguna boleh tidak maju sebelum avatar berhenti dan menoleh (detik).")]
     [SerializeField] private float stallSecondsBeforeWaiting = 1.5f;
-    [Tooltip("Kemajuan sekecil ini masih dianggap diam. Meredam derau proyeksi rute.")]
+    [Tooltip("Pergerakan sekecil ini masih dianggap diam. Meredam derau tracking kamera AR.")]
     [SerializeField] private float advanceEpsilon = 0.05f;
     [Tooltip("Sisa rute sependek ini dianggap sudah tiba.")]
     [SerializeField] private float arrivalThreshold = 1.5f;
@@ -63,7 +63,7 @@ public class AIAvatarGuideController : MonoBehaviour
     private GuideState _state = GuideState.IdleStand;
     private bool _leading;
     private int _speedHash;
-    private float _lastUserS;   // kemajuan pengguna terakhir di sepanjang rute
+    private Vector3 _lastUserPos;  // posisi pengguna terakhir (datar), acuan deteksi berhenti
     private float _stalledFor;  // sudah berapa lama pengguna tidak maju
 
     public GuideState CurrentState => _state;
@@ -82,7 +82,9 @@ public class AIAvatarGuideController : MonoBehaviour
     public void StartLeading()
     {
         _leading = true;
-        _lastUserS = 0f;    // reset, kalau tidak sisa sesi lama bikin avatar langsung mengira pengguna mandek
+        var u = _user != null ? _user.position : (Camera.main != null ? Camera.main.transform.position : Vector3.zero);
+        u.y = 0f;
+        _lastUserPos = u;   // reset, kalau tidak sisa sesi lama bikin avatar langsung mengira pengguna mandek
         _stalledFor = 0f;
         SetState(GuideState.LeadingPath);
     }
@@ -121,14 +123,26 @@ public class AIAvatarGuideController : MonoBehaviour
 
         // Pengguna berhenti berjalan: tunggu dan menoleh, jangan biarkan dia bicara ke punggung.
         //
-        // Pemicunya adalah KEMAJUAN pengguna di sepanjang rute, bukan jarak ke avatar.
-        // Ambang jarak (lagDistanceThreshold) diwarisi dari draft yang mengasumsikan avatar
-        // punya NavMeshAgent sendiri sehingga bisa melesat jauh mendahului. Di desain ini
-        // posisi avatar diikat ke userS + leadDistance, jadi jaraknya TIDAK PERNAH melebihi
-        // leadDistance dan ambang jarak berapa pun di atas itu mustahil tercapai.
-        if (userS > _lastUserS + advanceEpsilon)
+        // Pemicunya PERGERAKAN POSISI PENGGUNA DI DUNIA. Dua besaran lain sudah dicoba dan
+        // dua-duanya salah:
+        //
+        // 1. Jarak avatar ke pengguna (lagDistanceThreshold, warisan draft Task 6). Draft itu
+        //    mengasumsikan avatar punya NavMeshAgent sendiri sehingga bisa melesat jauh
+        //    mendahului. Di desain ini posisi avatar diikat ke userS + leadDistance, jadi
+        //    jaraknya TIDAK PERNAH melebihi leadDistance dan ambang di atas itu mustahil
+        //    tercapai. Kode mati.
+        //
+        // 2. Kemajuan pengguna di sepanjang rute (userS): ShowPath selalu menghitung ulang rute
+        //    dari posisi pengguna (tiap pathUpdateFrequency), jadi userS bergerak seperti gigi
+        //    gergaji dengan puncak terbatas oleh jarak yang ditempuh dalam satu interval
+        //    (~0,55 m pada 1,1 m/s). Terukur di Play mode: userS berkisar 0,03-0,24 sementara
+        //    nilai puncak tercatat beku di 0,306. Begitu puncak tercapai userS tidak pernah
+        //    melampauinya lagi, dan penghitung mandek menumpuk terus WALAUPUN pengguna
+        //    sedang berjalan.
+        Vector3 userFlat = _user.position; userFlat.y = 0f;
+        if ((userFlat - _lastUserPos).sqrMagnitude > advanceEpsilon * advanceEpsilon)
         {
-            _lastUserS = userS;
+            _lastUserPos = userFlat;
             _stalledFor = 0f;
         }
         else
