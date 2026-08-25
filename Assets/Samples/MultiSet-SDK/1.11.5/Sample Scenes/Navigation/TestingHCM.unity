@@ -469,16 +469,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 95971246b91aa2d4f82127bb70f359d4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OllamaConnector
-  ollamaHost: 192.168.18.150
-  ollamaPort: 11434
-  modelName: qwen3:8b
-  useHttps: 0
   groqApiKey: 
   groqModel: openai/gpt-oss-20b
   onConnectionFailed:
     m_PersistentCalls:
       m_Calls: []
-  txtStatus: {fileID: 586594366}
 --- !u!114 &73784736
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3971,6 +3966,7 @@ MonoBehaviour:
   moveSpeed: 1.4
   catchUpGain: 1
   maxSpeed: 3
+  repositionDeadzone: 0.35
   turnSpeed: 6
   animator: {fileID: 1458944694}
   speedParam: Speed
@@ -4000,7 +3996,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 807412536}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bd1c52e25ea599442876ddfc464a0ed0, type: 3}
   m_Name: 
@@ -4011,6 +4007,7 @@ MonoBehaviour:
   maxPitchAngle: 35
   lookSpeed: 6
   overallWeight: 1
+  behindWeight: 0.6
 --- !u!4 &807412540
 Transform:
   m_ObjectHideFlags: 0
@@ -7343,6 +7340,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 807412540}
     m_Modifications:
+    - target: {fileID: 5497395470994467326, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: Target
+      value: 
+      objectReference: {fileID: 1505451498}
+    - target: {fileID: 5497395470994467326, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
+      propertyPath: UpdateType
+      value: 2
+      objectReference: {fileID: 0}
     - target: {fileID: 7795343156727887343, guid: 1bdbe10c69fee37459e068c6e7cafb29, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
