@@ -207,3 +207,96 @@ Rekomendasi: **Mixamo**, karena satu sumber menutup seluruh kebutuhan gestur ADR
    menyesuaikan ambang kecepatan.
 3. Catat sumber dan lisensi aset final di dokumen, supaya laporan KP dan berkas paten
    punya jejak provenance yang jelas.
+
+---
+
+## 📌 Serah terima kerja avatar (2026-08-25) — halangan & jebakan yang sudah terbukti
+
+Ditulis di akhir sesi panjang, supaya sesi berikutnya tidak mengulang penemuan yang sama.
+**Baca ADR-034 + Amandemen 034-A dulu**; bagian ini hanya memuat yang TIDAK masuk ADR.
+
+### Halangan yang belum bisa diselesaikan dari Editor
+
+| Halangan | Kenapa terhenti |
+|---|---|
+| Serah terima lift (ADR-034 keputusan 9) | `AwaitingRelocalize` hanya muncul saat localize benar-benar putus lalu pulih. Mustahil dipicu di Editor |
+| NavMesh saat re-localize | Butuh MultiSet me-reposisi content root di device |
+| Model ≤ 15.000 tris (Fase 1) | Menunggu model RS sungguhan, bukan pekerjaan kode |
+| RAG lewat mic asli | Utang lama, seluruh verifikasi masih Editor Play mode |
+
+### ⚠️ `TestingHCM` TIDAK mewakili produksi untuk urusan lintas lantai
+
+Terukur dua kali (2026-08-24 dan 2026-08-25), rute `[Ground] Parkir Mobil` → `[Lantai1] IGD`:
+
+| Scene | Hasil |
+|---|---|
+| `DARSi-Indoor Navigation` (produksi) | `PathPartial`, 2 corner, 0,90 m |
+| `TestingHCM` | **`PathComplete`, 17 corner**, naik 4,21 m |
+
+Lantai di `TestingHCM` **tersambung di navmesh** (lompatan Y 2,04 m, tanpa OffMeshLink),
+bake-nya kemungkinan mendahului amandemen 020-B. Konsekuensinya `TestingHCM` akan
+**meluluskan uji yang gagal di produksi**. Sah untuk lead-follow dalam satu lantai; haram
+untuk menyimpulkan apa pun soal lintas lantai.
+
+**Jebakan turunannya:** siapa pun yang melihat `PathPartial` di produksi akan mengira
+NavMesh rusak lalu tergoda memasang `NavMeshLink`. Itu mencabut 020-B diam-diam dan
+menghidupkan lagi garis rute menembus plafon. Sudah dicatat di "Yang Ditolak" ADR-034.
+
+### Jebakan alat yang memakan waktu nyata sesi ini
+
+1. **Coplay timeout ≠ Unity mati.** Semua tool `mcp__coplay-mcp__*` timeout tanpa pesan
+   kalau `set_unity_project_root` belum dipanggil, dan root-nya bisa ter-reset di tengah
+   sesi. Refleks: panggil ulang set-root, baru simpulkan.
+2. **Jangan `git restore` aset Unity selagi Editor membukanya.** Salinan di memori jadi
+   invalid sementara file di disk sehat. Sesi ini sempat menyimpulkan "NavMesh rusak"
+   padahal hanya perlu memuat ulang scene. NavMesh-nya utuh: 4.278 vertex, 11/11 POI.
+3. **Membangun ulang aset mengubah GUID-nya** dan memutus semua referensi tanpa error.
+   `AvatarGuide.controller` dibangun ulang → `Animator` di prefab DAN scene jadi `NULL`.
+   Selalu verifikasi referensi setelah `DeleteAsset` + `CreateAsset`.
+4. **Reimport FBX memutus referensi BlendTree.** Slot `Walk` jadi `NULL` tanpa error dan
+   avatar meluncur dalam pose Idle. Periksa slot kosong setelah `SaveAndReimport()`.
+5. **Unity crash OOM** setelah puluhan `execute_script` beruntun (tiap panggilan memicu
+   compile + domain reload). Gabungkan operasi jadi satu script.
+
+### Kegagalan senyap: pola yang paling sering menggigit
+
+Semua bug mahal sesi ini nol error dan nol warning:
+
+* `AvatarSafetyFade.CacheRenderers()` ter-guard `Length == 0`, memudarkan renderer dummy
+* `AddComponent` MonoBehaviour dari assembly `Editor/` ditolak saat Play mode
+* Pencocokan nama file eksak melewatkan `Walk.fbx` saat `Walking.fbx` diganti
+* Slot BlendTree `NULL` setelah reimport
+* `_currentWeight` ditulis dari dua tempat, saling tarik, kepala mentok 19,7 dari 55°
+
+**Yang membongkar semuanya bukan penalaran, tapi mengukur satu angka konkret lalu
+membandingkannya dengan angka yang diharapkan.** Contoh paling jelas: kepala butuh 55°
+tapi hanya berputar 6,5°, dan `deltaTime * lookSpeed = 0,1` — 10% dari 55 adalah 5,5.
+Kecocokan angka itu yang menunjuk akar masalahnya, bukan membaca kode.
+
+### Duplikasi yang disadari dan belum diselesaikan
+
+Angka **1,589** (kecepatan asli klip `Walk`) ada di dua tempat: threshold BlendTree
+`Locomotion` dan field `walkClipSpeed` di `AIAvatarGuideController`. Tooltip menandai
+keduanya wajib sama. **Kalau klip `Walk` diganti, DUA-DUANYA harus disetel ulang** ke
+`clip.averageSpeed` klip baru, kalau tidak kaki akan selip lagi.
+
+### Perancah yang harus dihapus setelah lead-follow tervalidasi di device
+
+```
+Assets/Scripts/Avatar/Editor/GuideWalkProbe.cs     (Editor-only, aman)
+Assets/Scripts/Avatar/Editor/SafetyFadeProbe.cs    (Editor-only, aman)
+Assets/Scripts/Avatar/ProbeUserWalker.cs           <- IKUT TER-BUILD
+Assets/Scripts/Avatar/SimpleSandboxFreeCam.cs      <- IKUT TER-BUILD
+```
+
+Dua terakhir ada di folder runtime sehingga ikut ter-compile ke APK. `ProbeUserWalker`
+sengaja ditaruh di sana karena Unity menolak `AddComponent` untuk MonoBehaviour dari
+assembly editor-only saat Play mode. Tidak berbahaya selama tidak terpasang di GameObject
+mana pun, tapi tetap memperbesar build.
+
+### Menggantung di working tree, bukan dari pekerjaan avatar
+
+* `SECURITY.md` — untracked, dari sesi lain. Analisisnya sudah dicatat di bagian atas
+  berkas ini (kebijakan wajib yang ~85% tidak berlaku di repo Unity ini).
+* `TestingHCM` juga aktif di Build Settings, jadi scene testing ikut masuk APK. Tidak
+  melanggar aturan tercatat, tapi memperbesar build.

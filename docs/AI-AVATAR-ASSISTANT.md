@@ -226,10 +226,44 @@ Di sisi Unity, avatar dikendalikan oleh *State Machine* berikut:
 
 ## 6. Rencana Tahapan Pengembangan (Roadmap)
 
-* [ ] **Fase 1 (Aset & Pipeline VRM):**
-  * Import paket `UniVRM` ke Unity.
-  * Uji coba impor model VRM rendah poligon ($\le 15.000$ tris).
-  * Validasi `VRMLookAtHead` terhadap kamera ARCore di Play Mode.
+> ### 📍 STATUS NYATA per 2026-08-25 (branch sudah di-merge ke `main`, ADR-030 Amandemen 030-A)
+>
+> **Fase 1 dan seluruh ADR-030 Tahap 1 SELESAI, malah terlampaui.** Yang dibangun jauh
+> melewati "Visual Companion pasif": avatar kini **berjalan memimpin pengguna** menyusuri
+> rute MultiSet (lead-follow, ADR-034), lengkap dengan animasi Mixamo, gestur sapa/tunjuk,
+> tatapan kepala + bola mata, dan serah terima lintas lantai.
+>
+> **Terukur, bukan diklaim** (semua dari Play mode, angka lengkap di pesan commit):
+> simpangan avatar dari garis rute **0,000 m**; **0 dari 410 frame** avatar tertinggal di
+> belakang pengguna; `WaitingForUser` menyala di ambang 1,5 s lalu badan berputar ke
+> **0,0°** menghadap pengguna; safety fade mematikan **3/3 renderer pada 0,50 m**.
+>
+> **Fase 2 (Voice & Viseme Lip-Sync) BELUM DIMULAI SAMA SEKALI.** `AvatarSpeechLipSync.cs`
+> dan `AvatarAudioClient.cs` nol, belum ada filenya. Prasyaratnya sudah siap: prefab VRM
+> punya `VRMBlendShapeProxy` dan 19 blendshape termasuk viseme **A, I, U, E, O** lengkap.
+>
+> **Fase 2 adalah GATE RILIS, bukan sekadar item berikutnya.** ADR-034 keputusan 7
+> melarang lead-follow dirilis sebelum TTS berfungsi: tanpa lapisan audio, pemandu ini
+> berubah jadi "pengguna berjalan di koridor RS sambil menatap layar", persis bahaya yang
+> §4.1 ingin cegah. Jadi Fase 2 memblokir apa yang sudah jadi.
+>
+> Baca **ADR-034 beserta Amandemen 034-A** di `docs/DECISIONS.md` sebelum menyentuh kode
+> avatar. Sembilan keputusannya mengikat, dan beberapa mengoreksi rancangan di dokumen ini.
+
+* [x] **Fase 1 (Aset & Pipeline VRM):** SELESAI, kecuali satu item.
+  * [x] Import paket `UniVRM` ke Unity. **`com.vrmc.gltf` + `com.vrmc.univrm` v0.131.2**
+    (VRM **0.x**, bukan 1.0). Versi dipatok sadar: release itu yang memperbaiki import
+    exception pada Unity 6.2-6.5, dan project ini Unity 6.3.
+  * [ ] **BELUM: model VRM rendah poligon ($\le 15.000$ tris).** Yang dipakai
+    `AvatarSample_A` bawaan UniVRM, **25,5 MB**, dan tabel §2.2 sendiri menyebut model
+    VRoid baku 30.000-70.000 tris. Ini menunggu model RS sungguhan, bukan pekerjaan kode.
+    Placeholder-nya **gitignored** supaya blob-nya tidak permanen di history.
+  * [x] Validasi look-at terhadap kamera di Play Mode. **Temuan penting: `VRMLookAtHead`
+    bawaan UniVRM hanya menggerakkan BOLA MATA**, tidak pernah memutar kepala. Di VRM 0.x
+    memutar kepala adalah tugas aplikasi. Jadi §2.1 dokumen ini keliru saat menyiratkan
+    look-at bawaan menangani kepala sekaligus. Kepala dipegang `AvatarLookAtController`
+    (clamp 55°), mata oleh `VRMLookAtHead` + `VRMLookAtBoneApplyer`. Dua sistem, dua tulang
+    berbeda, tidak berebut.
 * [ ] **Fase 2 (Voice & Viseme Lip-Sync):**
   * Implementasi *audio amplitude to viseme driver* untuk menggerakkan `A, I, U, E, O` pada `VRMBlendShapeProxy`.
   * Pengujian animasi state machine (Mecanim).
