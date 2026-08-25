@@ -38,11 +38,33 @@
 > yang sungguhan (27 chunk) — SAH untuk dilaporkan**, lihat
 > `docs/RETRIEVAL-EVALUATION.md` §3.1 di repo `darsi-backend`. Sisa utang yang
 > masih harus diberesin dulu:
-> - `POI_SYNC_TOKEN` di server belum dirotasi dari default.
-> - `eval_llm_judge.py` (klaim 100% pass) masih punya 3 cacat metodologi belum
->   diperbaiki — lihat catatan koreksi di ADR-028, `docs/DECISIONS.md`.
-> - Cloudflare Tunnel masih quick tunnel (URL berubah tiap restart), belum
->   Named Tunnel permanen — lihat `docs/BACKEND-SERVER-OPERATIONS.md` Metode B.
+> - ~~`POI_SYNC_TOKEN` di server belum dirotasi dari default~~ **SELESAI
+>   (2026-08-24)**, sudah dirotasi + diverifikasi (token lama ditolak 401).
+> - `eval_llm_judge.py` — kodenya sudah diperbaiki (4 cacat). **Angka bersih
+>   pertama berhasil didapat (2026-08-24): 45/52 (86,5%)**, 52/52 dinilai
+>   tanpa error. Rincian: Gawat Darurat 90%, Poliklinik 70%, Farmasi 100%,
+>   Diagnostik 100%, Administrasi 67%, Fasilitas Umum 100%, Di Luar Cakupan
+>   75%. **Ini angka LOWER-BOUND, bukan final** — 2 perbaikan lagi (kosakata
+>   "spiral KB"/"pasang" jadi stopword, rubrik penolakan out-of-scope) sudah
+>   di-deploy dan diverifikasi manual lewat curl SETELAH run ini, tapi belum
+>   diukur ulang lewat 52 skenario penuh. Tabel lengkap ada di
+>   `README.md` repo `darsi-backend`.
+>   - **Temuan terkait, belum ditambal**: `poi_id`/`poi_name` di response API
+>     tetap terisi (dari chunk retrieval rank-1) walau JAWABAN TEKSNYA sudah
+>     benar menolak pertanyaan di luar cakupan tanpa sebut lokasi. Konsekuensi
+>     di Unity: `VoiceInputHandler.cs` bisa jatuh ke metadata yang salah
+>     sebagai fallback kalau jawaban teks tidak menyebut POI apa pun. Akar
+>     masalahnya sama dengan ambang skor `MIN_TOP_SCORE=0.22` di bawah.
+>   - Sisa yang masih gagal: #6 (luka robek/berdarah — korban ambang skor
+>     0,22, sengaja belum ditambal), #12/#13 (jadwal dokter kadang tidak
+>     sebut lokasi — diduga variasi sampling LLM, bukan bug kode, karena
+>     sebagian besar kasus serupa sudah lolos).
+> - ~~Cloudflare Tunnel masih quick tunnel~~ **SELESAI (2026-08-24)**: Named
+>   Tunnel permanen aktif di `https://api-darsi.rockhead07.tech` (domain
+>   `rockhead07.tech`, dibuat lewat CLI `cloudflared tunnel login/create/route
+>   dns` — BUKAN dashboard Zero Trust, itu minta aktivasi produk berbayar
+>   yang butuh kartu), jalan sebagai systemd service, survive restart/reboot.
+>   Sudah dipasang ke `AssistantClient.baseUrl` di scene `TestingHCM.unity`.
 > - **Belum pernah dites di device Android fisik pakai mic asli** — seluruh
 >   verifikasi sejauh ini lewat Unity Editor Play mode.
 > - Gerbang skor retrieval (`MIN_TOP_SCORE=0.22`) masih dikenal menolak

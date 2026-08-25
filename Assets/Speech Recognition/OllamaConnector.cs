@@ -5,21 +5,13 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Events; // Ditambahkan: untuk UnityEvent agar bisa kirim event ke UI
 using UnityEngine.Networking;
-using TMPro; // Ditambahkan: untuk referensi txtStatus pre-warm UI
 
 public class OllamaConnector : MonoBehaviour
 {
     public static OllamaConnector instance;
 
-    [Header("Ollama Settings")]
-    [Tooltip("IP laptop di jaringan WiFi lokal")]
-    public string ollamaHost = "192.168.18.150";
-    public int ollamaPort = 11434;
-    public string modelName = "llama3.2:latest";
-    public bool useHttps = false;
-
-    [Header("Groq Fallback (Opsional)")]
-    [Tooltip("Dipakai otomatis kalau Ollama lokal tidak terjangkau setelah retry habis. Kosongkan untuk nonaktifkan fallback.")]
+    [Header("Groq (satu-satunya provider fallback klien)")]
+    [Tooltip("Dipakai kalau RAG Assistant (jalur primer) tidak terjangkau. Kosongkan untuk nonaktifkan fallback ini sepenuhnya.")]
     public string groqApiKey = "";
     // llama-3.1-8b-instant dimatikan Groq utk free/developer tier per 2026-08-16 (404 kalau dipakai).
     // openai/gpt-oss-20b = pengganti resmi yang direkomendasikan.
@@ -27,26 +19,12 @@ public class OllamaConnector : MonoBehaviour
 
     // Event ketika koneksi gagal setelah retry habis, UI bisa tampilkan pesan error
     [Header("Events")]
-    [Tooltip("Event dipanggil ketika koneksi Ollama gagal setelah retry habis.")]
+    [Tooltip("Event dipanggil ketika Groq gagal/tidak tersedia.")]
     public UnityEvent onConnectionFailed;
 
     // Property read-only untuk cek apakah sedang memproses request
     public bool IsProcessing { get; private set; }
 
-    [Header("Pre-warm UI (Opsional)")]
-    [Tooltip("Referensi ke TextMeshPro untuk menampilkan status pre-warm. Boleh kosong.")]
-    public TMP_Text txtStatus;
-
-    // Ollama sekarang cuma fallback (Groq utama) — kalau tidak kejangkau (beda jaringan
-    // dari LAN rumah), retry ke IP yang sama tidak akan membantu. Satu percobaan saja,
-    // supaya gagalnya cepat, bukan bikin user nunggu lama tanpa hasil.
-    private const int MAX_ATTEMPTS = 1;
-    // Jeda sebelum retry, memberi waktu server pulih
-    private const float RETRY_DELAY_SECONDS = 2f;
-    // Timeout lebih panjang untuk pre-warm karena model besar butuh waktu load ke RAM
-    private const int PREWARM_TIMEOUT = 60;
-
-    private string OllamaURL => $"{(useHttps ? "https" : "http")}://{ollamaHost}:{ollamaPort}/api/generate";
     private const string GroqURL = "https://api.groq.com/openai/v1/chat/completions";
 
     // System prompt khusus ekstrak POI — singkat dan terarah
@@ -102,56 +80,12 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
 #endif
     }
 
-    void Start()
-    {
-        StartCoroutine(PreWarmModel());
-    }
-
-    /// <summary>
-    /// Kirim request dummy ke Ollama saat scene dibuka agar model sudah ter-load ke RAM.
-    /// Tanpa pre-warm, request pertama bisa lambat 10-20 detik karena model baru di-load.
-    /// Setelah pre-warm, request berikutnya langsung cepat 2-3 detik.
-    /// </summary>
-    private IEnumerator PreWarmModel()
-    {
-        Debug.Log("[Ollama] Pre-warming model...");
-        if (txtStatus != null) txtStatus.text = "Memuat sistem...";
-
-        // Buat request dummy singkat — cukup untuk trigger loading model ke RAM
-        string requestBody = JsonUtility.ToJson(new OllamaRequest
-        {
-            model = modelName,
-            prompt = "hi",
-            stream = false,
-            think = false
-        });
-
-        using (UnityWebRequest request = new UnityWebRequest(OllamaURL, "POST"))
-        {
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(requestBody);
-            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-            request.timeout = PREWARM_TIMEOUT;
-
-            yield return request.SendWebRequest();
-
-            if (request.result == UnityWebRequest.Result.Success)
-            {
-                Debug.Log("[Ollama] Model siap!");
-                if (txtStatus != null) txtStatus.text = "Siap!";
-            }
-            else
-            {
-                // Pre-warm gagal bukan fatal — fungsionalitas utama tetap jalan
-                Debug.LogWarning($"[Ollama] Pre-warm gagal: {request.error}. Model akan di-load saat request pertama.");
-                if (txtStatus != null) txtStatus.text = "Sistem siap (offline mode)";
-            }
-        }
-    }
-
-    // Groq (cloud) jadi utama — Ollama lokal cuma dipakai kalau Groq gagal/kosong,
-    // supaya tidak perlu nyala-matikan Ollama terus demi hemat RAM.
+    // Fallback klien terakhir kalau RAG Assistant (jalur primer, lihat AssistantClient/
+    // darsi-backend) tidak terjangkau. Ollama-LAN yang dulu ada di sini sudah dihapus
+    // (amandemen ADR-024, 2026-08-25): IP LAN hardcoded cuma kejangkau kalau HP dan laptop
+    // satu WiFi, dan itu sudah terbukti tidak realistis di lapangan (RS/kampus) sejak
+    // sebelum RAG ada. Pre-warm-nya pun tiap sesi buang sampai 60 detik nyoba nyambung ke
+    // server yang tidak akan pernah ada di lokasi.
     public IEnumerator ExtractPOI(string spokenText, Action<string> onResult)
     {
         IsProcessing = true;
@@ -162,20 +96,12 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
 
         if (!string.IsNullOrEmpty(groqApiKey))
         {
-            Debug.Log("[Voice] Mencoba Groq (utama)...");
             yield return TryGroq(spokenText, (success, poi) => { ok = success; poiName = poi; });
         }
 
         if (!ok)
         {
-            if (!string.IsNullOrEmpty(groqApiKey))
-                Debug.LogWarning("[Voice] Groq tidak terjangkau, fallback ke Ollama lokal...");
-            yield return TryOllama(spokenText, (success, poi) => { ok = success; poiName = poi; });
-        }
-
-        if (!ok)
-        {
-            Debug.LogError("[Voice] Groq dan Ollama dua-duanya gagal/tidak tersedia.");
+            Debug.LogError("[Voice] Groq gagal atau groqApiKey kosong — tidak ada fallback lain.");
             onConnectionFailed?.Invoke();
             onResult?.Invoke(null);
             IsProcessing = false;
@@ -229,57 +155,6 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
         }
     }
 
-    private IEnumerator TryOllama(string spokenText, Action<bool, string> onDone)
-    {
-        string prompt = $"{SYSTEM_PROMPT}\nInput: \"{spokenText}\"\nOutput:";
-        string requestBody = JsonUtility.ToJson(new OllamaRequest
-        {
-            model = modelName,
-            prompt = prompt,
-            stream = false,
-            think = false // Mematikan thinking mode untuk qwen3:8b
-        });
-
-        // Loop retry: coba MAX_ATTEMPTS kali (percobaan awal + 1 retry)
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)
-        {
-            Debug.Log($"[Ollama] Percobaan ke-{attempt} dari {MAX_ATTEMPTS}");
-
-            using (UnityWebRequest request = new UnityWebRequest(OllamaURL, "POST"))
-            {
-                byte[] bodyRaw = Encoding.UTF8.GetBytes(requestBody);
-                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-                request.downloadHandler = new DownloadHandlerBuffer();
-                request.SetRequestHeader("Content-Type", "application/json");
-                // Fallback best-effort: 8 detik cukup buat LAN yang benar-benar kejangkau,
-                // gagal cepat kalau memang beda jaringan (bukan 30 detik x 2 percobaan lagi).
-                request.timeout = 8;
-
-                yield return request.SendWebRequest();
-
-                if (request.result == UnityWebRequest.Result.Success)
-                {
-                    Debug.Log($"[Ollama] Berhasil di percobaan ke-{attempt}");
-                    OllamaResponse ollamaResponse = JsonUtility.FromJson<OllamaResponse>(request.downloadHandler.text);
-                    string generatedText = ollamaResponse.response.Trim();
-                    Debug.Log($"[Ollama] Generated: {generatedText}");
-                    onDone?.Invoke(true, ParsePOIFromJson(generatedText));
-                    yield break;
-                }
-
-                Debug.LogWarning($"[Ollama] Gagal percobaan ke-{attempt}: {request.error}");
-                if (attempt < MAX_ATTEMPTS)
-                {
-                    Debug.Log($"[Ollama] Menunggu {RETRY_DELAY_SECONDS}s sebelum retry...");
-                    yield return new WaitForSeconds(RETRY_DELAY_SECONDS);
-                }
-            }
-        }
-
-        Debug.LogWarning($"[Ollama] Semua {MAX_ATTEMPTS} percobaan gagal. Server lokal tidak tersedia.");
-        onDone?.Invoke(false, null);
-    }
-
     string ParsePOIFromJson(string jsonText)
     {
         try
@@ -301,22 +176,6 @@ Jika tidak ada lokasi yang cocok, jawab: {""poi"": """"}
     }
 
     // ── Data classes untuk serialisasi JSON ──
-
-    [Serializable]
-    class OllamaRequest
-    {
-        public string model;
-        public string prompt;
-        public bool stream;
-        public bool think; // Mematikan thinking mode untuk qwen3:8b
-    }
-
-    [Serializable]
-    class OllamaResponse
-    {
-        public string response;
-        public bool done;
-    }
 
     [Serializable]
     class POIResult

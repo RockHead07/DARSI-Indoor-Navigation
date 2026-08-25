@@ -393,6 +393,16 @@ jarak = path(user → lift lantai user) + path(lift lantai tujuan → POI)
 
 **Pengecualian tercatat terhadap CLAUDE.md:** `OllamaConnector.cs` masuk daftar "jangan diubah tanpa alasan kuat". Perubahan ini disengaja & disetujui pemilik project: prompt-nya faktual salah (konteks kampus di app rumah sakit) dan provider lokal terbukti tidak workable di lapangan. Sama seperti ADR-021 untuk `POIData.cs`, ini dicatat, bukan penyimpangan diam-diam.
 
+#### Amandemen 024-A (2026-08-25) — Ollama-LAN dihapus total dari `OllamaConnector.cs`, Groq jadi satu-satunya fallback klien
+
+**Mencabut** bagian Ollama-lokal dari keputusan pokok di atas ("Ollama cuma dipakai kalau Groq gagal"). Groq tetap seperti semula.
+
+**Pemicu:** setelah RAG Assistant + Bifrost (ADR-026, ADR-029) jadi jalur primer di server, `OllamaConnector` cuma jadi fallback klien level-dua (dipanggil `VoiceInputHandler.cs` kalau RAG Assistant tidak terjangkau). Ollama-LAN di dalamnya sudah didiagnosis sendiri oleh ADR-024 sebagai tidak realistis di lapangan (HP dan laptop harus satu WiFi) — tapi diagnosis itu belum ditindaklanjuti sampai tuntas. Ditemukan aktif merugikan, bukan cuma nganggur: `Start()` memanggil `PreWarmModel()` tanpa syarat setiap kali GameObject aktif, mengirim request ke IP LAN hardcoded dengan timeout 60 detik yang di lapangan pasti gagal — user menunggu sampai semenit tanpa hasil di setiap sesi voice, sebelum akhirnya jatuh ke "Sistem siap (offline mode)".
+
+**Yang berubah di kode:** dihapus seluruhnya — field `ollamaHost`/`ollamaPort`/`modelName`/`useHttps`, konstanta `MAX_ATTEMPTS`/`RETRY_DELAY_SECONDS`/`PREWARM_TIMEOUT`, method `TryOllama()`/`PreWarmModel()`/`Start()`, field `txtStatus` (cuma dipakai `PreWarmModel`), kelas `OllamaRequest`/`OllamaResponse`. `ExtractPOI()` disederhanakan: Groq gagal atau `groqApiKey` kosong → langsung `onConnectionFailed`, tanpa percobaan kedua. Interface publik yang dipakai `VoiceInputHandler.cs` (`OllamaConnector.instance.ExtractPOI(...)`) tidak berubah.
+
+**Yang sengaja TIDAK diubah:** nama kelas tetap `OllamaConnector` meski isinya sekarang murni Groq. Rename akan memaksa menyentuh `VoiceInputHandler.cs` juga (file protected lain) untuk manfaat kosmetik semata — di luar cakupan perbaikan ini.
+
 ---
 
 ### ADR-025 — Validasi akurasi VPS: HUD ground-truth admin-only, ukur manual pakai meteran (2026-08-18)
@@ -537,9 +547,21 @@ lagi (skrip belum bisa mendeteksi kapan ini terjadi, karena `generation.py`
 tidak mengembalikan info provider mana yang menjawab). URL target default yang
 lama (quick tunnel mati) juga dihapus — sekarang wajib diisi eksplisit lewat
 `TARGET_URL`, tidak lagi diam-diam menguji host yang sudah tidak ada.
-**Belum dijalankan ulang** — 52/52 (100%) LAMA masih angka dari kode yang
-rusak, dan angka BARU belum ada sampai `python -m scripts.eval_llm_judge`
-benar-benar dieksekusi dan hasilnya dicatat di sini.
+**UPDATE 2026-08-24 (lanjutan) — angka BARU sudah ada, 100% LAMA resmi
+dibuang.** Setelah 3 percobaan gagal (restart server, rate-limit Groq,
+gangguan sesi + 503 Bifrost), run ke-4 berhasil bersih: **52/52 dinilai
+tanpa error, 45/52 PASS (86,5%)**. Rincian kategori: Gawat Darurat 90%,
+Poliklinik 70%, Farmasi 100%, Diagnostik 100%, Administrasi 67%, Fasilitas
+Umum 100%, Di Luar Cakupan 75%. Diagnosis kegagalan (bukan tebakan, lewat
+curl langsung ke API produksi): satu diantaranya (ambang skor `MIN_TOP_SCORE
+=0.22`) sengaja belum ditambal, satu lagi (jadwal dokter kadang tanpa
+lokasi) sudah dites akar masalahnya nyata (`doctor_schedules.poi_unity_id`
+selalu `None`) dan ditambal, tapi masih kadang gagal — diduga variasi
+sampling LLM, bukan bug kode. Dua celah lain (kosakata "spiral KB" collision
+dengan "pemasangan gigi palsu", dan rubrik juri terlalu ketat untuk
+penolakan out-of-scope) ditambal dan diverifikasi manual setelah run ini —
+**angka 86,5% adalah lower-bound**, belum diukur ulang dengan kedua
+perbaikan itu. Detail lengkap + tabel: `README.md` repo `darsi-backend`.
 
 ---
 

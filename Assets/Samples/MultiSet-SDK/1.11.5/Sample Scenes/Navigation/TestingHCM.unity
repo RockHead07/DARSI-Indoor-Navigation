@@ -558,7 +558,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 07a7b5af3d2ff0b4cb77a40233be7a04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AssistantClient
-  baseUrl: https://adequate-throwing-bedroom-mainstream.trycloudflare.com
+  baseUrl: https://api-darsi.rockhead07.tech
   timeoutSeconds: 60
   floorManager: {fileID: 0}
   buildingName: RS Islam Ahmad Yani
