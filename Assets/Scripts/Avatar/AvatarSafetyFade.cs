@@ -100,12 +100,19 @@ public class AvatarSafetyFade : MonoBehaviour
     {
         if (targetRenderers == null) return;
 
-        // ponytail: fungsi keselamatannya ada di rend.enabled di bawah, BUKAN di alpha.
+        // Fungsi keselamatannya ada di rend.enabled di bawah, BUKAN di alpha.
         // Material MToon hasil impor VRM ber-_BlendMode 1 (Cutout, _ALPHATEST_ON), jadi
         // _Color.a tidak memudar halus, dan MaterialPropertyBlock tidak bisa mengubah
-        // keyword/render queue. Konsekuensinya avatar HILANG mendadak, tidak memudar.
-        // Upgrade path kalau pop-nya mengganggu: set material MToon ke _BlendMode 2
-        // (Transparent) saat impor, baru alpha di bawah ini jadi berarti.
+        // keyword/render queue. Avatar HILANG MENDADAK di fadeEndDistance, tidak memudar.
+        //
+        // Ini KEPUTUSAN TERCATAT, bukan utang: Amandemen 034-A mencabut syarat material
+        // transparan setelah gate keputusan 4 terbukti lulus lewat rend.enabled (0/3
+        // renderer pada 0,50 m). Alasan dan jalan naiknya ada di sana. Jangan mengubah
+        // material ke Transparent tanpa membaca 034-A lebih dulu — ongkosnya artefak
+        // urutan render pada rambut/wajah VRoid dan beban render queue transparan.
+        //
+        // Kode alpha di bawah sengaja dipertahankan: dia yang menghitung kapan renderer
+        // dimatikan, dan langsung bermakna secara visual kalau suatu saat 034-A dicabut.
         bool shouldRender = alpha > 0.02f;
 
         foreach (var rend in targetRenderers)

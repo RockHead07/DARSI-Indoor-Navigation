@@ -822,6 +822,9 @@ bentuk keputusan ini:
    mekanisme keselamatan yang ADR-nya sudah percaya diri menyatakan "sudah benar" ternyata
    masih gagal pada skenario persis yang menjadi alasan ADR itu ditulis.
 
+   > **Syarat (c) dicabut oleh Amandemen 034-A di bawah. Syarat (a) dan (b) tetap berlaku
+   > dan sudah TERBUKTI menyala (2026-08-25).**
+
 5. **Locomotion di-gate ke keberhasilan lokalisasi MultiSet.** Sesuai ADR-007 dan ADR-011,
    posisi hanya sah setelah localize berhasil. `StartLeading()` tidak boleh dipanggil sebelum
    itu, dan saat terjadi re-localize avatar wajib di-`Warp()` ulang ke titik valid pada rute.
@@ -978,6 +981,57 @@ bentuk keputusan ini:
   17,35 m saat navigasi aktif, sementara `agent.path` kosong (`hasPath=false`, 1 corner).
   Angka dan konsekuensinya dicatat di keputusan 2. Polyline-nya terbukti terbaca dan layak
   dinaiki avatar.
+
+#### Amandemen 034-A (2026-08-25) — syarat (c) keputusan 4 dicabut: avatar HILANG MENDADAK, bukan memudar
+
+**Mencabut syarat (c)** dari keputusan 4 ("material avatar memakai surface type transparan
+sehingga alpha benar-benar dihormati shader"). Syarat (a) dan (b) tetap berlaku.
+
+**Gate keputusan 4 dinyatakan LULUS** atas kriteria keselamatan, dengan bukti terukur dari
+Play mode (scene sandbox, kamera ditaruh pada jarak tetap lalu alpha dibiarkan stabil):
+
+| jarak horizontal | alpha | renderer aktif | avatar terlihat? |
+|---:|---:|---:|---|
+| 2,00 m | 1,00 | 3/3 | ya |
+| 0,90 m | 1,00 | 3/3 | ya (ambang mulai) |
+| 0,80 m | 0,75 | 3/3 | ya |
+| 0,70 m | 0,50 | 3/3 | ya |
+| 0,60 m | 0,25 | 3/3 | ya |
+| **0,50 m** | **0,00** | **0/3** | **TIDAK (aman)** |
+| 0,00 m | 0,00 | 0/3 | TIDAK (aman) |
+
+Renderer yang terdaftar adalah `Face`, `Body`, `Hair` milik model VRM sungguhan, bukan
+placeholder. Kurvanya persis `InverseLerp(0.5, 0.9, d)`. Ini pertama kalinya protokol §4
+benar-benar terlihat menyala sejak ditulis.
+
+**Yang diterima sebagai konsekuensi:** antara 0,9 m dan 0,5 m avatar tetap **pekat penuh**,
+lalu **hilang mendadak** di 0,5 m. Tidak ada transisi memudar.
+
+**Alasan syarat (c) gugur.** Material MToon hasil impor VRM ber-`_BlendMode` 1 (Cutout,
+`_ALPHATEST_ON`), sehingga alpha dipakai sebagai ambang potong dan `MaterialPropertyBlock`
+tidak dapat mengubah keyword maupun render queue. Memenuhi (c) menuntut mengubah material
+ke Transparent saat impor, dan itu membawa tiga ongkos untuk keuntungan yang **murni
+kosmetik**:
+1. Karakter VRoid punya lapisan rambut, wajah, dan mata yang saling tumpang tindih.
+   Transparansi pada geometri berlapis seperti ini rawan artefak urutan render.
+2. Render queue transparan menambah beban pada budget frame §2.2 yang sudah ketat
+   (target 60 FPS bersama ARCore dan VPS MultiSet).
+3. Fungsi keselamatannya **tidak bergantung pada alpha sama sekali** — yang melindungi
+   pandangan pengguna adalah `renderer.enabled` menjadi false, dan itu sudah terbukti.
+
+**Kenapa pop dapat diterima, bukan sekadar dihindari.** Pada 0,5 m horizontal avatar sudah
+memenuhi layar; nilai keselamatannya biner (pandangan terhalang atau tidak), bukan gradual.
+Memudar perlahan dari 0,9 m justru menampilkan avatar semi-transparan tepat di jarak paling
+berbahaya, sedangkan menghilangkannya sekaligus memberi pandangan penuh lebih cepat.
+
+**Jalan naik kalau ternyata mengganggu di lapangan.** Kalau uji dengan pengguna sungguhan
+menunjukkan pop-nya mengagetkan, dua opsi dievaluasi **dengan bukti lapangan**, bukan dugaan:
+(1) MToon `_BlendMode` 2 saat impor, atau (2) shader fade berbasis dither/alpha-clip yang
+tidak memerlukan render queue transparan. Jangan kerjakan salah satunya sebelum ada keluhan
+nyata — ini keputusan yang sengaja ditunda, bukan yang dilupakan.
+
+**Yang TIDAK berubah:** kewajiban bukti eksekusi di keputusan 4 tetap berlaku penuh untuk
+perubahan apa pun pada mekanisme ini di masa depan.
 
 ### ADR-035 — Tidak Membangun Dashboard Admin Custom; Supabase Dashboard Cukup (2026-08-24)
 
