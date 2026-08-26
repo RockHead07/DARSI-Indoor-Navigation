@@ -1167,3 +1167,33 @@ diukur di device, field test RSI belum dilakukan, AI Avatar masih brainstorming.
   di-maintain, tidak sebanding dengan skala proyek.
 - **Menunda telemetri sama sekali.** Data empiris tetap penting untuk evaluasi akademik,
   tapi dikumpulkan lewat logging sederhana, bukan arsitektur dashboard.
+
+---
+
+### ADR-036 — Gerbang relevansi retrieval dilonggarkan (`MIN_TOP_SCORE` 0,22 → 0,15), diputuskan lewat asimetri biaya (2026-08-26)
+
+**Berlaku di repo `darsi-backend`** (`app/assistant/retrieval.py`), dicatat di sini karena proyek ini sepakat satu tempat pencatatan ADR. Melanjutkan ADR-026, tidak mencabutnya.
+
+**Pemicu.** Skenario `eval_llm_judge` #06, *"Tangan kena pisau robek berdarah banyak"*, dijawab **"Maaf, saya tidak punya informasi soal itu"** — tidak ada arahan ke IGD sama sekali. Ini satu-satunya kegagalan yang tersisa dari 52 skenario (51/52 = 98,1%), dan kebetulan yang paling berbahaya.
+
+**Diagnosis yang sempat KELIRU, dicatat supaya tidak diulang.** Dugaan pertama: celah kosakata, pola yang sudah tiga kali berhasil sebelumnya (pipis, luka bakar, spiral KB). **Salah.** Dibuktikan lewat tiga curl ke produksi: chunk IGD sudah memuat frasa "luka robek, pendarahan hebat" secara harfiah, dan query yang memakai kata-kata itu persis memang berhasil. Akar sesungguhnya ada di `search_chunks()`: gerbang `MIN_TOP_SCORE` **hanya membaca skor vector**, sementara full-text baru dipakai *setelah* gerbang lolos. Akibatnya kecocokan kata harfiah ("robek") pun tidak bisa menolong membuka gerbang. Menebak akar masalah dari pola yang sudah-sudah adalah cara paling cepat menghasilkan perbaikan yang percaya diri tapi salah sasaran.
+
+**Angka yang menentukan.** Skor query itu **0,214**. Ambang lama **0,22**. Pasien luka berdarah tidak dilayani karena selisih **0,006**.
+
+**Keputusan 1 — dasar keputusannya asimetri biaya, bukan kemenangan angka.** Ini bagian terpenting ADR ini:
+- Sampah yang **lolos** gerbang tidak menghasilkan jawaban salah. Dia diteruskan ke LLM, yang menolaknya dengan benar. Terukur: kategori Di Luar Cakupan **4/4** pada run final `eval_llm_judge`. Biayanya nyaris nol.
+- Pertanyaan sah yang **diblokir** gerbang menghasilkan penolakan buta, dan di antaranya ada luka berdarah. Biayanya keselamatan.
+
+Satu sisi nyaris tanpa biaya, sisi lain berbiaya nyawa. Maka gerbang dilonggarkan dan penyaringan diserahkan ke LLM — persis pembagian tugas yang sudah diputuskan ADR-026, sekarang dijalankan lebih konsisten.
+
+**Keputusan 2 — 0,15, bukan 0,18.** Set uji `test-3` menunjukkan ≤0,18 sudah memberi recall soal sah **24/24 (100%)** (di 0,20 turun ke 21/24). Tapi 0,18 tetap ditolak: *"kena air panas melepuh"* ada di **0,181**, margin 0,001 dan akan patah begitu corpus berubah sedikit. 0,15 memberi margin nyata sambil tetap menahan yang benar-benar jauh (*"resep rendang padang"* di 0,090).
+
+**Keputusan 3 — dua set uji baru ditulis sekaligus SEBELUM pengukuran.** `test-2` sudah terbakar khusus untuk parameter ini (kegagalannya sudah dipakai belajar bahwa 0,15 > 0,22), jadi memakainya lagi berarti mengukur sistem terhadap dirinya sendiri. Ditulis `test-3` (penyetelan) dan `test-4` (disegel), komposisi identik (24 soal sah + 8 soal sampah), nol tumpang tindih dengan 97 soal di empat set lama. Keduanya di-commit bersamaan sebelum angka apa pun dilihat, dan commit itu sendiri yang jadi buktinya.
+
+**Bukti tandingan, dicatat apa adanya.** `test-4` **tidak mendukung** perubahan ini: soal sahnya 23/24 baik di 0,15 maupun 0,22, sementara penolakan sampahnya justru lebih baik di 0,22 (2/8 vs 1/8). Set segel bersikap netral-condong-menolak. Perubahan ini berdiri di atas argumen asimetri, bukan di atas tabel. **Siapa pun yang hendak mencabutnya harus membantah asimetri itu, bukan sekadar menunjuk angka.**
+
+**Koreksi atas dokumentasi lama.** `RETRIEVAL-EVALUATION.md` §6 mengklaim ambang 0,22 memblokir empat pertanyaan sah. Diukur ulang, **tiga di antaranya sudah lolos sendiri** lewat perkayaan corpus ("keseleo" 0,308, "beli minum" 0,330, "nganter jenazah" 0,268). Selisih 0,22 vs 0,15 di `test-2` juga menyusut dari +9,3 poin menjadi **+3,1 poin**. Alasan menurunkan ambang ternyata *lebih lemah* dari yang tertulis — dan keputusannya tetap diambil, karena dasarnya memang bukan selisih itu.
+
+**Temuan sampingan yang memperkuat ADR-026.** Pada ambang 0,22 gerbang cuma menolak **1 dari 8** soal sampah di `test-3` (2/8 di `test-4`, 1/4 di `test-2`). Gerbang ini bukan filter, melainkan kebocoran. Konsisten dengan bukti ADR-026 bahwa cosine tidak terkalibrasi untuk memisahkan dalam/luar cakupan.
+
+**Sengaja TIDAK dibangun.** Sempat dipertimbangkan membuat full-text ikut membuka gerbang (perbaikan arsitektural yang menyasar akar masalah langsung). **Dibatalkan berdasarkan data**: pada 0,15 recall soal sah `test-3` sudah 100%, tidak ada sisa yang bisa diperbaiki opsi itu. Menambah logika untuk keuntungan terukur nol adalah YAGNI. Kalau suatu saat ada pertanyaan sah yang gagal padahal kata kuncinya cocok persis, opsi ini yang pertama dibuka lagi.
