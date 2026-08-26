@@ -264,9 +264,10 @@ Di sisi Unity, avatar dikendalikan oleh *State Machine* berikut:
     look-at bawaan menangani kepala sekaligus. Kepala dipegang `AvatarLookAtController`
     (clamp 55°), mata oleh `VRMLookAtHead` + `VRMLookAtBoneApplyer`. Dua sistem, dua tulang
     berbeda, tidak berebut.
-* [ ] **Fase 2 (Voice & Viseme Lip-Sync):**
-  * Implementasi *audio amplitude to viseme driver* untuk menggerakkan `A, I, U, E, O` pada `VRMBlendShapeProxy`.
-  * Pengujian animasi state machine (Mecanim).
+* [ ] **Fase 2 (Voice Output, TTS & Viseme Lip-Sync):** — **Kajian arsitektur & spec: [`docs/superpowers/specs/2026-08-26-voice-output-lipsync-architecture.md`](superpowers/specs/2026-08-26-voice-output-lipsync-architecture.md)**
+  * Evaluasi engine lip-sync: `hecomi/uLipSync` (MFCC Burst) vs Custom C# FFT Formant Driver.
+  * Implementasi *audio amplitude/formant to viseme driver* untuk menggerakkan `A, I, U, E, O` pada `VRMBlendShapeProxy`.
+  * Integrasi TTS audio (`edge-tts` `id-ID-GadisNeural`) dan pemutaran audio panduan suara.
 * [ ] **Fase 3 (Backend RAG & TTS Integration):** — **sudah punya spec, lihat catatan di kepala dokumen.**
   Spec: repo `darsi-backend`, `docs/superpowers/specs/2026-08-20-rag-assistant-backend-design.md`.
   * Penyusunan tabel dokumen RS + pgvector (`knowledge_chunks`) **dan tabel terstruktur
