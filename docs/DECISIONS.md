@@ -746,6 +746,36 @@ Pada Milestone 2 AI Avatar Assistant DARSI, dibutuhkan modul Text-to-Speech (TTS
 - Menggunakan **Supertonic / Supertone Play Cloud** karena transisi penutupan layanan cloud per Agustus 2026 dan minimnya korpus intonasi medis bahasa Indonesia.
 - Menggunakan **XTTS v2 / Generative Voice Cloning** di fase awal karena kebutuhan GPU VRAM besar ($\ge 6\,\text{GB}$) dan latensi yang lebih tinggi untuk respon interaktif.
 
+#### Amandemen 033-A (2026-08-26) — kajian Fase 2 bertabrakan dengan ADR-033 karena tidak membaca ADR ini dulu; ADR-033 dikonfirmasi TETAP BERLAKU
+
+**Bukan revisi keputusan — ini kekeliruan proses yang dicatat supaya tidak terulang.**
+`docs/superpowers/specs/2026-08-26-voice-output-lipsync-architecture.md` (ditulis 2 hari
+setelah ADR-033, subjek persis sama: strategi TTS) merancang ulang arsitektur TTS dari nol
+tanpa mengecek ADR ini lebih dulu, melanggar alur kerja CLAUDE.md poin 1. Hasilnya
+bertabrakan pada dua hal:
+
+1. **Endpoint digabung.** Kajian itu (§5, §6) menaruh `audio_url` langsung di response
+   `POST /api/assistant/query` — sintesis TTS menumpang di request RAG yang sama. ADR-033
+   keputusan 1 mengunci endpoint **terpisah** (`POST /api/assistant/tts`) justru supaya
+   kegagalan salah satu tidak menjatuhkan yang lain. Digabung berarti kegagalan edge-tts
+   (API tidak resmi milik Microsoft, riwayatnya pernah berubah tanpa peringatan) bisa
+   menjatuhkan jawaban teks + `poi_id` navigasi yang sebenarnya sudah siap, dan menambah
+   latensi sintesis audio di atas beban Bifrost yang sudah 13-32 detik
+   (`AssistantClient.cs:31-35`).
+2. **Tier fallback offline hilang total.** Kajian itu tidak menyebut Sherpa-ONNX/Piper
+   sama sekali. ADR-033 keputusan 3 menaruh tier ini justru untuk skenario intranet RS
+   terputus dari internet publik — bukan detail opsional.
+
+**Keputusan:** ADR-033 dikonfirmasi berlaku persis seperti ditulis: endpoint TTS terpisah,
+dua tier (Edge-TTS primer + Sherpa-ONNX/Piper fallback offline). Dokumen kajian
+2026-08-26 **belum boleh dipakai sebagai basis implementasi Fase 2** sampai §5 dan §6-nya
+direvisi mengikuti kontrak ini.
+
+**Temuan tambahan, di luar konflik ADR:** field `gesture`/`expression` yang diusulkan di
+§5 kajian itu belum ada di backend sungguhan (`AI-AVATAR-ASSISTANT.md:29-30`) — sah sebagai
+desain ke depan, tapi harus ditandai "diusulkan", bukan ditulis seolah kontrak yang sudah
+disepakati.
+
 ---
 
 ### ADR-034 — Model Penempatan Avatar: *Lead-Follow Guide* di Atas Path MultiSet (2026-08-24)

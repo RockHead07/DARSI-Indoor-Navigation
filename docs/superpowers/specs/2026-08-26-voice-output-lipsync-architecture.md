@@ -73,17 +73,35 @@ Karakter VRM 0.x memiliki komponen standar `VRMBlendShapeProxy` dengan 5 preset 
 
 ## 4. Hasil Riset Teknologi: Voice Output (Text-to-Speech / TTS)
 
+> **Sudah diputuskan, bukan opsi terbuka.** Strategi TTS DARSI dikunci di
+> [`ADR-033`](../../DECISIONS.md) (2026-08-24), **hybrid dua tier**, bukan `edge-tts`
+> saja. Tabel di bawah diperbaiki supaya konsisten — draf sebelumnya menulis `edge-tts`
+> sebagai satu-satunya rekomendasi dan tidak menyebut tier fallback-nya sama sekali,
+> karena ditulis tanpa mengecek ADR-033 lebih dulu (lihat Amandemen 033-A).
+
 | Provider / Library | Tipe | Kualitas Suara (`id-ID`) | Biaya / Akses |
 |---|---|---|---|
-| **`edge-tts` (`id-ID-GadisNeural`)** *(Rekomendasi Utama)* | Python Server-Side (`pip install edge-tts`) | ⭐⭐⭐⭐⭐ Sangat Alami, Jernih, Ramah | **Gratis / Open Tier**, di-host di FastAPI backend DARSI. |
-| **Android Native TTS (`android.speech.tts`)** | Client-Side Java/Android OS Bridge | ⭐⭐☆☆☆ Kaku, suara mekanik/robotik | Gratis & Offline, tetapi kualitas buruk untuk asisten interaktif. |
-| **Commercial API (Google Cloud TTS / ElevenLabs)** | Cloud REST API | ⭐⭐⭐⭐⭐ Sangat Alami | Berbayar per karakter / kuota token. |
+| **`edge-tts` (`id-ID-GadisNeural`)** — **Tier 1 primer (ADR-033)** | Python Server-Side (`pip install edge-tts`) | ⭐⭐⭐⭐⭐ Sangat Alami, Jernih, Ramah | Gratis/Open Tier, di-host di FastAPI backend DARSI. Beban server ~0%, latensi < 250ms. |
+| **Sherpa-ONNX / Piper (`id_ID`)** — **Tier 2 fallback offline (ADR-033)** | Model ONNX lokal, jalan di CPU server | ⭐⭐⭐☆☆ Cukup natural, tidak sehalus neural cloud | Gratis, jalan mandiri tanpa internet. Dipakai otomatis saat koneksi server ke internet publik terputus (skenario intranet RS air-gapped). Latensi ≈ 50-80ms. |
+| Android Native TTS (`android.speech.tts`) | Client-Side Java/Android OS Bridge | ⭐⭐☆☆☆ Kaku, suara mekanik/robotik | **Ditolak** — kualitas tidak memadai untuk asisten interaktif RS. |
+| Commercial API (Google Cloud TTS / ElevenLabs) | Cloud REST API | ⭐⭐⭐⭐⭐ Sangat Alami | **Ditolak** — berbayar per karakter, tidak perlu di atas edge-tts gratis. |
 
 ---
 
 ## 5. Rancangan Kontrak Integrasi (API Payload)
 
-### Endpoint: `POST /api/assistant/query`
+> **Dua endpoint terpisah (ADR-033 keputusan 1), bukan digabung.** Draf sebelumnya
+> menaruh `audio_url` langsung di response `/query`, yang berarti kegagalan sintesis
+> suara (edge-tts adalah API tidak resmi milik Microsoft, riwayatnya pernah berubah
+> tanpa peringatan) bisa menjatuhkan jawaban teks + `poi_id` navigasi yang sebenarnya
+> sudah siap, dan menambah latensi sintesis di atas beban Bifrost yang sudah 13-32 detik
+> (`AssistantClient.cs:31-35`). Endpoint terpisah mengisolasi dua kegagalan itu.
+
+### Endpoint 1: `POST /api/assistant/query` (RAG — sudah live, TIDAK berubah)
+
+Kontrak ini **sudah diimplementasikan** persis begini di `AssistantClient.cs:174-203`.
+Field `gesture`/`expression` di bawah **diusulkan untuk Fase 2**, belum ada di backend
+sungguhan — jangan diasumsikan tersedia sampai diimplementasikan.
 
 #### Request Payload:
 ```json
@@ -97,16 +115,41 @@ Karakter VRM 0.x memiliki komponen standar `VRMBlendShapeProxy` dengan 5 preset 
 #### Response Payload:
 ```json
 {
-  "status": "success",
   "answer": "Poli Anak berada di Lantai 2. Hari ini ada dr. Ahmad Sp.A yang praktek hingga pukul 14.00. Saya siapkan rutenya ya!",
-  "audio_url": "https://api-darsi.rockhead07.tech/static/tts/resp_8921.mp3",
   "poi_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
   "poi_name": "Poli Anak",
+  "contains_simulated_data": true,
   "gesture": "point",
-  "expression": "Joy",
-  "contains_simulated_data": true
+  "expression": "Joy"
 }
 ```
+`contains_simulated_data` **wajib** ditampilkan di UI selama `true` (ADR-026) — data
+dokter/jadwal masih simulasi.
+
+### Endpoint 2: `POST /api/assistant/tts` (baru, ADR-033 keputusan 1)
+
+Dipanggil terpisah dari `/query`, dengan teks jawaban yang sudah didapat (misalnya
+field `answer` di atas) sebagai input. Kegagalan endpoint ini TIDAK BOLEH menjatuhkan
+jawaban teks/navigasi yang sudah diterima dari `/query`.
+
+#### Request Payload:
+```json
+{
+  "text": "Poli Anak berada di Lantai 2. Hari ini ada dr. Ahmad Sp.A yang praktek hingga pukul 14.00. Saya siapkan rutenya ya!",
+  "voice": "id-ID-GadisNeural"
+}
+```
+
+#### Response Payload:
+```json
+{
+  "audio_url": "https://api-darsi.rockhead07.tech/static/tts/resp_8921.mp3",
+  "engine_used": "edge-tts"
+}
+```
+`engine_used` membedakan `"edge-tts"` (Tier 1) dari `"sherpa-onnx"` (Tier 2 fallback
+offline, ADR-033 keputusan 3) — berguna untuk logging/diagnostik kalau backend diam-diam
+turun ke fallback karena internet server putus.
 
 ---
 
@@ -119,14 +162,17 @@ flowchart TD
         B --> C[3. Validasi Gerakan A-I-U-E-O dengan Sample Audio Klip di Sandbox]
     end
 
-    subgraph Sesi 2: Backend TTS Endpoint
-        D[4. Pasang edge-tts di FastAPI Backend] --> E[5. Generate audio .mp3 & return audio_url di Response API]
+    subgraph Sesi 2: Backend, endpoint TTS terpisah - ADR-033
+        D[4a. Pasang POST /api/assistant/tts, Tier 1 edge-tts] --> E[4b. Tier 2 fallback Sherpa-ONNX/Piper saat internet server putus]
+        E --> F[5. Return audio_url + engine_used]
     end
 
-    subgraph Sesi 3: Integrasi End-to-End
-        C --> F[6. AssistantClient unduh & putar audio_url]
-        E --> F
-        F --> G[7. Avatar Bicara + Lip-Sync + Pointing -> Mulai Lead-Follow]
+    subgraph Sesi 3: Integrasi End-to-End, dua panggilan terpisah
+        C --> G[6a. AssistantClient panggil /query, dapat answer + poi_id]
+        F --> H[6b. AssistantClient panggil /tts terpisah dengan teks answer]
+        G --> H
+        H --> I[6c. Unduh & putar audio_url; gagal di sini TIDAK menjatuhkan jawaban teks/navigasi dari 6a]
+        I --> J[7. Avatar Bicara + Lip-Sync + Pointing -> Mulai Lead-Follow]
     end
 ```
 
@@ -134,7 +180,13 @@ flowchart TD
 
 ## 7. Catatan untuk Sesi Revalidasi Claude Code
 
-Poin-poin kunci yang perlu disepakati saat revalidasi bersama Claude Code:
-1. **Pemilihan Lip-Sync Engine:** Apakah menyetujui adopsi **`hecomi/uLipSync`** (Burst-accelerated via UPM) untuk presisi fonem maksimal, atau memilih **Custom C# Spectrum Driver** untuk zero-dependency?
-2. **Implementasi Backend TTS:** Penambahan package `edge-tts` pada service FastAPI di repo `darsi-backend` untuk menyuplai field `audio_url`.
-3. **Protokol Audio Streaming vs File Fetch:** Untuk fase MVP, fetch file `.mp3` via `UnityWebRequestMultimedia.GetAudioClip` sudah sangat mencukupi sebelum mempertimbangkan WebSocket streaming jika dibutuhkan latensi instan.
+> **Revisi 2026-08-26 (Amandemen 033-A):** draf awal dokumen ini menyatukan TTS ke
+> `/api/assistant/query` dan tidak menyebut tier fallback offline, bertabrakan dengan
+> ADR-033 yang sudah terkunci 2 hari sebelumnya. §4-6 di atas sudah diperbaiki
+> mengikuti ADR-033. Poin 2 di bawah bukan lagi keputusan terbuka — sudah dikunci,
+> tinggal diimplementasikan sesuai kontrak §5.
+
+Poin-poin kunci yang masih perlu disepakati saat revalidasi bersama Claude Code:
+1. **Pemilihan Lip-Sync Engine:** Apakah menyetujui adopsi **`hecomi/uLipSync`** (Burst-accelerated via UPM) untuk presisi fonem maksimal, atau memilih **Custom C# Spectrum Driver** untuk zero-dependency? *(masih terbuka — belum ada ADR)*
+2. ~~Implementasi Backend TTS~~ **Sudah terkunci di ADR-033**, bukan pertanyaan terbuka: endpoint `POST /api/assistant/tts` terpisah dari `/query`, `edge-tts` Tier 1 + Sherpa-ONNX/Piper Tier 2 fallback offline. Tugas repo `darsi-backend`, ikuti kontrak §5 di atas.
+3. **Protokol Audio Streaming vs File Fetch:** Untuk fase MVP, fetch file `.mp3` via `UnityWebRequestMultimedia.GetAudioClip` sudah sangat mencukupi sebelum mempertimbangkan WebSocket streaming jika dibutuhkan latensi instan. *(masih terbuka)*

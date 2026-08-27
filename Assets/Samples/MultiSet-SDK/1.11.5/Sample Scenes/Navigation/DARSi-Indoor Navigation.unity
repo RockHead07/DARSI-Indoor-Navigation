@@ -352,16 +352,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 95971246b91aa2d4f82127bb70f359d4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OllamaConnector
-  ollamaHost: 192.168.18.150
-  ollamaPort: 11434
-  modelName: qwen3:8b
-  useHttps: 0
-  groqApiKey:
+  groqApiKey: 
   groqModel: openai/gpt-oss-20b
   onConnectionFailed:
     m_PersistentCalls:
       m_Calls: []
-  txtStatus: {fileID: 586594366}
 --- !u!114 &73784736
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -394,6 +389,9 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+  assistantClient: {fileID: 974495374}
+  useRAGPrimary: 1
+  enableFallback: 1
 --- !u!1 &133356939
 GameObject:
   m_ObjectHideFlags: 0
@@ -4773,6 +4771,70 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 961393126}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &974495372
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 974495375}
+  - component: {fileID: 974495374}
+  - component: {fileID: 974495373}
+  m_Layer: 0
+  m_Name: AssistantManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &974495373
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 974495372}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 423cd256104ed954b8f403f3026e6873, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssistantTestPanel
+  client: {fileID: 0}
+  logoTapTarget: {fileID: 0}
+--- !u!114 &974495374
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 974495372}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 07a7b5af3d2ff0b4cb77a40233be7a04, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssistantClient
+  baseUrl: https://api-darsi.rockhead07.tech
+  timeoutSeconds: 60
+  floorManager: {fileID: 0}
+  buildingName: RS Islam Ahmad Yani
+  entryPoint: {fileID: 0}
+--- !u!4 &974495375
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 974495372}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -13623,3 +13685,4 @@ SceneRoots:
   - {fileID: 701075304}
   - {fileID: 955434453}
   - {fileID: 356410618}
+  - {fileID: 974495375}
