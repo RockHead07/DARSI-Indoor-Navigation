@@ -3,22 +3,33 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// UI pengendali untuk pengujian Sandbox Avatar Companion (Tahap 1 MVP).
-/// Menyediakan tombol uji coba Spawn, Point, Dismiss, serta monitor status state machine.
+/// UI pengendali untuk pengujian Sandbox Avatar Companion & Lip-Sync (Tahap 1 & Fase 2).
+/// Menyediakan kontrol Spawn, Point, Dismiss, pemutaran audio uji (AIUEO & Sapaan), serta monitor diagnostik fonem/volume.
 /// </summary>
 public class AvatarSandboxUI : MonoBehaviour
 {
     [Header("Controller Target")]
     [SerializeField] private AvatarCompanionController companionController;
+    [SerializeField] private AvatarSpeechLipSync lipSyncDriver;
 
-    [Header("UI Buttons")]
+    [Header("UI Buttons - Gerakan")]
     [SerializeField] private Button btnSpawn;
     [SerializeField] private Button btnPoint;
     [SerializeField] private Button btnDismiss;
 
+    [Header("UI Buttons - Suara & Lip-Sync")]
+    [SerializeField] private Button btnPlayAIUEO;
+    [SerializeField] private Button btnPlayGreeting;
+    [SerializeField] private Button btnStopVoice;
+
+    [Header("Audio Clips")]
+    [SerializeField] private AudioClip clipAIUEO;
+    [SerializeField] private AudioClip clipGreeting;
+
     [Header("Status Feedback")]
     [SerializeField] private TMP_Text txtStatus;
     [SerializeField] private TMP_Text txtDistance;
+    [SerializeField] private TMP_Text txtPhoneme;
 
     private void Awake()
     {
@@ -27,9 +38,18 @@ public class AvatarSandboxUI : MonoBehaviour
             companionController = FindFirstObjectByType<AvatarCompanionController>();
         }
 
+        if (lipSyncDriver == null)
+        {
+            lipSyncDriver = FindFirstObjectByType<AvatarSpeechLipSync>();
+        }
+
         if (btnSpawn != null) btnSpawn.onClick.AddListener(OnSpawnClicked);
         if (btnPoint != null) btnPoint.onClick.AddListener(OnPointClicked);
         if (btnDismiss != null) btnDismiss.onClick.AddListener(OnDismissClicked);
+
+        if (btnPlayAIUEO != null) btnPlayAIUEO.onClick.AddListener(OnPlayAIUEOClicked);
+        if (btnPlayGreeting != null) btnPlayGreeting.onClick.AddListener(OnPlayGreetingClicked);
+        if (btnStopVoice != null) btnStopVoice.onClick.AddListener(OnStopVoiceClicked);
 
         if (companionController != null)
         {
@@ -47,14 +67,30 @@ public class AvatarSandboxUI : MonoBehaviour
 
     private void Update()
     {
-        if (txtDistance != null && companionController != null && Camera.main != null && companionController.IsVisible)
+        if (companionController != null && Camera.main != null && companionController.IsVisible)
         {
             float dist = Vector3.Distance(companionController.transform.position, Camera.main.transform.position);
-            txtDistance.text = $"Jarak Kamera: {dist:F2} m {(dist < 0.8f ? "<color=red>(Safety Fade Active)</color>" : "<color=green>(Aman)</color>")}";
+            if (txtDistance != null)
+            {
+                txtDistance.text = $"Jarak Kamera: {dist:F2} m {(dist < 0.8f ? "<color=red>(Safety Fade Active)</color>" : "<color=green>(Aman)</color>")}";
+            }
         }
         else if (txtDistance != null)
         {
             txtDistance.text = "Avatar Non-Aktif";
+        }
+
+        // Monitor diagnostik lip-sync
+        if (txtPhoneme != null && lipSyncDriver != null)
+        {
+            if (lipSyncDriver.IsSpeaking)
+            {
+                txtPhoneme.text = $"Bicara: <color=#00FFAA>Aktif</color> | Fonem: <b>{lipSyncDriver.ActivePhoneme}</b> | Vol: {lipSyncDriver.CurrentVolume:F2}";
+            }
+            else
+            {
+                txtPhoneme.text = "Bicara: <color=#888888>Diam</color> | Fonem: - | Vol: 0.00";
+            }
         }
     }
 
@@ -71,6 +107,30 @@ public class AvatarSandboxUI : MonoBehaviour
     private void OnDismissClicked()
     {
         if (companionController != null) companionController.Dismiss();
+    }
+
+    private void OnPlayAIUEOClicked()
+    {
+        if (lipSyncDriver != null && clipAIUEO != null)
+        {
+            lipSyncDriver.PlayAudio(clipAIUEO);
+        }
+    }
+
+    private void OnPlayGreetingClicked()
+    {
+        if (lipSyncDriver != null && clipGreeting != null)
+        {
+            lipSyncDriver.PlayAudio(clipGreeting);
+        }
+    }
+
+    private void OnStopVoiceClicked()
+    {
+        if (lipSyncDriver != null)
+        {
+            lipSyncDriver.StopAudio();
+        }
     }
 
     private void UpdateStateDisplay(AvatarCompanionController.AvatarState state)

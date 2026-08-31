@@ -1227,3 +1227,26 @@ Satu sisi nyaris tanpa biaya, sisi lain berbiaya nyawa. Maka gerbang dilonggarka
 **Temuan sampingan yang memperkuat ADR-026.** Pada ambang 0,22 gerbang cuma menolak **1 dari 8** soal sampah di `test-3` (2/8 di `test-4`, 1/4 di `test-2`). Gerbang ini bukan filter, melainkan kebocoran. Konsisten dengan bukti ADR-026 bahwa cosine tidak terkalibrasi untuk memisahkan dalam/luar cakupan.
 
 **Sengaja TIDAK dibangun.** Sempat dipertimbangkan membuat full-text ikut membuka gerbang (perbaikan arsitektural yang menyasar akar masalah langsung). **Dibatalkan berdasarkan data**: pada 0,15 recall soal sah `test-3` sudah 100%, tidak ada sisa yang bisa diperbaiki opsi itu. Menambah logika untuk keuntungan terukur nol adalah YAGNI. Kalau suatu saat ada pertanyaan sah yang gagal padahal kata kuncinya cocok persis, opsi ini yang pertama dibuka lagi.
+
+---
+
+### ADR-037 — Pemilihan Engine Lip-Sync hecomi/uLipSync Berbasis MFCC dan Burst Compiler untuk Avatar 3D VRM (2026-08-31)
+
+**Konteks.**
+Pada implementasi Fase 2 Avatar (melanjutkan [ADR-030](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/docs/DECISIONS.md#adr-030--pengembangan-ai-avatar-companion-pada-scene-terisolasi-dan-paket-gltf-2026-08-23), [ADR-033](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/docs/DECISIONS.md#adr-033--arsitektur-voice-output-tts-hybrid-edge-tts--sherpa-onnx-dan-kontrak-endpoint-2026-08-26), dan [ADR-034](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/docs/DECISIONS.md#adr-034--model-penempatan-lead-follow-dan-safety-fade-avatar-companion-2026-08-26)), avatar 3D VRM membutuhkan sinkronisasi gerakan bibir (viseme lip-sync) terhadap output suara TTS secara real-time di perangkat mobile AR (Android) tanpa membebani garbage collection (GC) frame budget.
+
+**Alternatif yang Dievaluasi:**
+1. **hecomi/uLipSync (v3.1.5, Lisensi MIT):** Menggunakan Mel-Frequency Cepstral Coefficients (MFCC) yang dioptimasi penuh melalui Unity C# Job System dan Burst Compiler. Memetakan sinyal audio ke 5 preset vokal vokal standar bahasa Jepang/Indonesia (A, I, U, E, O) yang cocok persis 1:1 dengan preset `VRMBlendShapeProxy` milik UniVRM 0.x. Zero allocation di audio thread.
+2. **OVRLipSync (Meta):** Menggunakan viseme Oculus (15 viseme). Memerlukan binary C++ native proprietary, lisensi tertutup, dan membutuhkan pemetaan ulang manual ke 5 blendshape UniVRM yang sering menghasilkan distorsi bentuk mulut.
+3. **Custom Amplitude/RMS FFT:** Sangat sederhana dan ringan, namun hanya dapat mendeteksi intensitas volume (buka-tutup mulut monoton) tanpa dapat membedakan formasi vokal fonem (A, I, U, E, O).
+
+**Keputusan Arsitektur:**
+1. **Engine Primer:** Mengadopsi paket `hecomi/uLipSync` (v3.1.5 via local UPM di `Packages/com.hecomi.ulipsync`) bersama dependensi `com.unity.burst` dan `com.unity.mathematics`.
+2. **Driver Adapter (`AvatarSpeechLipSync.cs`):** Dibuat komponen adapter [`AvatarSpeechLipSync`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Scripts/Avatar/AvatarSpeechLipSync.cs) di `Assets/Scripts/Avatar/` yang mendengarkan event `onLipSyncUpdate` dari `uLipSync`, menghitung pembukaan mulut terbobot rasio fonem dan volume gain, serta menerapkan nilai viseme ke [`VRMBlendShapeProxy`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Scripts/Avatar/AvatarSpeechLipSync.cs) di `LateUpdate()` menggunakan `Mathf.SmoothDamp`.
+3. **Penyediaan Fallback Terpadu:** Komponen [`AvatarSpeechLipSync`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Scripts/Avatar/AvatarSpeechLipSync.cs) menyertakan modul estimasi amplitudo RMS prosedural lokal dengan buffer `float[512]` pra-alokasi (0 GC alloc). Jika `uLipSync` tidak terpasang atau non-aktif, avatar tetap dapat menggerakkan bibir secara ritmis tanpa crash atau exception.
+4. **Guardrail Keselamatan Animasi:** Saat audio selesai diputar atau volume berada di bawah `minVolumeThreshold` (0.02), seluruh bobot viseme (A, I, U, E, O) secara otomatis diredam halus kembali ke 0.0f (pose istirahat / mulut tertutup) untuk mencegah mulut avatar tersangkut dalam pose terbuka.
+
+**Hasil Validasi Empiris:**
+- Unit Test EditMode: 9 dari 9 test lulus 100% ([`AvatarSpeechLipSyncTests.cs`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Tests/Editor/AvatarSpeechLipSyncTests.cs)).
+- PlayMode Probe: Berhasil merekam ribuan frame pengujian vokal AIUEO dan sapaan natural RS. Evaluasi post-playback membuktikan seluruh viseme kembali ke 0.000 (LULUS 100%).
+
