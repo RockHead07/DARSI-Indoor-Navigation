@@ -272,13 +272,25 @@ Di sisi Unity, avatar dikendalikan oleh *State Machine* berikut:
   * Evaluasi engine lip-sync: `hecomi/uLipSync` (MFCC Burst) vs Custom C# FFT Formant Driver.
   * Implementasi *audio amplitude/formant to viseme driver* untuk menggerakkan `A, I, U, E, O` pada `VRMBlendShapeProxy`.
   * Integrasi TTS audio (`edge-tts` `id-ID-GadisNeural`) dan pemutaran audio panduan suara.
-* [ ] **Fase 3 (Backend RAG & TTS Integration):** — **sudah punya spec, lihat catatan di kepala dokumen.**
+* [x] **Fase 3 (Backend RAG):** SELESAI, kecuali pengujian device fisik.
   Spec: repo `darsi-backend`, `docs/superpowers/specs/2026-08-20-rag-assistant-backend-design.md`.
-  * Penyusunan tabel dokumen RS + pgvector (`knowledge_chunks`) **dan tabel terstruktur
+  * [x] Tabel dokumen RS + pgvector (`knowledge_chunks`) **dan tabel terstruktur
     `doctor_schedules`** yang sengaja tidak di-embed (retrieval hybrid).
-  * Endpoint FastAPI `POST /api/assistant/query` untuk pipeline RAG.
-  * Groq dipanggil dari server (menutup utang keamanan `groqApiKey` di `OllamaConnector.cs`).
-  * Edge-TTS generator **belum masuk lingkup spec itu**, menyusul setelah RAG terbukti jalan.
+  * [x] Endpoint FastAPI `POST /api/assistant/query` untuk pipeline RAG.
+  * [x] Groq dipanggil dari server (menutup utang keamanan `groqApiKey`, dan `OllamaConnector.cs`
+    sendiri sudah diperkecil jadi fallback klien saja — Ollama-LAN dihapus total,
+    Amandemen 024-A).
+  * [x] Gerbang relevansi disetel ulang 0,22→0,15 lewat set uji baru, bukan tebakan
+    (ADR-036) — menutup celah keselamatan nyata: skenario luka berdarah sempat
+    ditolak buta karena selisih skor 0,006 dari ambang lama.
+  * [x] `poi_id` tidak lagi bocor saat asisten menolak menjawab (penanda `[TOLAK]`
+    dari LLM sendiri, bukan ditebak dari kata kunci) — diverifikasi 3 run berturut.
+  * [ ] **Device fisik belum pernah dites sama sekali** — checklist sudah siap:
+    [`docs/FIELD-TEST-RAG-ASSISTANT.md`](FIELD-TEST-RAG-ASSISTANT.md).
+  * **Utang terbuka (bukan blocker Fase 4):** instabilitas Bifrost/jaringan ~10-15%
+    gagal di bawah beban berturut-turut, belum terdiagnosis (log server buntu, lihat
+    `darsi-backend/README.md`). Edge-TTS generator tetap di luar lingkup Fase 3 ini,
+    jadi tanggung jawab Fase 2 di atas.
 * [ ] **Fase 4 (Pengujian Lapangan & Evaluasi UX):**
   * Pengujian performa frame rate (FPS) dan memori di perangkat Android target.
   * Evaluasi kenyamanan pengguna saat berdialog dengan avatar di lingkungan RS Islam A. Yani.
