@@ -30,48 +30,52 @@
 >   (menunggu Fase 1/2), jadi jangan diasumsikan sudah tersedia.
 > - Seluruh isi corpus tahap ini adalah **data simulasi** dan wajib ditandai seperti itu.
 >
-> **⛔ Keputusan urutan kerja (2026-08-24): JANGAN mulai avatar 3D/VRM sebelum RAG
-> backend ini benar-benar matang.** RAG sudah live di produksi (Bifrost + Groq
-> fallback, ADR-029) dan terverifikasi end-to-end dari Unity, bug navigasi
-> parkir-vs-IGD sudah ketemu dan diperbaiki (lihat ADR-028), dan angka
-> **recall@3 = 71,9% sudah diukur ULANG (2026-08-24) terhadap corpus produksi
-> yang sungguhan (27 chunk) — SAH untuk dilaporkan**, lihat
-> `docs/RETRIEVAL-EVALUATION.md` §3.1 di repo `darsi-backend`. Sisa utang yang
-> masih harus diberesin dulu:
+> **✅ Update 2026-08-26: seluruh punch-list di bawah SUDAH DITUTUP, kecuali
+> device fisik.** Gerbang kerja "jangan mulai avatar sebelum RAG matang" yang
+> tertulis di sini (2026-08-24) sudah dicabut Amandemen 030-A untuk alasan
+> operasional (bukan menunggu RAG), dan sekarang RAG-nya sendiri juga sudah
+> matang — dua alasan berbeda, kesimpulan sama. Riwayat lengkap di bawah
+> dipertahankan sebagai jejak, bukan dihapus.
 > - ~~`POI_SYNC_TOKEN` di server belum dirotasi dari default~~ **SELESAI
 >   (2026-08-24)**, sudah dirotasi + diverifikasi (token lama ditolak 401).
-> - `eval_llm_judge.py` — kodenya sudah diperbaiki (4 cacat). **Angka bersih
->   pertama berhasil didapat (2026-08-24): 45/52 (86,5%)**, 52/52 dinilai
->   tanpa error. Rincian: Gawat Darurat 90%, Poliklinik 70%, Farmasi 100%,
->   Diagnostik 100%, Administrasi 67%, Fasilitas Umum 100%, Di Luar Cakupan
->   75%. **Ini angka LOWER-BOUND, bukan final** — 2 perbaikan lagi (kosakata
->   "spiral KB"/"pasang" jadi stopword, rubrik penolakan out-of-scope) sudah
->   di-deploy dan diverifikasi manual lewat curl SETELAH run ini, tapi belum
->   diukur ulang lewat 52 skenario penuh. Tabel lengkap ada di
+> - ~~`eval_llm_judge.py` — angka belum final~~ **SELESAI (2026-08-26)**:
+>   `#06` (luka-robek) dan penolakan out-of-scope (`poi_id` tidak bocor)
+>   terverifikasi **PASS di 3 dari 3** run susulan berturut-turut. Riwayat
+>   angka: 45/52 (86,5%) → 46/52 → 51/52 (98,1%, run bersih terakhir sebelum
+>   fix ambang) → 3 run terakhir semuanya kena kontaminasi infrastruktur
+>   (503/koneksi, 6-8 dari 52 tiap run) sehingga tidak ada angka 52/52 yang
+>   benar-benar bersih pasca-ADR-036, TAPI sinyal kontennya konsisten:
+>   dua perbaikan paling penting (keselamatan + kebocoran `poi_id`) terbukti
+>   kokoh, bukan kebetulan sekali jalan. Detail lengkap + tabel kategori:
 >   `README.md` repo `darsi-backend`.
->   - **Temuan terkait, belum ditambal**: `poi_id`/`poi_name` di response API
->     tetap terisi (dari chunk retrieval rank-1) walau JAWABAN TEKSNYA sudah
->     benar menolak pertanyaan di luar cakupan tanpa sebut lokasi. Konsekuensi
->     di Unity: `VoiceInputHandler.cs` bisa jatuh ke metadata yang salah
->     sebagai fallback kalau jawaban teks tidak menyebut POI apa pun. Akar
->     masalahnya sama dengan ambang skor `MIN_TOP_SCORE=0.22` di bawah.
->   - Sisa yang masih gagal: #6 (luka robek/berdarah — korban ambang skor
->     0,22, sengaja belum ditambal), #12/#13 (jadwal dokter kadang tidak
->     sebut lokasi — diduga variasi sampling LLM, bukan bug kode, karena
->     sebagian besar kasus serupa sudah lolos).
+>   - ~~`poi_id`/`poi_name` bocor saat menolak~~ **SELESAI (2026-08-26)**:
+>     LLM sekarang menandai jawabannya sendiri (`[TOLAK]`) saat menolak,
+>     backend membuang `poi_id` berdasarkan penanda itu — bukan ditebak dari
+>     kata kunci. Lihat ADR-036 (§ "Amandemen" di dalamnya).
+>   - ~~#6 (luka robek/berdarah)~~ **SELESAI (2026-08-26)**: akar masalahnya
+>     BUKAN celah kosakata (dugaan awal keliru, sudah dikoreksi) — gerbang
+>     `MIN_TOP_SCORE` cuma baca skor vector, kata kunci literal pun tidak
+>     menolong. Ditambal turunkan ambang 0,22→0,15 (ADR-036), divalidasi set
+>     uji baru yang ditulis buta sebelum pengukuran (`test-3`/`test-4`).
+>   - #12/#13 (jadwal dokter kadang tidak sebut lokasi) TETAP terbuka, prioritas
+>     rendah — diduga variasi sampling LLM, bukan bug kode.
+>   - **Utang BARU (2026-08-26), belum diselidiki**: Bifrost/jaringan gagal
+>     ~10-15% di bawah beban 52 panggilan berturut-turut, di 3 run independen.
+>     Diagnosis lewat `docker compose logs` buntu total (container tidak
+>     mencetak log request/exception). Bukan bug RAG, tapi relevan untuk
+>     kesiapan lapangan. Detail: `README.md` repo `darsi-backend`.
 > - ~~Cloudflare Tunnel masih quick tunnel~~ **SELESAI (2026-08-24)**: Named
 >   Tunnel permanen aktif di `https://api-darsi.rockhead07.tech` (domain
 >   `rockhead07.tech`, dibuat lewat CLI `cloudflared tunnel login/create/route
 >   dns` — BUKAN dashboard Zero Trust, itu minta aktivasi produk berbayar
 >   yang butuh kartu), jalan sebagai systemd service, survive restart/reboot.
 >   Sudah dipasang ke `AssistantClient.baseUrl` di scene `TestingHCM.unity`.
-> - **Belum pernah dites di device Android fisik pakai mic asli** — seluruh
->   verifikasi sejauh ini lewat Unity Editor Play mode.
-> - Gerbang skor retrieval (`MIN_TOP_SCORE=0.22`) masih dikenal menolak
->   sebagian query valid (lihat `RETRIEVAL-EVALUATION.md` §6) — belum
->   dioptimalkan, sengaja ditunda supaya tidak membakar set uji `test-2`.
-> Selesaikan daftar ini dulu sebelum membuka pekerjaan avatar 3D di bawah —
-> avatar butuh RAG yang stabil sebagai fondasi jawabannya, bukan sebaliknya.
+> - ~~Gerbang skor retrieval (`MIN_TOP_SCORE=0.22`) menolak sebagian query
+>   valid~~ **SELESAI (2026-08-26)**, lihat ADR-036 di atas.
+> - **SATU-SATUNYA yang masih terbuka: belum pernah dites di device Android
+>   fisik pakai mic asli.** Seluruh verifikasi sejauh ini lewat Unity Editor
+>   Play mode + `curl` langsung + `eval_llm_judge`. Checklist siap dibawa ke
+>   lokasi: [`docs/FIELD-TEST-RAG-ASSISTANT.md`](FIELD-TEST-RAG-ASSISTANT.md).
 >
 > 📌 **Update 2026-08-24 (ADR-030):** Eksplorasi visual & aset avatar 3D (Tahap 1: Visual Companion)
 > diizinkan berjalan secara paralel dan terisolasi pada branch terpisah `feature/vrm-avatar-assistant`
