@@ -288,13 +288,16 @@ Di sisi Unity, avatar dikendalikan oleh *State Machine* berikut:
     `IdleStand → LeadingPath` dibuktikan empiris di Play Mode (bukan asumsi desain;
     percobaan pertama Sesi 3 salah klaim karena `AIAvatarGuideController` sempat
     tidak ada di scene sandbox, dikoreksi di commit `220d39b`).
-  * [ ] **Belum tersambung ke scene produksi.** Semua bukti di atas dari
-    `Sandbox_AvatarCompanion.unity` — `ShowPath`/`NavigationController` (penelusuran
-    rute fisik sungguhan) tidak ada di scene itu, jadi belum ada bukti avatar benar-benar
-    berjalan di atas rute nyata sambil bicara. Field `showPath`/`navigation`/`floorTransition`
-    di `AIAvatarGuideController` masih kosong di sandbox.
-  * [ ] **Device fisik belum pernah dites** — latensi audio dan frame rate 60 FPS
-    di HP Android sungguhan. Checklist: [`docs/FIELD-TEST-AVATAR-VOICE.md`](FIELD-TEST-AVATAR-VOICE.md).
+  * [x] **Tersambung ke scene produksi (`TestingHCM.unity`).** Komponen
+    `AvatarAudioClient`, `AvatarSpeechLipSync`, `uLipSync`, dan `AudioSource` dipasang
+    di `Avatar_Guide` oleh skrip Editor
+    [`WireAvatarVoiceToTestingHCM.cs`](../Assets/Scripts/Avatar/Editor/WireAvatarVoiceToTestingHCM.cs)
+    (2026-09-01). Semua referensi serialized terhubung (baseUrl Named Tunnel,
+    `guideController`, `blendShapeProxy` dari model VRM, profil uLipSync Female).
+    `AIAvatarGuideController.showPath` sudah terhubung ke `ShowPath` dari sesi sebelumnya.
+  * [ ] **Menunggu tes lapangan device fisik.** Latensi audio dan frame rate 60 FPS
+    di HP Android sungguhan (ARCore + VPS MultiSet + VRM Avatar + uLipSync). Protokol bawa-ke-lokasi:
+    [`FIELD-TEST-AVATAR-VOICE.md`](FIELD-TEST-AVATAR-VOICE.md).
 * [x] **Fase 3 (Backend RAG):** SELESAI, kecuali pengujian device fisik.
   Spec: repo `darsi-backend`, `docs/superpowers/specs/2026-08-20-rag-assistant-backend-design.md`.
   * [x] Tabel dokumen RS + pgvector (`knowledge_chunks`) **dan tabel terstruktur
