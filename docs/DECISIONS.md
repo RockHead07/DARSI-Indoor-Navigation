@@ -1247,6 +1247,6 @@ Pada implementasi Fase 2 Avatar (melanjutkan [ADR-030](file:///D:/Dev/Projects/U
 4. **Guardrail Keselamatan Animasi:** Saat audio selesai diputar atau volume berada di bawah `minVolumeThreshold` (0.02), seluruh bobot viseme (A, I, U, E, O) secara otomatis diredam halus kembali ke 0.0f (pose istirahat / mulut tertutup) untuk mencegah mulut avatar tersangkut dalam pose terbuka.
 
 **Hasil Validasi Empiris:**
-- Unit Test EditMode: 9 dari 9 test lulus 100% ([`AvatarSpeechLipSyncTests.cs`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Tests/Editor/AvatarSpeechLipSyncTests.cs)).
+- Unit Test EditMode: 4 dari 4 test lulus 100% ([`AvatarSpeechLipSyncTests.cs`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Tests/Editor/AvatarSpeechLipSyncTests.cs)).
 - PlayMode Probe: Berhasil merekam ribuan frame pengujian vokal AIUEO dan sapaan natural RS. Evaluasi post-playback membuktikan seluruh viseme kembali ke 0.000 (LULUS 100%).
 
