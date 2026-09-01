@@ -146,6 +146,19 @@ public static class AvatarSandboxSceneBuilder
         var audioClientSo = new SerializedObject(audioClient);
         audioClientSo.FindProperty("lipSyncDriver").objectReferenceValue = lipSyncDriver;
         audioClientSo.FindProperty("audioSource").objectReferenceValue = audioSource;
+
+        // Tambahkan AIAvatarGuideController ke scene sandbox agar probe
+        // dapat memverifikasi bahwa StartLeading() sungguhan terpanggil.
+        // Di scene produksi komponen ini sudah ada tersendiri; di sandbox
+        // perlu ditambahkan eksplisit karena scene ini tidak punya ShowPath
+        // atau NavigationController (itu tidak apa-apa, yang diuji hanya
+        // transisi state FSM setelah SpeakAnswerAndGuide selesai).
+        var guideCtrl = avatarRoot.AddComponent<AIAvatarGuideController>();
+        var guideSo = new SerializedObject(guideCtrl);
+        guideSo.FindProperty("animator").objectReferenceValue = animator;
+        guideSo.ApplyModifiedProperties();
+
+        audioClientSo.FindProperty("guideController").objectReferenceValue = guideCtrl;
         audioClientSo.ApplyModifiedProperties();
 
         var companionCtrl = avatarRoot.AddComponent<AvatarCompanionController>();
@@ -160,6 +173,7 @@ public static class AvatarSandboxSceneBuilder
         ctrlSo.FindProperty("lookAtController").objectReferenceValue = lookAt;
         ctrlSo.FindProperty("safetyFade").objectReferenceValue = safetyFade;
         ctrlSo.ApplyModifiedProperties();
+
 
         // 6. Buat Canvas UI Sandbox
         var canvasGo = new GameObject("Canvas_SandboxUI");

@@ -221,6 +221,12 @@ public static class AvatarAudioIntegrationProbe
     {
         _audioClient.BaseUrl = "http://127.0.0.1:8000";
 
+        // Pastikan GuideController di-reset ke IdleStand sebelum uji
+        if (_guide != null)
+        {
+            _guide.StopLeading();
+        }
+
         var dummyAnswer = new AssistantAnswer
         {
             answer = "Poli Anak berada di Lantai 2.",
@@ -229,19 +235,39 @@ public static class AvatarAudioIntegrationProbe
             contains_simulated_data = false
         };
 
+        // Catat state FSM SEBELUM SpeakAnswerAndGuide dipanggil
+        string stateBefore = _guide != null ? _guide.CurrentState.ToString() : "NULL";
+        bool isLeadingBefore = _guide != null && _guide.IsLeading;
+
         bool navReadyCalled = false;
         yield return _audioClient.SpeakAnswerAndGuide(dummyAnswer, onNavigationReady: () =>
         {
             navReadyCalled = true;
         });
 
-        _liveTtsPassed = navReadyCalled && !string.IsNullOrEmpty(_audioClient.LastAudioUrl);
+        // Catat state FSM SESUDAH SpeakAnswerAndGuide selesai -- ini bukti bahwa
+        // StartLeading() benar-benar dipanggil, bukan cuma callback generik
+        string stateAfter = _guide != null ? _guide.CurrentState.ToString() : "NULL";
+        bool isLeadingAfter = _guide != null && _guide.IsLeading;
+        bool startLeadingActuallyFired = _guide != null && isLeadingAfter && !isLeadingBefore;
+
+        _liveTtsPassed = navReadyCalled
+                      && !string.IsNullOrEmpty(_audioClient.LastAudioUrl)
+                      && startLeadingActuallyFired;
         _liveTtsLog = $"Live Backend TTS:\n" +
-                      $"- Engine Digunakan : {_audioClient.LastEngineUsed}\n" +
-                      $"- URL Audio        : {_audioClient.LastAudioUrl}\n" +
-                      $"- Navigasi Terpanggil Pasca-Bicara: {(navReadyCalled ? "YA" : "TIDAK")}";
+                      $"- Engine Digunakan           : {_audioClient.LastEngineUsed}\n" +
+                      $"- URL Audio                  : {_audioClient.LastAudioUrl}\n" +
+                      $"- Callback onNavigationReady : {(navReadyCalled ? "YA" : "TIDAK")}\n" +
+                      $"- AIAvatarGuide Ditemukan    : {(_guide != null ? "YA" : "TIDAK")}\n" +
+                      $"- GuideState SEBELUM         : {stateBefore} (IsLeading={isLeadingBefore})\n" +
+                      $"- GuideState SESUDAH         : {stateAfter} (IsLeading={isLeadingAfter})\n" +
+                      $"- StartLeading() Terpanggil  : {(startLeadingActuallyFired ? "YA (state berubah dari IdleStand ke LeadingPath)" : "TIDAK")}";
         _liveTtsDone = true;
+
+        // Bersihkan state FSM agar tidak mencemari skenario berikutnya
+        if (_guide != null) _guide.StopLeading();
     }
+
 
     private static IEnumerator RunFaultIsolationCoroutine()
     {
