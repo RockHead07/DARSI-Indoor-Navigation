@@ -268,10 +268,33 @@ Di sisi Unity, avatar dikendalikan oleh *State Machine* berikut:
     look-at bawaan menangani kepala sekaligus. Kepala dipegang `AvatarLookAtController`
     (clamp 55°), mata oleh `VRMLookAtHead` + `VRMLookAtBoneApplyer`. Dua sistem, dua tulang
     berbeda, tidak berebut.
-* [ ] **Fase 2 (Voice Output, TTS & Viseme Lip-Sync):** — **Kajian arsitektur & spec: [`docs/superpowers/specs/2026-08-26-voice-output-lipsync-architecture.md`](superpowers/specs/2026-08-26-voice-output-lipsync-architecture.md)**
-  * Evaluasi engine lip-sync: `hecomi/uLipSync` (MFCC Burst) vs Custom C# FFT Formant Driver.
-  * Implementasi *audio amplitude/formant to viseme driver* untuk menggerakkan `A, I, U, E, O` pada `VRMBlendShapeProxy`.
-  * Integrasi TTS audio (`edge-tts` `id-ID-GadisNeural`) dan pemutaran audio panduan suara.
+* [x] **Fase 2 (Voice Output, TTS & Viseme Lip-Sync):** SELESAI secara mekanisme,
+  kecuali integrasi scene produksi dan device fisik. Dikerjakan Antigravity (3 sesi,
+  2026-08-31/09-01), tiap sesi diverifikasi independen (git + baca file + Unity Editor
+  hidup) sebelum diterima — 2 dari 3 sesi sempat salah lapor dan baru benar setelah
+  dikoreksi, lihat riwayat di `docs/superpowers/specs/2026-08-27-antigravity-prompt-fase2-voice-lipsync.md`.
+  Spec: [`docs/superpowers/specs/2026-08-26-voice-output-lipsync-architecture.md`](superpowers/specs/2026-08-26-voice-output-lipsync-architecture.md).
+  * [x] Engine lip-sync: `hecomi/uLipSync` v3.1.5 (Burst/MFCC) dipilih dan dipasang
+    (ADR-037), dengan fallback estimasi RMS prosedural zero-GC kalau uLipSync non-aktif.
+    Driver: [`AvatarSpeechLipSync.cs`](../Assets/Scripts/Avatar/AvatarSpeechLipSync.cs).
+  * [x] Client TTS terpisah (`POST /api/assistant/tts`, ADR-033) dan audio fetch via
+    `UnityWebRequestMultimedia.GetAudioClip` — [`AvatarAudioClient.cs`](../Assets/Scripts/Avatar/AvatarAudioClient.cs)
+    (ADR-038).
+  * [x] Isolasi kegagalan mutlak (ADR-033 Amandemen 033-A poin 1): endpoint `/tts`
+    diputus paksa (port mati) di Play Mode, jawaban teks + navigasi tetap jalan tanpa
+    exception — diverifikasi eksekusi nyata, bukan cuma dibaca dari kode.
+  * [x] Koordinasi FSM Lead-Follow: avatar bicara + lip-sync dulu, baru
+    `AIAvatarGuideController.StartLeading()` terpanggil — transisi state
+    `IdleStand → LeadingPath` dibuktikan empiris di Play Mode (bukan asumsi desain;
+    percobaan pertama Sesi 3 salah klaim karena `AIAvatarGuideController` sempat
+    tidak ada di scene sandbox, dikoreksi di commit `220d39b`).
+  * [ ] **Belum tersambung ke scene produksi.** Semua bukti di atas dari
+    `Sandbox_AvatarCompanion.unity` — `ShowPath`/`NavigationController` (penelusuran
+    rute fisik sungguhan) tidak ada di scene itu, jadi belum ada bukti avatar benar-benar
+    berjalan di atas rute nyata sambil bicara. Field `showPath`/`navigation`/`floorTransition`
+    di `AIAvatarGuideController` masih kosong di sandbox.
+  * [ ] **Device fisik belum pernah dites** — latensi audio dan frame rate 60 FPS
+    di HP Android sungguhan. Checklist: [`docs/FIELD-TEST-AVATAR-VOICE.md`](FIELD-TEST-AVATAR-VOICE.md).
 * [x] **Fase 3 (Backend RAG):** SELESAI, kecuali pengujian device fisik.
   Spec: repo `darsi-backend`, `docs/superpowers/specs/2026-08-20-rag-assistant-backend-design.md`.
   * [x] Tabel dokumen RS + pgvector (`knowledge_chunks`) **dan tabel terstruktur
