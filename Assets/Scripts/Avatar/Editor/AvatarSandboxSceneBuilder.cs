@@ -142,6 +142,12 @@ public static class AvatarSandboxSceneBuilder
         lipSo.FindProperty("lipSync").objectReferenceValue = uLipSyncComp;
         lipSo.ApplyModifiedProperties();
 
+        var audioClient = avatarRoot.AddComponent<AvatarAudioClient>();
+        var audioClientSo = new SerializedObject(audioClient);
+        audioClientSo.FindProperty("lipSyncDriver").objectReferenceValue = lipSyncDriver;
+        audioClientSo.FindProperty("audioSource").objectReferenceValue = audioSource;
+        audioClientSo.ApplyModifiedProperties();
+
         var companionCtrl = avatarRoot.AddComponent<AvatarCompanionController>();
 
         // Wire serialized properties on companionCtrl
@@ -239,6 +245,7 @@ public static class AvatarSandboxSceneBuilder
 
         var btnPlayAIUEO = CreateButton("Btn_PlayAIUEO", "Uji AIUEO", btnGroupVoiceGo.transform, new Color(0.55f, 0.35f, 0.15f));
         var btnPlayGreeting = CreateButton("Btn_PlayGreeting", "Uji Sapaan RS", btnGroupVoiceGo.transform, new Color(0.45f, 0.25f, 0.65f));
+        var btnTestBackendTTS = CreateButton("Btn_TestBackendTTS", "Uji TTS Backend", btnGroupVoiceGo.transform, new Color(0.15f, 0.45f, 0.75f));
         var btnStopVoice = CreateButton("Btn_StopVoice", "Stop Suara", btnGroupVoiceGo.transform, new Color(0.4f, 0.4f, 0.4f));
 
         var clipAIUEO = AssetDatabase.LoadAssetAtPath<AudioClip>(ClipAIUEOPath);
@@ -249,11 +256,13 @@ public static class AvatarSandboxSceneBuilder
         var so = new SerializedObject(sandboxUI);
         so.FindProperty("companionController").objectReferenceValue = companionCtrl;
         so.FindProperty("lipSyncDriver").objectReferenceValue = lipSyncDriver;
+        so.FindProperty("audioClient").objectReferenceValue = audioClient;
         so.FindProperty("btnSpawn").objectReferenceValue = btnSpawn;
         so.FindProperty("btnPoint").objectReferenceValue = btnPoint;
         so.FindProperty("btnDismiss").objectReferenceValue = btnDismiss;
         so.FindProperty("btnPlayAIUEO").objectReferenceValue = btnPlayAIUEO;
         so.FindProperty("btnPlayGreeting").objectReferenceValue = btnPlayGreeting;
+        so.FindProperty("btnTestBackendTTS").objectReferenceValue = btnTestBackendTTS;
         so.FindProperty("btnStopVoice").objectReferenceValue = btnStopVoice;
         so.FindProperty("clipAIUEO").objectReferenceValue = clipAIUEO;
         so.FindProperty("clipGreeting").objectReferenceValue = clipGreeting;
@@ -261,6 +270,7 @@ public static class AvatarSandboxSceneBuilder
         so.FindProperty("txtDistance").objectReferenceValue = txtDist;
         so.FindProperty("txtPhoneme").objectReferenceValue = txtPhoneme;
         so.ApplyModifiedProperties();
+
 
         // 7. Simpan Scene
         EditorSceneManager.SaveScene(scene, ScenePath);

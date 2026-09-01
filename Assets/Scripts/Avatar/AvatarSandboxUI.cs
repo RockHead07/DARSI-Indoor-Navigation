@@ -11,6 +11,7 @@ public class AvatarSandboxUI : MonoBehaviour
     [Header("Controller Target")]
     [SerializeField] private AvatarCompanionController companionController;
     [SerializeField] private AvatarSpeechLipSync lipSyncDriver;
+    [SerializeField] private AvatarAudioClient audioClient;
 
     [Header("UI Buttons - Gerakan")]
     [SerializeField] private Button btnSpawn;
@@ -20,6 +21,7 @@ public class AvatarSandboxUI : MonoBehaviour
     [Header("UI Buttons - Suara & Lip-Sync")]
     [SerializeField] private Button btnPlayAIUEO;
     [SerializeField] private Button btnPlayGreeting;
+    [SerializeField] private Button btnTestBackendTTS;
     [SerializeField] private Button btnStopVoice;
 
     [Header("Audio Clips")]
@@ -43,12 +45,18 @@ public class AvatarSandboxUI : MonoBehaviour
             lipSyncDriver = FindFirstObjectByType<AvatarSpeechLipSync>();
         }
 
+        if (audioClient == null)
+        {
+            audioClient = FindFirstObjectByType<AvatarAudioClient>();
+        }
+
         if (btnSpawn != null) btnSpawn.onClick.AddListener(OnSpawnClicked);
         if (btnPoint != null) btnPoint.onClick.AddListener(OnPointClicked);
         if (btnDismiss != null) btnDismiss.onClick.AddListener(OnDismissClicked);
 
         if (btnPlayAIUEO != null) btnPlayAIUEO.onClick.AddListener(OnPlayAIUEOClicked);
         if (btnPlayGreeting != null) btnPlayGreeting.onClick.AddListener(OnPlayGreetingClicked);
+        if (btnTestBackendTTS != null) btnTestBackendTTS.onClick.AddListener(OnTestBackendTTSClicked);
         if (btnStopVoice != null) btnStopVoice.onClick.AddListener(OnStopVoiceClicked);
 
         if (companionController != null)
@@ -125,13 +133,26 @@ public class AvatarSandboxUI : MonoBehaviour
         }
     }
 
+    private void OnTestBackendTTSClicked()
+    {
+        if (audioClient != null)
+        {
+            StartCoroutine(audioClient.SpeakText("Poli Anak berada di Lantai 2. Dokter spesialis anak praktek hingga pukul 14.00. Saya siapkan rutenya ya!"));
+        }
+    }
+
     private void OnStopVoiceClicked()
     {
         if (lipSyncDriver != null)
         {
             lipSyncDriver.StopAudio();
         }
+        if (audioClient != null)
+        {
+            audioClient.StopSpeaking();
+        }
     }
+
 
     private void UpdateStateDisplay(AvatarCompanionController.AvatarState state)
     {

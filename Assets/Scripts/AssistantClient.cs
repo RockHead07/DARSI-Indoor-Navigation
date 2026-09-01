@@ -43,6 +43,10 @@ public class AssistantClient : MonoBehaviour
     [Tooltip("Dikirim sebagai 'building'. Kosongkan kalau tidak ingin mem-bias per gedung.")]
     [SerializeField] private string buildingName = "RS Islam Ahmad Yani";
 
+    [Header("Avatar Voice Output (Fase 2 - ADR-033)")]
+    [Tooltip("Klien audio avatar untuk sintesis suara TTS & lip-sync. Jika kosong, dicari otomatis.")]
+    [SerializeField] private AvatarAudioClient avatarAudioClient;
+
     [Header("Navigasi")]
     [Tooltip("Kosongkan untuk cari otomatis. Dipakai memulai rute saat jawaban membawa poi_id.")]
     [SerializeField] private UaaLEntryPoint entryPoint;
@@ -53,6 +57,7 @@ public class AssistantClient : MonoBehaviour
     {
         if (floorManager == null) floorManager = FindAnyObjectByType<FloorVisibilityManager>();
         if (entryPoint == null) entryPoint = FindAnyObjectByType<UaaLEntryPoint>();
+        if (avatarAudioClient == null) avatarAudioClient = FindAnyObjectByType<AvatarAudioClient>();
     }
 
     /// <summary>
@@ -156,6 +161,34 @@ public class AssistantClient : MonoBehaviour
         entryPoint.ReceiveLaunchPayload(JsonUtility.ToJson(payload));
         return true;
     }
+
+    /// <summary>
+    /// Memutar suara jawaban asisten melalui AvatarAudioClient dan memulai navigasi setelah selesai berbicara (Fase 2 - Sesi 3).
+    /// Jika AvatarAudioClient tidak tersedia atau TTS gagal, navigasi langsung dimulai tanpa suara.
+    /// </summary>
+    public void SpeakAndStartNavigation(AssistantAnswer answer)
+    {
+        if (answer == null) return;
+
+        if (avatarAudioClient != null && avatarAudioClient.EnableVoiceOutput)
+        {
+            StartCoroutine(avatarAudioClient.SpeakAnswerAndGuide(answer, onNavigationReady: () =>
+            {
+                StartNavigationFrom(answer);
+            }));
+        }
+        else
+        {
+            StartNavigationFrom(answer);
+        }
+    }
+
+    public AvatarAudioClient AudioClient
+    {
+        get => avatarAudioClient;
+        set => avatarAudioClient = value;
+    }
+
 
     // ── Uji cepat tanpa UI, mengikuti pola debug ContextMenu di UaaLEntryPoint ──
 

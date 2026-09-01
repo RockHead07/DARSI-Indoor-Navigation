@@ -1250,3 +1250,21 @@ Pada implementasi Fase 2 Avatar (melanjutkan [ADR-030](file:///D:/Dev/Projects/U
 - Unit Test EditMode: 4 dari 4 test lulus 100% ([`AvatarSpeechLipSyncTests.cs`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Tests/Editor/AvatarSpeechLipSyncTests.cs)).
 - PlayMode Probe: Berhasil merekam ribuan frame pengujian vokal AIUEO dan sapaan natural RS. Evaluasi post-playback membuktikan seluruh viseme kembali ke 0.000 (LULUS 100%).
 
+---
+
+### ADR-038 — Integrasi Klien Suara Avatar (AvatarAudioClient), Isolasi Kegagalan TTS, dan Urutan FSM Lead-Follow (2026-09-01)
+
+**Konteks.**
+Pada penyelesaian Fase 2 Avatar (Voice Output & Viseme Lip-Sync), sistem asisten RAG DARSI memerlukan integrasi klien di sisi Unity untuk memanggil endpoint sintesis suara terpisah `POST /api/assistant/tts` ([ADR-033](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/docs/DECISIONS.md#adr-033--arsitektur-voice-output-tts-hybrid-edge-tts--sherpa-onnx-dan-kontrak-endpoint-2026-08-26)), mengunduh file audio, memutarnya melalui driver lip-sync [`AvatarSpeechLipSync`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Scripts/Avatar/AvatarSpeechLipSync.cs) ([ADR-037](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/docs/DECISIONS.md#adr-037--pemilihan-engine-lip-sync-hecomiulipsync-berbasis-mfcc-dan-burst-compiler-untuk-avatar-3d-vrm-2026-08-31)), serta mengoordinasikan transisi ke status pemandu [`AIAvatarGuideController`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Scripts/Avatar/AIAvatarGuideController.cs) ([ADR-034](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/docs/DECISIONS.md#adr-034--model-penempatan-lead-follow-dan-safety-fade-avatar-companion-2026-08-26)).
+
+**Keputusan Arsitektur:**
+1. **Klien Suara Terdedikasi ([`AvatarAudioClient.cs`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Scripts/Avatar/AvatarAudioClient.cs)):** Dibuat komponen terpisah di `Assets/Scripts/Avatar/` untuk menangani siklus hidup permintaan TTS, pengunduhan `AudioClip` via `UnityWebRequestMultimedia.GetAudioClip`, pemutaran audio pada `AudioSource`, serta deteksi selesainya ucapan.
+2. **Isolasi Kegagalan Mutlak ([ADR-033 Amandemen 033-A Poin 1](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/docs/DECISIONS.md#amandemen-033-a--pemisahan-endpoint-tts-dan-rag-query-untuk-keandalan-layanan-2026-08-26)):** Kegagalan sintesis suara atau putusnya endpoint TTS TIDAK BOLEH membatalkan respon teks maupun rute navigasi. Jika TTS mengalami timeout/error, callback penyelesaian tetap dipanggil seketika sehingga alur navigasi AR langsung berjalan tanpa suara dan teks jawaban asisten tetap tampil di layar.
+3. **Urutan Koordinasi FSM Lead-Follow:** Urutan perilaku ditetapkan secara deterministik: avatar berbicara dan menggerakkan viseme bibir terlebih dahulu saat berada di posisi awal, dan baru beralih ke state `LeadingPath` / memicu `StartLeading()` setelah audio ucapan selesai diputar.
+4. **Pemenuhan Gate Rilis [ADR-034 Keputusan 7](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/docs/DECISIONS.md#adr-034--model-penempatan-lead-follow-dan-safety-fade-avatar-companion-2026-08-26):** Gate penahanan rilis avatar pemandu kini terpenuhi secara mekanisme, di mana informasi suara, visual lip-sync, dan panduan rute navigasi terintegrasi end-to-end.
+
+**Hasil Validasi Empiris:**
+- Unit Test EditMode: 5 dari 5 test lulus 100% ([`AvatarAudioClientTests.cs`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Tests/Editor/AvatarAudioClientTests.cs)).
+- PlayMode Probe: 3 dari 3 skenario lulus 100% ([`AvatarAudioIntegrationProbe.cs`](file:///D:/Dev/Projects/UnityProjects/Learning/DARSI-Indoor%20Navigation/Assets/Scripts/Avatar/Editor/AvatarAudioIntegrationProbe.cs)) mencakup local lip-sync, live backend TTS download & playback, serta live fault isolation saat endpoint TTS offline (LULUS 100%).
+
+
