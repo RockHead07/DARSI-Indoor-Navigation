@@ -64,6 +64,21 @@ dokumen desain, bukan sebaliknya):
 dan `AvatarAudioClient.cs` — nol, belum ada file-nya di `Assets/Scripts/Avatar/`.
 Endpoint `POST /api/assistant/tts` belum ada di `darsi-backend`.
 
+> **⚠️ Pelajaran dari Sesi 1 (2026-08-31), baca ini sebelum menulis laporan apa pun.**
+> Laporan penyelesaian Sesi 1 mengklaim *"9 dari 9 test EditMode lulus"*. Setelah
+> diverifikasi independen (file `AvatarSpeechLipSyncTests.cs` dibaca langsung, bukan
+> dipercaya dari laporan), kenyataannya cuma **4 test**. 5 sisanya (`POIData.Floor_*`,
+> `POIData.Building_*`) adalah test LAMA dari file lain, tidak ada hubungannya sama
+> sekali — tercampur ke laporan, kemungkinan besar dari menjalankan suite penuh
+> lalu menghitung semua baris `PASS` yang muncul di layar, bukan dari test file yang
+> sedang dikerjakan. Ini ketahuan karena pemilik proyek membaca file test-nya
+> langsung, bukan karena laporan mengoreksi dirinya sendiri.
+>
+> Konsekuensinya: **setiap angka di laporan sesi manapun sekarang WAJIB
+> diverifikasi ulang persis sebelum ditulis** — lihat aturan konkret di bagian
+> RESPONSE FORMAT di bawah. Ini bukan formalitas tambahan; ini syarat supaya
+> laporan bisa dipercaya tanpa pemilik proyek harus membongkar ulang setiap klaim.
+
 **Gate rilis, ini alasan Fase 2 ini dikerjakan sama sekali** — ADR-034 keputusan 7:
 > "Informasi rute dibawa audio; visual adalah penguat, bukan syarat... Lead-follow
 > TIDAK BOLEH dirilis sebelum TTS berfungsi, untuk mencegah pengguna berjalan di
@@ -220,6 +235,13 @@ teori" tanpa menjalankannya. Kalau menemukan sesuatu yang bertentangan dengan sp
 saat implementasi (kontrak API tidak cocok, dependency tidak tersedia, dll), **berhenti
 dan laporkan**, jangan diam-diam mengubah arah dan melanjutkan.
 
+**Angka dalam laporan bukan tempat untuk percaya diri.** "Kira-kira segini" atau
+mengingat dari konteks percakapan sebelumnya (yang mungkin sudah bercampur dengan hasil
+run lain, test file lain, atau sesi lain) tidak cukup — lihat kejadian Sesi 1 di CONTEXT
+di atas. Setiap angka WAJIB berasal dari command yang dijalankan ULANG, sesaat sebelum
+kalimat itu ditulis, dengan scope yang sesempit mungkin (satu file test, bukan satu
+folder; satu file, bukan satu direktori).
+
 ## AUDIENCE
 
 Bagus (pemilik proyek, mahasiswa, developer solo) mereview hasil kerjamu lewat commit
@@ -232,8 +254,25 @@ mana berubah, apa yang terverifikasi jalan (dan buktinya), apa yang belum.
 
 Kerjakan per sesi (1 → 2 → 3), commit terpisah per langkah logis (ikuti pola
 "test gagal → implementasi minimal → test lolos → commit" untuk bagian backend yang
-testable). Di akhir SETIAP sesi, laporkan dalam format ini sebelum lanjut ke sesi
-berikutnya:
+testable).
+
+**Sebelum menulis SATU KALIMAT PUN dari laporan** (lihat CONTEXT soal kenapa ini
+bukan basa-basi), jalankan urutan ini, dalam urutan ini:
+
+1. Untuk setiap klaim angka (jumlah test, jumlah file, jumlah baris, dsb.): jalankan
+   ULANG command yang menghasilkan angka itu, **discope ke file/target paling sempit
+   yang relevan** — `pytest tests/test_tts.py`, BUKAN `pytest tests/`;
+   `grep -c "^def test_" file.cs`, BUKAN mengandalkan output run sebelumnya yang
+   mungkin sudah bercampur konteks.
+2. Salin **output mentah command itu apa adanya** ke field "Bukti mentah" di bawah —
+   bukan parafrase, bukan rangkuman tulisan tangan seperti "9 dari 9 test lulus".
+   Kalau outputnya panjang, potong bagian tengah tapi PERTAHANKAN baris ringkasan
+   asli (`X passed, Y failed` atau setara) apa adanya, jangan ditulis ulang dengan
+   kata-kata sendiri.
+3. Cocokkan angka di ringkasan naratif dengan angka di "Bukti mentah" — kalau beda,
+   yang naratif itu salah, perbaiki, ulangi dari langkah 1 kalau perlu.
+
+Di akhir SETIAP sesi, laporkan dalam format ini sebelum lanjut ke sesi berikutnya:
 
 ```
 ## Sesi N selesai
@@ -241,7 +280,10 @@ berikutnya:
 **Commit:** <hash pendek> — <pesan singkat>
 **File berubah:** <daftar path>
 **Terverifikasi (bukti nyata, bukan asumsi):**
-- <item> — <cara verifikasi: curl/Play-mode/test output, dengan hasil aktualnya>
+- <item> — <command persis yang dijalankan ULANG barusan> — <hasil aktualnya>
+
+**Bukti mentah:**
+<output command apa adanya, tidak diparafrase, untuk setiap klaim angka di atas>
 
 **Keputusan yang diambil (kalau ada):**
 - <keputusan> — <alasan> — <ditulis sebagai ADR-0XX? ya/tidak, kenapa>
