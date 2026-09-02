@@ -833,6 +833,79 @@ lebih dulu, bukan lewat lip-sync yang diam-diam rusak di lapangan.
 **Yang BELUM diverifikasi saat amandemen ini ditulis:** tampilan visualnya belum dinilai
 langsung oleh pemilik proyek, dan belum diuji di device fisik.
 
+#### Amandemen 033-C (2026-09-02) — Tier 2 sherpa-onnx offline diaktifkan; risiko lisensi diterima sadar
+
+**Konteks.** ADR-033 keputusan 3 mengunci Tier 2 (fallback offline saat internet RS
+terputus) sejak Agustus, tapi tidak pernah benar-benar di-deploy: `SHERPA_ONNX_VITS_MODEL`
+dkk. tidak ada di manapun (env, `docker-compose.yml`, `.env.example`), jadi
+`_get_sherpa_tts()` akan langsung gagal kalau Tier 1 jatuh. Isolasi kegagalan tetap
+bekerja (teks + navigasi selamat), tapi janji "tahan mati internet" di ADR-033 baru di
+kertas, bukan di server.
+
+**Riset model.** Dicari model VITS/TTS Indonesia siap-pakai untuk sherpa-onnx:
+- **`vits-piper-id_ID-news_tts-medium`** (rilis resmi sherpa-onnx, berbasis Piper) —
+  SATU-SATUNYA suara Indonesia yang ada di ekosistem itu. Terverifikasi genuinely
+  Indonesia lewat TIGA sinyal independen: config fungsional `.onnx.json`
+  (`espeak.voice: 'id'`, dipakai sungguhan saat inferensi), field `language` di sumber
+  asli (`rhasspy/piper-voices`), dan sintesis audio nyata yang didengarkan langsung.
+  Kecepatan terukur: RTF 0,227 di CPU (4,4x lebih cepat dari real-time) -- aman untuk
+  server tanpa GPU.
+- **`facebook/mms-tts-ind`** (Meta MMS) -- lisensi CC-BY-NC-4.0, EKSPLISIT melarang
+  penggunaan komersial. Ditolak, bukan kandidat.
+- **`jerichosiahaya/vits-tts-id`** (MPL-2.0) dan **`grandhigh/Chatterbox-TTS-Indonesian`**
+  (Apache-2.0) -- ditemukan tapi TIDAK dikejar: yang pertama perlu verifikasi ulang
+  provenance data + konversi ke ONNX (kerja tambahan, hasil belum pasti), yang kedua
+  arsitekturnya kemungkinan besar butuh GPU untuk kecepatan wajar (membalikkan alasan
+  Tier 2 ada sama sekali -- server `vm-amma` tidak punya GPU).
+- **Chatterbox lewat Bifrost (GPU lab) ditolak untuk peran ini secara khusus**: Bifrost
+  adalah gateway eksternal (`hcm-lab.id`), tetap butuh internet untuk dijangkau. Tier 2
+  ada justru untuk skenario internet RS terputus -- solusi yang sama-sama butuh internet
+  tidak bisa mengisi peran itu, terlepas seberapa bagus lisensinya. (Catatan: kombinasi
+  ini tetap relevan untuk masalah LAIN -- edge-tts spesifik rusak padahal internet umum
+  tetap hidup, ADR-033 sudah mencatat risiko itu -- tapi itu tier ketiga yang belum
+  diputuskan, bukan pengganti Tier 2.)
+
+**Keputusan: pakai `vits-piper-id_ID-news_tts-medium-int8`.**
+
+**Risiko lisensi yang diterima SADAR, ditulis eksplisit (bukan disembunyikan):**
+Metadata provenance suara ini di sumber resminya sendiri (`rhasspy/piper-voices`)
+TERCAMPUR dengan suara Malayalam lain -- `MODEL_CARD` dan field dataset-nya menunjuk ke
+korpus Kaggle Malayalam (`indic-tts-malayalam-speech-corpus`), padahal config fungsional
+dan sintesis nyata membuktikan modelnya genuinely Indonesia. Ini BUKAN sekadar bug
+tampilan di satu tempat -- dikonfirmasi identik di dua varian (int8 dan fp32), dan
+sumber aslinya (bukan cuma re-pack sherpa-onnx) punya masalah yang sama. Menurut
+pernyataan maintainer proyek Piper sendiri: proyek itu **tidak memberlakukan lisensi
+apa pun** ke model suara, tanggung jawab verifikasi ada di pengguna.
+
+**Kenapa tetap dipakai meski begitu:** ini Tier 2 -- cadangan yang cuma aktif saat Tier
+1 gagal (jarang, bukan jalur utama), bukan suara yang didengar sehari-hari. Alternatif
+yang genuinely lebih bersih (lisensi jelas + provenance terverifikasi + kompatibel CPU
+tanpa GPU) tidak ditemukan dalam riset yang dilakukan; dua kandidat lain butuh
+riset+kerja tambahan dengan hasil tidak pasti lebih baik, dan satu kandidat berlisensi
+jelas (MMS) justru eksplisit melarang komersial.
+
+**Pemicu tinjau ulang eksplisit:** kalau suatu saat ada tinjauan legal/compliance
+sungguhan untuk deployment RS (bukan cuma internal), model INI yang pertama harus
+diperiksa ulang -- jangan dianggap "sudah beres" secara permanen hanya karena sudah
+dipasang dan jalan.
+
+**Implementasi:**
+- Model diunduh SAAT BUILD image Docker (`Dockerfile`, dari rilis GitHub resmi
+  sherpa-onnx langsung), bukan di-commit sebagai file biner ke git maupun via volume
+  terpisah -- pola yang sama dengan FastEmbed, plus jaminan `test -f` di akhir RUN
+  supaya build gagal cepat kalau unduhan/ekstraksi rusak, bukan gagal senyap saat
+  runtime pertama kali dibutuhkan.
+- `SHERPA_ONNX_VITS_LEXICON` sengaja dikosongkan: model Piper pakai frontend
+  `espeak-ng` (lewat `data_dir`), bukan kamus lexicon terpisah.
+
+**Terverifikasi (bukan asumsi):** dipanggil langsung fungsi produksi
+`synthesize_speech()` sungguhan dengan Tier 1 dipaksa gagal (bukan menguji ulang
+`sherpa_onnx` terpisah dari alur backend) -- jatuh ke Tier 2 dengan benar, `engine_used
+== "sherpa-onnx"`, `words == []` sesuai kontrak Amandemen 033-B. 43 tes lulus, tidak ada
+regresi. Build Docker sungguhan (bukan cuma sintaks) BELUM diverifikasi lokal (Docker
+Desktop tidak aktif saat amandemen ini ditulis) -- verifikasi build+deploy sungguhan
+terjadi saat `docker compose up -d --build api` di `vm-amma`.
+
 ---
 
 ### ADR-034 — Model Penempatan Avatar: *Lead-Follow Guide* di Atas Path MultiSet (2026-08-24)
