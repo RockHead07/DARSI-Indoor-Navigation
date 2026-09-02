@@ -776,6 +776,63 @@ direvisi mengikuti kontrak ini.
 desain ke depan, tapi harus ditandai "diusulkan", bukan ditulis seolah kontrak yang sudah
 disepakati.
 
+#### Amandemen 033-B (2026-09-02) — response `/tts` menambah `words`; suara default pindah ke Thalita
+
+**Konteks.** Lip-sync avatar (uLipSync/MFCC, ADR-037) dilaporkan "kurang natural".
+Penelusuran menemukan sebabnya bukan setelan, melainkan kategori pendekatannya:
+menebak vokal dari spektrum audio. **Terukur di Play mode: 260 dari 437 frame (59,5%)
+menampilkan vokal yang tidak ada sama sekali di ejaan kata yang sedang diucapkan** —
+contoh yang tidak bisa dibantah sebagai efek peluruhan, pada kata PERTAMA "Selamat"
+(didahului hening) uLipSync menampilkan U 0,80 dan O 0,68, padahal kata itu tidak
+punya huruf U maupun O. Kalibrasi ulang profil MFCC ke suara TTS sungguhan sudah
+dicoba lebih dulu dan tidak menyelesaikannya.
+
+**Keputusan.**
+1. **Response `POST /api/assistant/tts` menambah field `words`**: daftar
+   `{text, start, end}` (detik) per kata. Ini MEMPERLUAS kontrak ADR-033 keputusan 3,
+   tidak menggantinya — `audio_url` dan `engine_used` tetap apa adanya, jadi klien
+   lama tidak rusak.
+2. **`words` KOSONG untuk Tier 2 (sherpa-onnx)**, dan itu **kondisi normal, bukan
+   error**. Tier 2 memang tidak menghasilkan timing apa pun. Klien WAJIB tetap
+   berfungsi tanpa `words`.
+3. **Klien memilih driver lip-sync dari data, bukan dari asumsi**: ada `words` →
+   `VisemeTimelineLipSync` (viseme diturunkan dari teks, amplitudo dari audio);
+   tidak ada → `AvatarSpeechLipSync` (MFCC). Keduanya menulis blendshape yang sama
+   sehingga WAJIB eksklusif — AvatarSpeechLipSync menulis di LateUpdate dan akan
+   selalu menang kalau dibiarkan hidup bersamaan.
+4. **uLipSync/MFCC TIDAK dicabut.** Ia sekarang jadi jalur wajib untuk skenario
+   intranet RS terputus (Tier 2), yaitu skenario yang justru jadi alasan ADR-033
+   keputusan 3 ada. Dua pendekatan ini memetakan tepat ke dua tier TTS.
+5. **Suara default pindah `id-ID-GadisNeural` → `pt-BR-ThalitaMultilingualNeural`**,
+   setelah uji dengar berdampingan (5 suara multilingual + 3 suara Supertonic, kalimat
+   identik). Ini KONFIGURASI di `tts.py:DEFAULT_VOICE`, bukan keputusan permanen.
+   `AssistantTTSRequest.voice` sengaja `None` (bukan menyalin nama default ke sana)
+   supaya nama suara default punya satu pemilik — pola yang sama dengan ADR-021.
+
+**Yang ditolak, beserta alasannya:**
+- **Mengganti Tier 1 ke Supertonic 3** (sempat dipertimbangkan karena suaranya dinilai
+  lebih natural). Diperiksa ke sumber resmi: Supertonic **tidak mengeluarkan timing
+  fonem/viseme/alignment sama sekali**, outputnya WAV polos. Menggantinya berarti
+  mendapat LEBIH SEDIKIT dari sekarang. Catatan: klaim "Supertonic mengeluarkan
+  anotasi viseme" yang beredar terbukti SALAH. Supertonic tetap kandidat menarik untuk
+  **Tier 2** (on-device, mendukung Indonesia, ~380 MB ONNX, tanpa GPU) — itu keputusan
+  terpisah yang belum diambil. Lisensi modelnya OpenRAIL-M, perlu ditinjau.
+- **Azure Speech SDK** (punya event viseme resmi): bikin akun Azure apa pun wajib kartu
+  non-prepaid, dikonfirmasi dari dokumentasi resmi Microsoft. Ditolak.
+- **Rhubarb Lip Sync / espeak-ng / forced alignment Wav2Vec2**: masing-masing tetap
+  audio-driven, GPL-3.0, dan terlalu berat untuk server tanpa GPU. Riset lengkapnya
+  ada di `docs/superpowers/specs/2026-09-02-riset-viseme-opensource-prompt.md`.
+
+**Risiko yang diterima secara sadar:** Thalita adalah suara ber-locale `pt-BR`, dan
+Bahasa Indonesia bukan locale aslinya. edge-tts sendiri sudah dicatat ADR-033 sebagai
+API tidak resmi Microsoft yang pernah berubah tanpa peringatan. Mitigasi: suara adalah
+konfigurasi satu baris, dan tes `test_live_edge_tts_synthesis` memverifikasi batas kata
+masih benar-benar keluar dari layanan sungguhan, sehingga kerusakan ketahuan lewat tes
+lebih dulu, bukan lewat lip-sync yang diam-diam rusak di lapangan.
+
+**Yang BELUM diverifikasi saat amandemen ini ditulis:** tampilan visualnya belum dinilai
+langsung oleh pemilik proyek, dan belum diuji di device fisik.
+
 ---
 
 ### ADR-034 — Model Penempatan Avatar: *Lead-Follow Guide* di Atas Path MultiSet (2026-08-24)

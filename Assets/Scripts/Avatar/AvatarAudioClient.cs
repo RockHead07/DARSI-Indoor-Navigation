@@ -32,8 +32,13 @@ public class AvatarAudioClient : MonoBehaviour
     [SerializeField] private bool enableVoiceOutput = true;
 
     [Header("Komponen Target")]
-    [Tooltip("Driver lip-sync avatar. Jika kosong, dicari otomatis.")]
+    [Tooltip("Driver lip-sync berbasis analisis audio (MFCC). Dipakai sebagai CADANGAN " +
+             "saat backend tidak mengirim batas waktu kata, mis. Tier 2 sherpa-onnx offline.")]
     [SerializeField] private AvatarSpeechLipSync lipSyncDriver;
+
+    [Tooltip("Driver lip-sync berbasis timeline teks (Amandemen 033-B). Dipakai UTAMA " +
+             "saat backend mengirim `words`. Kosongkan untuk mencari otomatis.")]
+    [SerializeField] private VisemeTimelineLipSync timelineDriver;
 
     [Tooltip("Pengendali pemandu lead-follow. Jika kosong, dicari otomatis.")]
     [SerializeField] private AIAvatarGuideController guideController;
@@ -105,6 +110,12 @@ public class AvatarAudioClient : MonoBehaviour
         {
             lipSyncDriver = GetComponentInChildren<AvatarSpeechLipSync>(true);
             if (lipSyncDriver == null) lipSyncDriver = GetComponentInParent<AvatarSpeechLipSync>();
+        }
+
+        if (timelineDriver == null)
+        {
+            timelineDriver = GetComponentInChildren<VisemeTimelineLipSync>(true);
+            if (timelineDriver == null) timelineDriver = GetComponentInParent<VisemeTimelineLipSync>();
         }
 
         if (guideController == null)
@@ -229,8 +240,14 @@ public class AvatarAudioClient : MonoBehaviour
                 yield break;
             }
 
+            // Pilih driver lip-sync menurut data yang BENAR-BENAR dikirim backend,
+            // bukan menurut asumsi (Amandemen 033-B). Tier 1 edge-tts mengirim batas
+            // kata; Tier 2 sherpa-onnx offline tidak mengirim apa pun, dan di sana
+            // analisis audio adalah satu-satunya yang masih bisa bekerja.
+            PilihDriver(responsePayload.words);
+
             // Putar audio pada driver lip-sync atau AudioSource
-            if (lipSyncDriver != null)
+            if (lipSyncDriver != null && lipSyncDriver.enabled)
             {
                 lipSyncDriver.PlayAudio(clip);
             }
@@ -275,6 +292,63 @@ public class AvatarAudioClient : MonoBehaviour
     }
 
     /// <summary>
+    /// Menyalakan tepat SATU driver lip-sync sesuai ketersediaan batas waktu kata.
+    ///
+    /// Wajib eksklusif: keduanya menulis ke blendshape VRM yang sama, dan
+    /// AvatarSpeechLipSync menulis di LateUpdate (menang atas Update milik driver
+    /// timeline). Kalau dua-duanya hidup, yang terlihat selalu punya MFCC dan
+    /// timeline-nya tidak berpengaruh apa-apa.
+    /// </summary>
+    private void PilihDriver(TTSKata[] words)
+    {
+        bool adaTiming = words != null && words.Length > 0;
+
+        if (adaTiming && timelineDriver != null)
+        {
+            var kata = new VisemeTimelineLipSync.KataJson[words.Length];
+            for (int i = 0; i < words.Length; i++)
+            {
+                kata[i] = new VisemeTimelineLipSync.KataJson
+                {
+                    text = words[i].text,
+                    start = words[i].start,
+                    end = words[i].end,
+                };
+            }
+
+            if (timelineDriver.BangunDariKata(kata))
+            {
+                timelineDriver.enabled = true;
+                if (lipSyncDriver != null) lipSyncDriver.enabled = false;
+                LipSyncAktif = "timeline";
+                return;
+            }
+        }
+
+        // Tidak ada timing yang bisa dipakai: kembali ke analisis audio.
+        if (timelineDriver != null)
+        {
+            timelineDriver.HentikanTimeline();
+            timelineDriver.enabled = false;
+        }
+        if (lipSyncDriver != null) lipSyncDriver.enabled = true;
+        LipSyncAktif = adaTiming ? "mfcc (timeline gagal dibangun)" : "mfcc (tanpa timing)";
+    }
+
+    /// <summary>Driver yang dipakai pada ucapan terakhir. Untuk diagnostik.</summary>
+    public string LipSyncAktif { get; private set; } = "-";
+
+    /// <summary>
+    /// Pemicu manual untuk uji lip-sync di Play Mode: klik kanan komponen ini di Inspector
+    /// (atau ikon gerigi) lalu pilih menu ini. Tidak dipanggil di alur produksi mana pun.
+    /// </summary>
+    [ContextMenu("Debug/Uji Bicara (kalimat sampel)")]
+    private void DebugUjiBicara()
+    {
+        StartCoroutine(SpeakText("Selamat datang di Rumah Sakit Islam Ahmad Yani. Silakan ikuti saya menuju ruangan yang Anda tuju."));
+    }
+
+    /// <summary>
     /// Menghentikan pemutaran audio ucapan seketika.
     /// </summary>
     public void StopSpeaking()
@@ -296,10 +370,22 @@ public class AvatarAudioClient : MonoBehaviour
         public string voice;
     }
 
+    /// <summary>Satu kata beserta batas waktunya (detik dari awal klip).</summary>
+    [Serializable]
+    public class TTSKata
+    {
+        public string text;
+        public float start;
+        public float end;
+    }
+
     [Serializable]
     public class TTSResponsePayload
     {
         public string audio_url;
         public string engine_used;
+        // KOSONG saat engine_used == "sherpa-onnx" (Tier 2 offline tidak menghasilkan
+        // timing). Itu kondisi normal yang WAJIB ditangani, bukan error.
+        public TTSKata[] words;
     }
 }

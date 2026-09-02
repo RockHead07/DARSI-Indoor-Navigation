@@ -1,0 +1,106 @@
+{
+  "text": "Selamat datang di Rumah Sakit Islam Ahmad Yani. Silakan ikuti saya menuju ruang Poli Anak yang ada di lantai dua.",
+  "voice": "id-ID-GadisNeural",
+  "words": [
+    {
+      "text": "Selamat",
+      "start": 0.1,
+      "end": 0.6375
+    },
+    {
+      "text": "datang",
+      "start": 0.6375,
+      "end": 1.1
+    },
+    {
+      "text": "di",
+      "start": 1.1,
+      "end": 1.225
+    },
+    {
+      "text": "Rumah",
+      "start": 1.225,
+      "end": 1.5
+    },
+    {
+      "text": "Sakit",
+      "start": 1.5,
+      "end": 1.85
+    },
+    {
+      "text": "Islam",
+      "start": 1.85,
+      "end": 2.3625
+    },
+    {
+      "text": "Ahmad",
+      "start": 2.3625,
+      "end": 2.8625
+    },
+    {
+      "text": "Yani",
+      "start": 2.8625,
+      "end": 3.4
+    },
+    {
+      "text": "Silakan",
+      "start": 4.2375,
+      "end": 4.8
+    },
+    {
+      "text": "ikuti",
+      "start": 4.8,
+      "end": 5.3
+    },
+    {
+      "text": "saya",
+      "start": 5.3,
+      "end": 5.7
+    },
+    {
+      "text": "menuju",
+      "start": 5.7,
+      "end": 6.15
+    },
+    {
+      "text": "ruang",
+      "start": 6.15,
+      "end": 6.4625
+    },
+    {
+      "text": "Poli",
+      "start": 6.4625,
+      "end": 6.725
+    },
+    {
+      "text": "Anak",
+      "start": 6.725,
+      "end": 7.225
+    },
+    {
+      "text": "yang",
+      "start": 7.225,
+      "end": 7.4
+    },
+    {
+      "text": "ada",
+      "start": 7.4,
+      "end": 7.9
+    },
+    {
+      "text": "di",
+      "start": 7.9,
+      "end": 8.075
+    },
+    {
+      "text": "lantai",
+      "start": 8.075,
+      "end": 8.575
+    },
+    {
+      "text": "dua",
+      "start": 8.575,
+      "end": 9.1
+    }
+  ]
+}
