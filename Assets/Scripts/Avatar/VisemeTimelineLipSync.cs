@@ -123,12 +123,13 @@ public class VisemeTimelineLipSync : MonoBehaviour
         if (blendShapeProxy == null) blendShapeProxy = GetComponentInParent<VRMBlendShapeProxy>();
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = GetComponentInChildren<AudioSource>(true);
-
-        BangunTimeline();
     }
 
     /// <summary>Bangun timeline dari file JSON uji (dipakai untuk pengujian mandiri
-    /// di Editor, bukan jalur produksi).</summary>
+    /// di Editor via ContextMenu/panggilan manual -- BUKAN jalur produksi, dan
+    /// sengaja TIDAK dipanggil dari Awake: timelineJson kosong di produksi, jadi
+    /// memanggilnya otomatis cuma menghasilkan log error palsu tiap scene dimuat.</summary>
+    [ContextMenu("Debug/Bangun Timeline dari Fixture")]
     public void BangunTimeline()
     {
         if (timelineJson == null)

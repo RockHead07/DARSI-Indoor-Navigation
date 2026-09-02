@@ -149,7 +149,7 @@ public class AvatarAudioClient : MonoBehaviour
     private class KlipSiap
     {
         public AudioClip klip;
-        public TTSKata[] words;
+        public VisemeTimelineLipSync.KataJson[] words;
         public string engineUsed;
         public string audioUrl;
     }
@@ -281,7 +281,6 @@ public class AvatarAudioClient : MonoBehaviour
             yield break;
         }
 
-        ResolveComponents();
         IsFetchingAudio = true;
         KlipSiap hasil = null;
         yield return FetchOne(text, r => hasil = r);
@@ -342,7 +341,6 @@ public class AvatarAudioClient : MonoBehaviour
             yield break;
         }
 
-        ResolveComponents();
         var siap = new KlipSiap[kalimat.Count];
 
         IsFetchingAudio = true;
@@ -404,24 +402,13 @@ public class AvatarAudioClient : MonoBehaviour
     /// timeline). Kalau dua-duanya hidup, yang terlihat selalu punya MFCC dan
     /// timeline-nya tidak berpengaruh apa-apa.
     /// </summary>
-    private void PilihDriver(TTSKata[] words)
+    private void PilihDriver(VisemeTimelineLipSync.KataJson[] words)
     {
         bool adaTiming = words != null && words.Length > 0;
 
         if (adaTiming && timelineDriver != null)
         {
-            var kata = new VisemeTimelineLipSync.KataJson[words.Length];
-            for (int i = 0; i < words.Length; i++)
-            {
-                kata[i] = new VisemeTimelineLipSync.KataJson
-                {
-                    text = words[i].text,
-                    start = words[i].start,
-                    end = words[i].end,
-                };
-            }
-
-            if (timelineDriver.BangunDariKata(kata))
+            if (timelineDriver.BangunDariKata(words))
             {
                 timelineDriver.enabled = true;
                 if (lipSyncDriver != null) lipSyncDriver.enabled = false;
@@ -475,15 +462,6 @@ public class AvatarAudioClient : MonoBehaviour
         public string voice;
     }
 
-    /// <summary>Satu kata beserta batas waktunya (detik dari awal klip).</summary>
-    [Serializable]
-    public class TTSKata
-    {
-        public string text;
-        public float start;
-        public float end;
-    }
-
     [Serializable]
     public class TTSResponsePayload
     {
@@ -491,6 +469,8 @@ public class AvatarAudioClient : MonoBehaviour
         public string engine_used;
         // KOSONG saat engine_used == "sherpa-onnx" (Tier 2 offline tidak menghasilkan
         // timing). Itu kondisi normal yang WAJIB ditangani, bukan error.
-        public TTSKata[] words;
+        // Tipe sama persis dengan VisemeTimelineLipSync.KataJson -- satu bentuk kata
+        // {text,start,end}, bukan didefinisikan dua kali lalu disalin manual.
+        public VisemeTimelineLipSync.KataJson[] words;
     }
 }
