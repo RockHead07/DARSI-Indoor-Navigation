@@ -962,10 +962,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 670337274}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 180}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 214, y: -95}
+  m_SizeDelta: {x: 348, y: 180}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &193346128
 MonoBehaviour:
@@ -2765,7 +2765,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: 0, y: 575}
-  m_SizeDelta: {x: 0, y: 190}
+  m_SizeDelta: {x: 428, y: 190}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &670337275
 MonoBehaviour:
@@ -4043,6 +4043,7 @@ GameObject:
   - component: {fileID: 807412544}
   - component: {fileID: 807412543}
   - component: {fileID: 807412542}
+  - component: {fileID: 807412546}
   m_Layer: 0
   m_Name: Avatar_Guide
   m_TagString: Untagged
@@ -4163,9 +4164,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AvatarAudioClient
   baseUrl: https://api-darsi.rockhead07.tech
   timeoutSeconds: 15
-  voiceName: id-ID-GadisNeural
+  voiceName: 
   enableVoiceOutput: 1
   lipSyncDriver: {fileID: 807412543}
+  timelineDriver: {fileID: 807412546}
   guideController: {fileID: 807412537}
   audioSource: {fileID: 807412545}
 --- !u!114 &807412543
@@ -4302,6 +4304,30 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &807412546
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 807412536}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4cdd98e19726174293a03e54ab1c874, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VisemeTimelineLipSync
+  timelineJson: {fileID: 0}
+  klip: {fileID: 0}
+  blendShapeProxy: {fileID: 0}
+  audioSource: {fileID: 0}
+  bobotVokal: 2
+  bobotKonsonan: 1
+  penguatanAmplitudo: 8
+  bukaanMinimum: 0.15
+  bobotKoartikulasi: 0.45
+  rasioPerataan: 0.35
+  rasioPerataanTutup: 0.55
+  batasPerataan: {x: 0.012, y: 0.06}
 --- !u!1 &815381363
 GameObject:
   m_ObjectHideFlags: 0

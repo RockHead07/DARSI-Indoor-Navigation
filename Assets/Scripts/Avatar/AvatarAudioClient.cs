@@ -25,8 +25,12 @@ public class AvatarAudioClient : MonoBehaviour
     [Tooltip("Timeout permintaan sintesis TTS (detik).")]
     [SerializeField] private int timeoutSeconds = 15;
 
-    [Tooltip("Nama model suara yang digunakan (default: id-ID-GadisNeural).")]
-    [SerializeField] private string voiceName = "id-ID-GadisNeural";
+    [Tooltip("KOSONGKAN kecuali memang mau memaksa suara tertentu. Kosong berarti " +
+             "backend yang menentukan (tts.py DEFAULT_VOICE). Nama suara sengaja TIDAK " +
+             "diduplikasi di sini: pernah kejadian backend sudah pindah ke Thalita tapi " +
+             "Unity masih mengirim id-ID-GadisNeural yang ter-serialize di scene, " +
+             "sehingga suara produksi diam-diam tidak berubah (pola yang dilarang ADR-021).")]
+    [SerializeField] private string voiceName = "";
 
     [Tooltip("Apakah keluaran suara TTS diaktifkan.")]
     [SerializeField] private bool enableVoiceOutput = true;
