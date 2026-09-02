@@ -9,7 +9,40 @@
 
 ---
 
-## STATUS TERKINI (2026-07-20) — baca ini dulu
+## STATUS TERKINI (2026-09-02, hasil audit terhadap kode) — baca ini dulu
+
+> **Dokumen ini sempat basi 6 minggu.** Audit 2026-09-02 membandingkan tiap klaim status
+> dengan kode/dokumen sungguhan dan menemukan **7 task yang sebenarnya sudah selesai tapi
+> masih tertulis TODO** (T0.1, T0.2, T0.6, T0.7, T5.1, T5.2) plus 2 yang statusnya
+> berubah jadi PARTIAL (T2.1, T2.3). Tiap koreksi disertai baris bukti di task-nya.
+> Blok "rencana pekan depan" di bawah ditulis 2026-07-20 dan **belum diperbarui**.
+
+**Di mana kita (2026-09-02):**
+
+- **Fase 0** — tinggal T0.8 (`WIP`, wiring identitas MyRSIy) + 3 task di repo WebView
+  (T0.3, T0.4, T0.5) yang tidak bisa diaudit dari repo ini. Sisanya beres.
+- **Fase 1, 3, 4** — selesai.
+- **Fase 2 (Cari Teman)** — **fitur inti yang paling tertinggal.** Presence sudah jalan,
+  tapi graph pertemanannya (`profiles`, `connections`) belum ada, sehingga
+  `GET /api/friends`, UI friendlist, dan render posisi teman di Unity semuanya belum
+  bisa dibangun. Skrip `Multiplayer/*` yang ada sekarang masih Photon-room, BUKAN
+  friendlist backend.
+- **Fase 5** — dua-duanya sudah jadi secara mekanisme; T5.2 masih perlu penyetelan angka
+  dari scan RSI asli.
+
+**Jalur Avatar/Asisten — TIDAK PERNAH TERCATAT DI ROADMAP INI.** Enam minggu kerja
+(avatar lead-follow, RAG, TTS, lip-sync) berjalan di luar dokumen ini dan dilacak di
+`AI-AVATAR-ASSISTANT.md` + `DECISIONS.md` (ADR-026 s/d ADR-038). Perlu diputuskan:
+gabungkan ke roadmap ini, atau tulis eksplisit bahwa roadmap ini khusus jalur
+navigasi/integrasi. Penomoran "Fase 2" yang berbeda di dua dokumen sudah terbukti
+membingungkan.
+
+**Gap paling menentukan sekarang:** hampir semuanya masih "terbukti di Editor, belum di
+perangkat". Tes lapangan RSI belum pernah dilakukan.
+
+---
+
+## Rencana lama (2026-07-20) — belum diperbarui setelah audit
 
 **Di mana kita:** T5.3 (navigasi lintas-lantai) selesai & terverifikasi sejauh yang bisa di Editor.
 Prinsip yang menata semuanya: **hampir seluruh logika navigasi berstatus "terbukti di Editor,
@@ -45,12 +78,14 @@ me-restart jendela 60 dtk belum terbukti. Lihat juga Backlog di bawah (PERF-1, d
 Nggak boleh mulai coding fitur sebelum fase ini clear — kontrak yang masih bertabrakan bikin Unity & WebView di-code dari spec yang beda.
 
 ### T0.1 — Hapus blok pairing lama yang kontradiktif di INTEGRATION.md
-- `TODO` · Docs(Unity+WebView) · Depends: —
+- `DONE` (diaudit 2026-09-02) · Docs(Unity+WebView) · Depends: —
 - **Done when:** section "Message: Cari Teman (pairing-code)" lama (Unity A generate / Unity B input) dihapus/ditulis ulang; `INTEGRATION.md` konsisten bahwa Unity TIDAK panggil `/api/pairing/*` langsung dan TIDAK punya UI kode.
+- **Bukti audit:** `grep -i pairing docs/INTEGRATION.md` = nol hasil.
 
 ### T0.2 — Kunci payload `arSessionClosed`
-- `TODO` · Docs(Unity+WebView) · Depends: —
+- `DONE` (diaudit 2026-09-02) · Docs(Unity+WebView) · Depends: —
 - **Done when:** `INTEGRATION.md` & `API_CONTRACT.md` sepakat field `{ arrived, poiId }` dan tertulis siapa yang mengisi (Flutter merge dari `navigationArrived`, atau Unity kirim payload non-empty). Tidak ada lagi `{}` vs `{arrived,poiId}` mismatch.
+- **Bukti audit:** `INTEGRATION.md:75` mengunci payload `{ arrived, poiId, poiName }` beserta siapa pengisinya; baris 68 menandai rantainya "✅ tersambung end-to-end". Sisi `API_CONTRACT.md` (repo WebView) belum bisa diaudit dari sini.
 
 ### T0.3 — Samakan bridge API ke `webview_flutter`
 - `TODO` · Docs(WebView) · Depends: —
@@ -65,11 +100,13 @@ Nggak boleh mulai coding fitur sebelum fase ini clear — kontrak yang masih ber
 - **Done when:** folder `app/peta-lantai/` dihapus (patuh ADR-006), ATAU ADR baru ditulis untuk mencabut ADR-006. Tidak boleh ada screen Peta 2D nyangkut tanpa keputusan.
 
 ### T0.6 — Daftarkan layer Backend di ARCHITECTURE.md
-- `TODO` · Docs(all) · Depends: —
+- `DONE` (diaudit 2026-09-02) · Docs(all) · Depends: —
 - **Done when:** tabel arsitektur mencantumkan Backend (Supabase + FastAPI) sebagai komponen ke-4 + peran + kepemilikan (Bagus). "3 repo" → "4 komponen".
+- **Bukti audit:** `ARCHITECTURE.md:55` mencantumkan baris `DARSI-Indoor-Navigation-Backend` (FastAPI + Postgres, peran & pemilik Bagus), plus section khusus di baris 57.
 
 ### T0.7 — Tulis ADR-013 (friendlist persisten berbasis friend-request)
-- `TODO` · Docs(all) · Depends: —
+- `DONE` (diaudit 2026-09-02) · Docs(all) · Depends: —
+- **Bukti audit:** ADR-013 ada di `DECISIONS.md:104` ("Cari Teman: friendlist persisten via friend-request, menggantikan pairing-code ephemeral").
 - **Done when:** ADR-013 ditulis di `DECISIONS.md` + `FLOWS.md §5` di-update. Isi: friendlist persisten via **friend-request add-by-exact-identifier (bukan direktori terbuka) + mutual accept**; presence **status-only** (online/AR-active/offline, tanpa lokasi); posisi live tetap **AR-only**; user bisa **opt-out (tampil offline)**; rate-limit + block. ADR-013 me-refine ADR-011 (bukan mencabut — posisi tetap AR-only).
 
 ### T0.8 — identitas user stabil dari MyRSIy  *(diturunkan dari blocker keras → wiring terakhir, 2026-07-06)*
@@ -143,7 +180,8 @@ Model final (ADR-013): friend-request persisten. Data-entry & manajemen teman di
 **Update 2026-07-06 (ADR-017):** tidak lagi "BLOCKED keras". Identity seam (`app/lib/user.ts` + `window.__DARSI_USER__`) sudah ada → T2.1–T2.7 bisa dibangun & dites di atas `userId` suntikan (dev/copycat). `Depends: T0.8` di bawah sekarang berarti "butuh final wiring MyRSIy untuk PRODUKSI", bukan "tak bisa mulai". UI Cari Teman (tab, add-by-handle, request, request-to-meet, guest-gate) sudah jadi di atas mock (`lib/friends.ts`).
 
 ### T2.1 — Skema Supabase (identity + friend graph)
-- `TODO` · Backend · Depends: T0.8
+- `PARTIAL` (diaudit 2026-09-02) · Backend · Depends: T0.8
+- **Bukti audit:** `schema.sql` cuma punya `pois`, `di…`, dan `presence`. Tabel `profiles` maupun `connections` **belum ada** — jadi graph pertemanannya belum eksis. Yang sudah jadi hanya bagian presence-nya.
 - **Done when:** tabel `profiles` (map MyRSIy user ID → handle), `connections` (requester, addressee, status `pending|accepted`, timestamps) + RLS dibuat.
 
 ### T2.2 — Endpoint friend-request (FastAPI)
@@ -151,7 +189,8 @@ Model final (ADR-013): friend-request persisten. Data-entry & manajemen teman di
 - **Done when:** `POST /api/friends/request`, `POST /api/friends/respond` (accept/reject), `GET /api/friends`, `DELETE /api/friends/{id}` jalan; rate-limit + block; **tidak ada** endpoint search direktori terbuka.
 
 ### T2.3 — Presence (status-only, tanpa lokasi)
-- `TODO` · Backend · Depends: T2.1
+- `PARTIAL` (diaudit 2026-09-02) · Backend · Depends: T2.1
+- **Bukti audit:** tabel `presence` ada (`schema.sql:77`) dan endpoint `GET/PUT /api/presence/{user_id}` sudah jalan (`main.py:235,242`). Yang BELUM: `GET /api/friends` (butuh tabel `connections` dari T2.1), jadi presence per-teman belum bisa disajikan.
 - **Done when:** `GET /api/friends` mengembalikan `online | ar-active | offline` per teman; menghormati opt-out; TIDAK pernah kirim gedung/lantai/posisi.
 
 ### T2.4 — WebView: UI friendlist + add-by-identifier + pending
@@ -266,11 +305,13 @@ Stack: **FastAPI + Supabase (Postgres)**. Prinsip **portability** (biar migrasi 
 ## Fase 5 — Polish AR UX  *(aditif, tidak nge-block fase lain)*
 
 ### T5.1 — Tombol back di dalam AR (kanan-atas)
-- `TODO` · Unity · Depends: Fase 1
+- `DONE` (diaudit 2026-09-02) · Unity · Depends: Fase 1
+- **Bukti audit:** `ExitArSession` ter-wire sebagai persistent listener di KEDUA scene AR (`TestingHCM.unity:3519` dan `DARSi-Indoor Navigation.unity:3066`), dan method-nya ada di `UaaLEntryPoint.cs:272`.
 - Sekarang scene AR tidak punya affordance keluar yang terlihat — user cuma andalkan tombol back Android. Tambah tombol back uGUI di kanan-atas, wired ke `UaaLEntryPoint.CloseArSession` (jalur exit yang sudah ada → `arSessionClosed`). Sengaja **bukan** topbar Flutter asli: AR = Activity full-screen, overlay Flutter di atas AR butuh `flutter_unity_widget` (platform-view) yang rewel dgn ARCore — uGUI yang di-render Unity sendiri jauh lebih stabil (lihat pembahasan host/guest UaaL).
 
 ### T5.2 — Out-of-bounds coverage notice (ADR-019)
-- `TODO` · Unity · Depends: Fase 1; tuning depends: scan RSI (Sprint 2)
+- `DONE` (mekanisme; tuning masih menunggu scan RSI) (diaudit 2026-09-02) · Unity · Depends: Fase 1
+- **Bukti audit:** `Assets/Scripts/Navigation/NavBoundaryNotifier.cs` ada dan menyebut ADR-019 eksplisit; `UaaLEntryPoint.cs:54` mengekspos gating `IsLocalized` yang dibutuhkannya. Angka threshold tetap perlu disetel dari data scan RSI asli.
 - Komponen `NavBoundaryNotifier`: deteksi kamera keluar tepi NavMesh (auto-derive, hysteresis) → billboard AR menghadap user "Di luar jangkauan navigasi" + panah balik ke titik NavMesh terdekat. Framing = **coverage**, bukan larangan fisik (lorongnya nyata & bisa dijalani — lihat ADR-019). MVP dibangun sekarang (murni editor, tak butuh device); angka threshold & caveat NavMesh multi-lantai (ADR-018) di-tune saat scan RSI asli masuk. Butuh expose `UaaLEntryPoint.IsLocalized`.
 
 ### T5.3 — Navigasi lintas-lantai: rute tersegmentasi + handoff lift (ADR-020)
