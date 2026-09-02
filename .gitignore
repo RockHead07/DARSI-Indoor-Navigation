@@ -12,9 +12,11 @@
 #
 .utmp/
 
-# Groq API key — dibaca dari file lokal ini di Editor (OllamaConnector.cs),
+# Local API keys & tokens — dibaca dari file lokal ini di Editor,
 # JANGAN pernah diisi langsung ke field Inspector (ikut ter-serialize ke scene).
+*.local.txt
 groq-api-key.local.txt
+POI_SYNC_TOKEN.local.txt
 
 /[Ll]ibrary/
 /[Tt]emp/

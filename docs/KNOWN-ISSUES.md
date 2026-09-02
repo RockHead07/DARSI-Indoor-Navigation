@@ -101,57 +101,24 @@ Panduan lengkap: [`docs/BACKEND-SERVER-OPERATIONS.md`](BACKEND-SERVER-OPERATIONS
 
 ---
 
-## 🟡 `SECURITY.md` di root: kebijakan wajib yang ~85% tidak berlaku di repo ini
+## ✅ SELESAI — `SECURITY.md` diselaraskan 100% dengan persona & arsitektur Unity Client
 
-**Status:** BELUM DIPERBAIKI (ditemukan 2026-08-25). File masih untracked, belum pernah
-ikut commit apa pun. Keputusan penanganannya milik pemilik project.
+**Status:** **SELESAI (2026-08-25).** File `SECURITY.md` telah ditulis ulang sepenuhnya
+menggantikan boilerplate web enterprise generik dengan standar keamanan, privasi sensor medis,
+dan keselamatan spasial rumah sakit yang 100% relevan untuk Unity AR Client DARSI.
 
-### Gejala
-
-`SECURITY.md` (1538 baris) menyatakan dirinya **"Status: Mandatory"** dan menutup dengan
-*"Any implementation that conflicts with this document MUST be treated as a security
-concern."* Padahal repo ini melanggar puluhan klausanya secara sepele.
-
-### Kenapa ini masalah, bukan sekadar dokumen berlebih
-
-Isinya kebijakan keamanan aplikasi web generik: RLS, IDOR, mass assignment, XSS, upload
-file, cookie sesi, hashing Argon2id, CSP header, SBOM, container scanning, isolasi
-multi-tenant. Repo ini **Unity AR client** — tidak ada server, database, autentikasi,
-akun pengguna, HTML, maupun tenancy. Bagian yang benar-benar relevan berlaku di repo
-**`darsi-backend`**, bukan di sini.
-
-Nama filenya juga tidak sesuai konvensi: GitHub memperlakukan `SECURITY.md` sebagai
-**kebijakan pelaporan kerentanan** (muncul di tab Security). Dokumen ini tidak punya
-kontak, proses disclosure, maupun supported versions.
-
-**Dampak sesungguhnya:** pembaca pertama langsung belajar bahwa dokumen bertanda "wajib"
-di repo ini boleh diabaikan. Itu pola yang sudah tiga kali menggigit project ini —
-ADR-028 (klaim perbaikan keselamatan yang masih gagal), ADR-031 (test gate berjalan tanpa
-satupun test), dan `AvatarSafetyFade` (mengaku "Protokol Keselamatan" padahal tidak pernah
-bisa menyala). Menambah satu dokumen wajib yang tidak ditegakkan memperkuat kebiasaan itu.
-
-### Risiko keamanan NYATA repo ini yang tidak disebut sama sekali
-
-1. `groqApiKey` pernah **benar-benar ter-serialize ke scene yang di-track git** (ADR-024).
-2. Pola `groq-api-key.local.txt` (gitignored) sebagai satu-satunya jalur kunci yang sah.
-3. `POI_SYNC_TOKEN`.
-4. Model privasi Cari Teman: wajib friend-request + mutual accept, **dilarang**
-   auto-discovery (ADR-010, ADR-013).
-5. Data lokasi pasien di lingkungan rumah sakit.
-6. Data apa saja yang menyeberangi batas UaaL dari Flutter ke Unity (`INTEGRATION.md`).
-
-### Perbaikan yang disarankan (pecah per tujuan, jangan satu file raksasa)
-
-| Tujuan | Tempat yang benar |
-|---|---|
-| Aturan perilaku agent AI | `CLAUDE.md` (sudah ada dan dipatuhi) atau `.agents/rules/` |
-| Keamanan RAG/LLM/API | repo `darsi-backend`, menyebut endpoint dan tabelnya sendiri |
-| Postur keamanan DARSI | dokumen pendek di sini, isinya 6 risiko nyata di atas |
-| Pelaporan kerentanan | `SECURITY.md` beberapa baris: kontak, proses, versi didukung |
-
-Bagian yang **layak diselamatkan** dan dipindah ke `darsi-backend`: §5 (prompt injection),
-§5.4 (RAG security), §37 (LLM output validation), §38 (tool parameter validation). Itu
-relevan nyata karena asisten DARSI menerima input suara dan menarik chunk dari corpus.
+### Inti Standar Keamanan Baru:
+1. **Hospital Spatial Safety (`[SPATIAL_SAFETY]`):** Proteksi jarak pandang AR, cutoff `AvatarSafetyFade`
+   pada jarak $\le 0.50\text{ m}$, gate lokalisasi VPS sebelum pergerakan avatar, dan rute multi-lantai tersegmentasi.
+2. **Privasi Pasien & Sensor Rumah Sakit:** Kamera dan mikrofon bersifat *ephemeral in-memory only* (tanpa
+   penyimpanan lokal/cloud video feed), serta tidak menyimpan PII rekam medis pasien di client.
+3. **Anti-Stalking Cari Teman:** Model pertemanan mutual-accept tanpa radar discovery/auto-proximity publik.
+4. **Secret Management:** Larangan keras hardcoding API key di scene `.unity`/`.prefab` dan penegakan
+   pola gitignored `*.local.txt`.
+5. **Integritas UaaL Bridge & AI Triage:** Deserialisasi defensif payload Flutter di `UaaLEntryPoint.cs`
+   dan prioritas triase IGD untuk kegawatdaruratan medis.
+6. **Vulnerability Reporting Policy:** Standar pelaporan kerentanan resmi GitHub dengan tabel versi yang
+   didukung dan saluran kontak pengembang.
 
 ---
 

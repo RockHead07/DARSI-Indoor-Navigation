@@ -37,7 +37,8 @@ public class VoiceUIController : MonoBehaviour
     [SerializeField] private Color errorColor = new Color(0.9f, 0.3f, 0.3f, 1f);
 
     [Header("Transcript Defaults")]
-    [SerializeField] private float transcriptAutoHideSecondsDefault = 4f;
+    [SerializeField] private float transcriptAutoHideSecondsDefault = 5f;
+    [SerializeField] private bool autoHidePanelAfterTranscript = true;
 
     private Image[] waveformBars;
     private VoiceState currentState = VoiceState.Idle;
@@ -119,7 +120,8 @@ public class VoiceUIController : MonoBehaviour
             statusText.text = message ?? "Error";
         if (errorResetCoroutine != null)
             StopCoroutine(errorResetCoroutine);
-        errorResetCoroutine = StartCoroutine(ResetAfterDelay(2.5f));
+        if (gameObject.activeInHierarchy)
+            errorResetCoroutine = StartCoroutine(ResetAfterDelay(2.5f));
     }
 
     public void SetTranscript(string text)
@@ -127,7 +129,7 @@ public class VoiceUIController : MonoBehaviour
         if (transcriptText == null) return;
         transcriptText.text = text ?? "";
         ShowTranscript(true);
-        if (_transcriptAutoHide > 0f)
+        if (_transcriptAutoHide > 0f && gameObject.activeInHierarchy)
         {
             if (transcriptHideCoroutine != null)
                 StopCoroutine(transcriptHideCoroutine);
@@ -143,6 +145,16 @@ public class VoiceUIController : MonoBehaviour
 
     public void HidePanel()
     {
+        if (transcriptHideCoroutine != null)
+        {
+            StopCoroutine(transcriptHideCoroutine);
+            transcriptHideCoroutine = null;
+        }
+        if (errorResetCoroutine != null)
+        {
+            StopCoroutine(errorResetCoroutine);
+            errorResetCoroutine = null;
+        }
         if (voicePanel != null)
             voicePanel.SetActive(false);
     }
@@ -263,17 +275,24 @@ public class VoiceUIController : MonoBehaviour
     {
         yield return new WaitForSeconds(delay);
         CanvasGroup cg = GetTranscriptCanvasGroup();
-        if (cg == null) yield break;
-        float elapsed = 0f;
-        float fadeDuration = 0.4f;
-        while (elapsed < fadeDuration)
+        if (cg != null)
         {
-            elapsed += Time.deltaTime;
-            cg.alpha = Mathf.Lerp(1f, 0f, elapsed / fadeDuration);
-            yield return null;
+            float elapsed = 0f;
+            float fadeDuration = 0.4f;
+            while (elapsed < fadeDuration)
+            {
+                elapsed += Time.deltaTime;
+                cg.alpha = Mathf.Lerp(1f, 0f, elapsed / fadeDuration);
+                yield return null;
+            }
+            cg.alpha = 0f;
         }
-        cg.alpha = 0f;
         transcriptHideCoroutine = null;
+
+        if (autoHidePanelAfterTranscript && currentState != VoiceState.Listening && currentState != VoiceState.Processing)
+        {
+            HidePanel();
+        }
     }
 
     // ── Mic Pulse ──
