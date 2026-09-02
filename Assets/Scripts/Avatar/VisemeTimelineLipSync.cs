@@ -69,13 +69,23 @@ public class VisemeTimelineLipSync : MonoBehaviour
              "turun-naik dalam slot ~60 ms.")]
     [Range(0f, 1f)] [SerializeField] private float bobotKoartikulasi = 0.45f;
 
-    [Header("Perataan")]
-    [Tooltip("Waktu perataan saat mulut MEMBUKA.")]
-    [Range(0.01f, 0.2f)] [SerializeField] private float smoothness = 0.035f;
+    [Header("Perataan (mengikuti kecepatan bicara, bukan konstanta)")]
+    [Tooltip("Waktu perataan MEMBUKA sebagai pecahan dari panjang slot yang sedang " +
+             "berjalan. Sengaja relatif, bukan angka tetap: suara yang berbeda bicara " +
+             "dengan kecepatan berbeda (terukur: Thalita 21% lebih cepat dari " +
+             "GadisNeural untuk kalimat yang sama), dan konstanta tetap membuat mulut " +
+             "tidak sempat mencapai bentuk vokalnya pada suara yang cepat -- puncak I " +
+             "sempat jatuh 0,877 ke 0,653 gara-gara ini. Nilai relatif membuat driver " +
+             "menyesuaikan sendiri tanpa disetel ulang tiap ganti suara.")]
+    [Range(0.1f, 0.8f)] [SerializeField] private float rasioPerataan = 0.35f;
 
-    [Tooltip("Waktu perataan saat mulut MENUTUP. Sengaja lebih cepat dari membuka: " +
-             "penutupan bibir yang lambat terlihat seperti mulut menganga tertinggal.")]
-    [Range(0.01f, 0.2f)] [SerializeField] private float smoothnessTutup = 0.02f;
+    [Tooltip("Menutup diredam lebih cepat daripada membuka: mulut yang lambat menutup " +
+             "terlihat menganga tertinggal di belakang suara.")]
+    [Range(0.2f, 1f)] [SerializeField] private float rasioPerataanTutup = 0.55f;
+
+    [Tooltip("Batas bawah dan atas waktu perataan (detik), pengaman untuk slot yang " +
+             "ekstrem pendek/panjang.")]
+    [SerializeField] private Vector2 batasPerataan = new Vector2(0.012f, 0.06f);
 
     // Viseme: 0=A 1=I 2=U 3=E 4=O, -1 = konsonan
     private struct Slot
@@ -231,6 +241,7 @@ public class VisemeTimelineLipSync : MonoBehaviour
 
             var slot = _slot[_indeksSlot];
             bool didalamSlot = t >= slot.mulai && t < slot.akhir;
+            _panjangSlotKini = Mathf.Max(slot.akhir - slot.mulai, 0.001f);
 
             // Amplitudo diambil dari audio yang benar-benar terdengar. Inilah bagian
             // yang tidak bisa diketahui dari teks: keras-pelannya ucapan.
@@ -286,9 +297,14 @@ public class VisemeTimelineLipSync : MonoBehaviour
         blendShapeProxy.ImmediatelySetValue(KeyO, _o);
     }
 
+    /// <summary>Panjang slot yang sedang berjalan, dipakai menurunkan waktu perataan.
+    /// Diperbarui tiap frame di Update.</summary>
+    private float _panjangSlotKini = 0.08f;
+
     private float Redam(float kini, float target, ref float kecepatan, float dt)
     {
-        float waktu = target < kini ? smoothnessTutup : smoothness;
+        float rasio = target < kini ? rasioPerataanTutup : rasioPerataan;
+        float waktu = Mathf.Clamp(_panjangSlotKini * rasio, batasPerataan.x, batasPerataan.y);
         return Mathf.SmoothDamp(kini, target, ref kecepatan, waktu, Mathf.Infinity, dt);
     }
 

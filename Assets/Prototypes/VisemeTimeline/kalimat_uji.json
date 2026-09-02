@@ -1,106 +1,106 @@
 {
   "text": "Selamat datang di Rumah Sakit Islam Ahmad Yani. Silakan ikuti saya menuju ruang Poli Anak yang ada di lantai dua.",
-  "voice": "id-ID-GadisNeural",
+  "voice": "pt-BR-ThalitaMultilingualNeural",
   "words": [
     {
       "text": "Selamat",
-      "start": 0.1,
-      "end": 0.6375
+      "start": 0.0625,
+      "end": 0.5125
     },
     {
       "text": "datang",
-      "start": 0.6375,
-      "end": 1.1
+      "start": 0.5125,
+      "end": 0.9875
     },
     {
       "text": "di",
-      "start": 1.1,
-      "end": 1.225
+      "start": 0.9875,
+      "end": 1.0875
     },
     {
       "text": "Rumah",
-      "start": 1.225,
-      "end": 1.5
+      "start": 1.0875,
+      "end": 1.35
     },
     {
       "text": "Sakit",
-      "start": 1.5,
-      "end": 1.85
+      "start": 1.35,
+      "end": 1.625
     },
     {
       "text": "Islam",
-      "start": 1.85,
-      "end": 2.3625
+      "start": 1.625,
+      "end": 2.0625
     },
     {
       "text": "Ahmad",
-      "start": 2.3625,
-      "end": 2.8625
+      "start": 2.0625,
+      "end": 2.55
     },
     {
       "text": "Yani",
-      "start": 2.8625,
-      "end": 3.4
+      "start": 2.55,
+      "end": 3.0375
     },
     {
       "text": "Silakan",
-      "start": 4.2375,
-      "end": 4.8
+      "start": 3.4,
+      "end": 3.8625
     },
     {
       "text": "ikuti",
-      "start": 4.8,
-      "end": 5.3
+      "start": 3.8625,
+      "end": 4.3
     },
     {
       "text": "saya",
-      "start": 5.3,
-      "end": 5.7
+      "start": 4.3,
+      "end": 4.55
     },
     {
       "text": "menuju",
-      "start": 5.7,
-      "end": 6.15
+      "start": 4.55,
+      "end": 4.9625
     },
     {
       "text": "ruang",
-      "start": 6.15,
-      "end": 6.4625
+      "start": 4.9625,
+      "end": 5.225
     },
     {
       "text": "Poli",
-      "start": 6.4625,
-      "end": 6.725
+      "start": 5.225,
+      "end": 5.4125
     },
     {
       "text": "Anak",
-      "start": 6.725,
-      "end": 7.225
+      "start": 5.4125,
+      "end": 5.8
     },
     {
       "text": "yang",
-      "start": 7.225,
-      "end": 7.4
+      "start": 5.8,
+      "end": 5.975
     },
     {
       "text": "ada",
-      "start": 7.4,
-      "end": 7.9
+      "start": 5.975,
+      "end": 6.35
     },
     {
       "text": "di",
-      "start": 7.9,
-      "end": 8.075
+      "start": 6.35,
+      "end": 6.4625
     },
     {
       "text": "lantai",
-      "start": 8.075,
-      "end": 8.575
+      "start": 6.4625,
+      "end": 6.8
     },
     {
       "text": "dua",
-      "start": 8.575,
-      "end": 9.1
+      "start": 6.8,
+      "end": 7.2
     }
   ]
 }
