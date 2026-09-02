@@ -113,6 +113,19 @@ public class AssistantTestPanel : MonoBehaviour
 
         _output.text = penanda + answer.answer;
 
+        // Avatar MENGUCAPKAN jawabannya, terlepas dari ada tidaknya rute.
+        //
+        // Dulu bicara hanya terjadi lewat tombol "Mulai Rute", padahal tombol itu cuma
+        // muncul kalau poi_id terisi. Akibatnya untuk pertanyaan yang tidak berujung
+        // navigasi -- dan juga untuk lokasi yang chunk-nya belum tertaut poi_unity_id --
+        // avatar tidak pernah bersuara sama sekali. Menjawab dengan suara itu berguna
+        // sendiri, tidak seharusnya digandeng ke navigasi.
+        var audio = client.AudioClient;
+        if (audio != null && audio.EnableVoiceOutput && !string.IsNullOrWhiteSpace(answer.answer))
+        {
+            StartCoroutine(audio.SpeakText(answer.answer));
+        }
+
         // Tombol rute cuma muncul kalau jawabannya memang menyangkut satu lokasi.
         // poi_id diturunkan backend dari metadata chunk, tidak pernah dikarang LLM.
         if (_navButton != null && !string.IsNullOrEmpty(answer.poi_id))
@@ -127,8 +140,13 @@ public class AssistantTestPanel : MonoBehaviour
     private void OnNavClicked()
     {
         if (client == null || _lastAnswer == null) return;
-        if (client.StartNavigationFrom(_lastAnswer))
-            _panel.SetActive(false);
+
+        // Jawabannya SUDAH diucapkan di OnAnswer begitu diterima, jadi di sini cukup
+        // menyalakan rutenya. Gate ADR-034 keputusan 7 (informasi dibawa audio sebelum
+        // pengguna berjalan) tetap terpenuhi, malah lebih baik: pengguna mendengar dulu,
+        // baru memutuskan sendiri mau dirutekan atau tidak.
+        _panel.SetActive(false);
+        client.StartNavigationFrom(_lastAnswer);
     }
 
     // ── UI dibangun runtime, nempel ke Canvas utama ──

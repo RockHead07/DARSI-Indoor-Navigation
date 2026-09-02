@@ -539,7 +539,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 423cd256104ed954b8f403f3026e6873, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AssistantTestPanel
-  client: {fileID: 0}
+  client: {fileID: 103957502}
   logoTapTarget: {fileID: 930331528}
 --- !u!114 &103957502
 MonoBehaviour:
@@ -557,8 +557,8 @@ MonoBehaviour:
   timeoutSeconds: 60
   floorManager: {fileID: 0}
   buildingName: RS Islam Ahmad Yani
-  avatarAudioClient: {fileID: 0}
-  entryPoint: {fileID: 0}
+  avatarAudioClient: {fileID: 807412542}
+  entryPoint: {fileID: 277745320}
 --- !u!4 &103957503
 Transform:
   m_ObjectHideFlags: 0
@@ -962,10 +962,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 670337274}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 214, y: -95}
-  m_SizeDelta: {x: 348, y: 180}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 180}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &193346128
 MonoBehaviour:
@@ -2765,7 +2765,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: 0, y: 575}
-  m_SizeDelta: {x: 428, y: 190}
+  m_SizeDelta: {x: 0, y: 190}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &670337275
 MonoBehaviour:
