@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -141,27 +143,23 @@ public class AvatarAudioClient : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Mengirim teks ke backend TTS, mengunduh file audio, memutarnya melalui driver lip-sync,
-    /// dan memanggil onFinished ketika audio selesai diputar (atau seketika jika TTS gagal/non-aktif).
-    /// </summary>
-    public IEnumerator SpeakText(string text, Action onFinished = null)
+    /// <summary>Satu potongan audio siap putar, hasil dari FetchOne. Null di pemanggil
+    /// berarti potongan itu gagal disintesis/diunduh -- ditangani sebagai lewati diam-diam,
+    /// bukan menjatuhkan keseluruhan ucapan (ADR-033 Amandemen 033-A poin 1).</summary>
+    private class KlipSiap
     {
-        if (string.IsNullOrWhiteSpace(text) || !enableVoiceOutput)
-        {
-            onFinished?.Invoke();
-            yield break;
-        }
+        public AudioClip klip;
+        public TTSKata[] words;
+        public string engineUsed;
+        public string audioUrl;
+    }
 
-        ResolveComponents();
-        IsFetchingAudio = true;
-
-        var payload = new TTSRequestPayload
-        {
-            text = text,
-            voice = voiceName
-        };
-
+    /// <summary>Ambil SATU klip audio dari backend TANPA memutarnya. Dipisah dari
+    /// pemutaran supaya bisa di-prefetch di latar belakang (lihat SpeakTextChunked)
+    /// sementara potongan sebelumnya masih diputar.</summary>
+    private IEnumerator FetchOne(string text, Action<KlipSiap> onDone)
+    {
+        var payload = new TTSRequestPayload { text = text, voice = voiceName };
         string ttsEndpoint = $"{baseUrl.TrimEnd('/')}/api/assistant/tts";
         string jsonBody = JsonUtility.ToJson(payload);
         Debug.Log($"[AvatarAudioClient] POST {ttsEndpoint} : {jsonBody}");
@@ -179,9 +177,8 @@ public class AvatarAudioClient : MonoBehaviour
 
             if (webReq.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogWarning($"[AvatarAudioClient] Endpoint TTS gagal: {webReq.error} (HTTP {webReq.responseCode}). Melanjutkan tanpa suara.");
-                IsFetchingAudio = false;
-                onFinished?.Invoke();
+                Debug.LogWarning($"[AvatarAudioClient] Endpoint TTS gagal: {webReq.error} (HTTP {webReq.responseCode}). Melanjutkan tanpa suara untuk potongan ini.");
+                onDone?.Invoke(null);
                 yield break;
             }
 
@@ -198,17 +195,14 @@ public class AvatarAudioClient : MonoBehaviour
         if (responsePayload == null || string.IsNullOrEmpty(responsePayload.audio_url))
         {
             Debug.LogWarning("[AvatarAudioClient] Payload response TTS kosong atau tidak memiliki audio_url.");
-            IsFetchingAudio = false;
-            onFinished?.Invoke();
+            onDone?.Invoke(null);
             yield break;
         }
 
-        LastEngineUsed = responsePayload.engine_used;
-        LastAudioUrl = responsePayload.audio_url;
-        Debug.Log($"[AvatarAudioClient] TTS berhasil diproses oleh engine '{LastEngineUsed}', mengunduh audio dari: {LastAudioUrl}");
+        Debug.Log($"[AvatarAudioClient] TTS berhasil diproses oleh engine '{responsePayload.engine_used}', mengunduh audio dari: {responsePayload.audio_url}");
 
         // Resolusi URL audio (jika path relatif terhadap backend)
-        string fullAudioUrl = LastAudioUrl;
+        string fullAudioUrl = responsePayload.audio_url;
         if (!fullAudioUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
             !fullAudioUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
@@ -228,47 +222,154 @@ public class AvatarAudioClient : MonoBehaviour
 
             if (audioReq.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogWarning($"[AvatarAudioClient] Gagal mengunduh file audio dari {fullAudioUrl}: {audioReq.error}. Melanjutkan tanpa suara.");
-                IsFetchingAudio = false;
-                onFinished?.Invoke();
+                Debug.LogWarning($"[AvatarAudioClient] Gagal mengunduh file audio dari {fullAudioUrl}: {audioReq.error}. Melanjutkan tanpa suara untuk potongan ini.");
+                onDone?.Invoke(null);
                 yield break;
             }
 
             AudioClip clip = DownloadHandlerAudioClip.GetContent(audioReq);
-            IsFetchingAudio = false;
-
             if (clip == null)
             {
                 Debug.LogWarning("[AvatarAudioClient] AudioClip hasil unduhan null.");
-                onFinished?.Invoke();
+                onDone?.Invoke(null);
                 yield break;
             }
 
-            // Pilih driver lip-sync menurut data yang BENAR-BENAR dikirim backend,
-            // bukan menurut asumsi (Amandemen 033-B). Tier 1 edge-tts mengirim batas
-            // kata; Tier 2 sherpa-onnx offline tidak mengirim apa pun, dan di sana
-            // analisis audio adalah satu-satunya yang masih bisa bekerja.
-            PilihDriver(responsePayload.words);
-
-            // Putar audio pada driver lip-sync atau AudioSource
-            if (lipSyncDriver != null && lipSyncDriver.enabled)
+            onDone?.Invoke(new KlipSiap
             {
-                lipSyncDriver.PlayAudio(clip);
-            }
-            else if (audioSource != null)
-            {
-                audioSource.clip = clip;
-                audioSource.Play();
-            }
-
-            // Tunggu hingga pemutaran audio selesai
-            while (IsSpeaking)
-            {
-                yield return null;
-            }
-
-            onFinished?.Invoke();
+                klip = clip,
+                words = responsePayload.words,
+                engineUsed = responsePayload.engine_used,
+                audioUrl = fullAudioUrl,
+            });
         }
+    }
+
+    /// <summary>Pilih driver lip-sync untuk klip ini lalu mulai memutarnya. Tidak menunggu
+    /// selesai -- pemanggil yang menunggu lewat IsSpeaking.</summary>
+    private void Mainkan(KlipSiap hasil)
+    {
+        LastEngineUsed = hasil.engineUsed;
+        LastAudioUrl = hasil.audioUrl;
+
+        // Pilih driver lip-sync menurut data yang BENAR-BENAR dikirim backend,
+        // bukan menurut asumsi (Amandemen 033-B). Tier 1 edge-tts mengirim batas
+        // kata; Tier 2 sherpa-onnx offline tidak mengirim apa pun, dan di sana
+        // analisis audio adalah satu-satunya yang masih bisa bekerja.
+        PilihDriver(hasil.words);
+
+        if (lipSyncDriver != null && lipSyncDriver.enabled)
+        {
+            lipSyncDriver.PlayAudio(hasil.klip);
+        }
+        else if (audioSource != null)
+        {
+            audioSource.clip = hasil.klip;
+            audioSource.Play();
+        }
+    }
+
+    /// <summary>
+    /// Mengirim teks ke backend TTS, mengunduh file audio, memutarnya melalui driver lip-sync,
+    /// dan memanggil onFinished ketika audio selesai diputar (atau seketika jika TTS gagal/non-aktif).
+    /// </summary>
+    public IEnumerator SpeakText(string text, Action onFinished = null)
+    {
+        if (string.IsNullOrWhiteSpace(text) || !enableVoiceOutput)
+        {
+            onFinished?.Invoke();
+            yield break;
+        }
+
+        ResolveComponents();
+        IsFetchingAudio = true;
+        KlipSiap hasil = null;
+        yield return FetchOne(text, r => hasil = r);
+        IsFetchingAudio = false;
+
+        if (hasil == null)
+        {
+            onFinished?.Invoke();
+            yield break;
+        }
+
+        Mainkan(hasil);
+        while (IsSpeaking) yield return null;
+        onFinished?.Invoke();
+    }
+
+    // Pisah kalimat pada tanda baca akhir (.!?) yang diikuti spasi/akhir teks. Titik di
+    // tengah angka ("07.00-15.00") TIDAK ikut kepisah karena syaratnya harus diikuti
+    // spasi -- di jadwal dokter tidak ada spasi setelah titik jam. Heuristik ini cukup
+    // untuk jawaban asisten yang sudah dibatasi sistem prompt maksimal 3 kalimat wajar;
+    // bukan tokenizer kalimat umum untuk teks bebas.
+    private static readonly Regex PemisahKalimat = new Regex(@"(?<=[.!?])\s+", RegexOptions.Compiled);
+
+    private static List<string> PecahKalimat(string teks)
+    {
+        var hasil = new List<string>();
+        foreach (var potongan in PemisahKalimat.Split(teks.Trim()))
+        {
+            var t = potongan.Trim();
+            if (!string.IsNullOrEmpty(t)) hasil.Add(t);
+        }
+        return hasil;
+    }
+
+    /// <summary>
+    /// Seperti SpeakText, tapi teks dipecah per kalimat dan disintesis terpisah supaya
+    /// avatar mulai bicara begitu kalimat PERTAMA siap -- bukan menunggu seluruh jawaban
+    /// disintesis dulu. Kalimat berikutnya di-prefetch di latar belakang sambil kalimat
+    /// sekarang diputar.
+    ///
+    /// TIDAK memangkas waktu tunggu LLM (teks ini baru ada setelah itu selesai) -- cuma
+    /// memangkas ekor sintesis+unduh TTS setelah jawaban lengkap tersedia.
+    /// </summary>
+    public IEnumerator SpeakTextChunked(string fullText, Action onFinished = null)
+    {
+        if (string.IsNullOrWhiteSpace(fullText) || !enableVoiceOutput)
+        {
+            onFinished?.Invoke();
+            yield break;
+        }
+
+        var kalimat = PecahKalimat(fullText);
+        if (kalimat.Count <= 1)
+        {
+            // Satu kalimat saja: tidak ada yang diuntungkan dari prefetch, langsung
+            // pakai jalur biasa daripada menambah mesin bertahap untuk nol manfaat.
+            yield return SpeakText(fullText, onFinished);
+            yield break;
+        }
+
+        ResolveComponents();
+        var siap = new KlipSiap[kalimat.Count];
+
+        IsFetchingAudio = true;
+        yield return FetchOne(kalimat[0], r => siap[0] = r);
+        IsFetchingAudio = false;
+
+        for (int i = 0; i < kalimat.Count; i++)
+        {
+            Coroutine prefetch = null;
+            if (i + 1 < kalimat.Count)
+            {
+                prefetch = StartCoroutine(FetchOne(kalimat[i + 1], r => siap[i + 1] = r));
+            }
+
+            if (siap[i] != null)
+            {
+                Mainkan(siap[i]);
+                while (IsSpeaking) yield return null;
+            }
+            // siap[i] == null: potongan ini gagal disintesis/diunduh. Lewati diam-diam,
+            // lanjut ke kalimat berikutnya -- isolasi kegagalan per-potongan, bukan
+            // menjatuhkan seluruh ucapan (ADR-033 Amandemen 033-A poin 1).
+
+            if (prefetch != null) yield return prefetch;
+        }
+
+        onFinished?.Invoke();
     }
 
     /// <summary>
@@ -284,7 +385,7 @@ public class AvatarAudioClient : MonoBehaviour
             yield break;
         }
 
-        yield return SpeakText(answer.answer, onFinished: () =>
+        yield return SpeakTextChunked(answer.answer, onFinished: () =>
         {
             onNavigationReady?.Invoke();
 

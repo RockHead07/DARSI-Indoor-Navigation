@@ -123,7 +123,7 @@ public class AssistantTestPanel : MonoBehaviour
         var audio = client.AudioClient;
         if (audio != null && audio.EnableVoiceOutput && !string.IsNullOrWhiteSpace(answer.answer))
         {
-            StartCoroutine(audio.SpeakText(answer.answer));
+            StartCoroutine(audio.SpeakTextChunked(answer.answer));
         }
 
         // Tombol rute cuma muncul kalau jawabannya memang menyangkut satu lokasi.
