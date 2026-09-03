@@ -62,6 +62,12 @@ public class AIAvatarGuideController : MonoBehaviour
              "membuat avatar terlihat gelisah saat pengguna bergerak sedikit saja.")]
     [SerializeField] private float repositionDeadzone = 0.35f;
     [SerializeField] private float turnSpeed = 6.0f;
+    [Tooltip("Waktu meredam PERUBAHAN kecepatan (detik). Tanpa ini kecepatan target " +
+             "(moveSpeed + gap*catchUpGain) diterapkan SEKETIKA tiap frame -- begitu gap " +
+             "melompat (lumrah terjadi, titik bidik dihitung ulang tiap frame dari ShowPath, " +
+             "terutama di tikungan), avatar melompat langsung ke kecepatan tinggi tanpa " +
+             "melalui fase jalan biasa, terlihat 'tiba-tiba lari'. Dilaporkan dari uji device.")]
+    [SerializeField] private float speedSmoothTime = 0.4f;
 
     [Header("Animator")]
     [SerializeField] private Animator animator;
@@ -87,6 +93,8 @@ public class AIAvatarGuideController : MonoBehaviour
     private Vector3 _lastUserPos;  // posisi pengguna terakhir (datar), acuan deteksi berhenti
     private float _stalledFor;  // sudah berapa lama pengguna tidak maju
     private bool _needsSnap;    // pindahkan ke posisi memimpin di frame pertama, jangan menyalip
+    private float _currentSpeed;    // kecepatan REDAM yang sungguhan dipakai gerak, lihat speedSmoothTime
+    private float _speedVelocity;   // state internal SmoothDamp untuk _currentSpeed
 
     public GuideState CurrentState => _state;
     public bool IsLeading => _leading;
@@ -116,6 +124,8 @@ public class AIAvatarGuideController : MonoBehaviour
         u.y = 0f;
         _lastUserPos = u;   // reset, kalau tidak sisa sesi lama bikin avatar langsung mengira pengguna mandek
         _stalledFor = 0f;
+        _currentSpeed = 0f;   // mulai dari diam tiap sesi memimpin baru, bukan menyambung kecepatan lama
+        _speedVelocity = 0f;
         _needsSnap = true;
         SetState(GuideState.LeadingPath);
         // Menyapa dulu sebelum jalan, seperti pemandu sungguhan.
@@ -273,8 +283,12 @@ public class AIAvatarGuideController : MonoBehaviour
             return;
         }
 
-        float speed = Mathf.Min(moveSpeed + gap * catchUpGain, maxSpeed);
-        transform.position = Vector3.MoveTowards(before, target, speed * Time.deltaTime);
+        // Kecepatan TARGET boleh melompat (wajar, gap dihitung ulang tiap frame), tapi
+        // kecepatan yang SUNGGUHAN dipakai gerak diredam -- inilah yang memberi fase jalan
+        // sebelum berlari, bukan lompat seketika ke kecepatan tinggi.
+        float targetSpeed = Mathf.Min(moveSpeed + gap * catchUpGain, maxSpeed);
+        _currentSpeed = Mathf.SmoothDamp(_currentSpeed, targetSpeed, ref _speedVelocity, speedSmoothTime);
+        transform.position = Vector3.MoveTowards(before, target, _currentSpeed * Time.deltaTime);
 
         Vector3 moved = transform.position - before;
         if (moved.sqrMagnitude > 1e-8f) FaceTowards(transform.position + moved);
