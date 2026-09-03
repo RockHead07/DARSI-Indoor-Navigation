@@ -20,11 +20,24 @@ using UnityEngine;
 /// dipanggil oleh pihak yang sudah memastikan MultiSet localize berhasil (ADR-034 keputusan 5,
 /// ADR-007). Gate sengaja ditaruh di pemanggil, bukan sebagai flag di sini, supaya tidak ada
 /// saklar "matikan pengaman" yang bisa ikut ter-build tanpa sengaja.
+///
+/// MODEL GERAK -- "lompat-tunggu" (2026-09-03), menggantikan model "tali kekang" lama:
+/// avatar dulu diikat SELALU tepat leadDistance di depan pengguna, dihitung ulang tiap
+/// frame, dan karena itu WAJIB mengejar secara proporsional (catchUpGain/maxSpeed) begitu
+/// pengguna berjalan lebih cepat -- ini yang bikin avatar terlihat "tiba-tiba lari": kecepatan
+/// geraknya tidak pernah konstan, selalu fungsi dari jarak yang berubah tiap frame. Model baru
+/// membuang kebutuhan itu SAMA SEKALI: avatar berjalan ke SATU titik tetap (legDistance di
+/// depan posisi pengguna SAAT dipilih, bukan dihitung ulang tiap frame) dengan kecepatan
+/// KONSTAN (moveSpeed), lalu BERHENTI dan menunggu. Begitu pengguna cukup dekat
+/// (advanceTriggerDistance), titik berikutnya dipilih dan avatar jalan lagi. Kalau pengguna
+/// tidak kunjung mendekat (chaseStallSeconds), avatar balik menjemput (Chasing) dengan
+/// kecepatan tetap juga (chaseSpeed) -- bukan proporsional. Tidak ada lagi rumus kecepatan
+/// yang bergantung jarak di mana pun dalam file ini.
 /// </summary>
 [DisallowMultipleComponent]
 public class AIAvatarGuideController : MonoBehaviour
 {
-    public enum GuideState { IdleStand, LeadingPath, WaitingForUser, ArrivalPointing }
+    public enum GuideState { IdleStand, LeadingPath, WaitingForUser, ArrivalPointing, Chasing }
 
     [Header("Sumber Rute")]
     [Tooltip("Kosongkan untuk mencari ShowPath otomatis di scene.")]
@@ -39,34 +52,38 @@ public class AIAvatarGuideController : MonoBehaviour
     [SerializeField] private GameObject visualRoot;
 
     [Header("Jarak (meter)")]
-    [Tooltip("Seberapa jauh avatar berjalan di DEPAN pengguna sepanjang rute.")]
-    [SerializeField] private float leadDistance = 2.0f;
-    [Tooltip("Berapa lama pengguna boleh tidak maju sebelum avatar berhenti dan menoleh (detik).")]
-    [SerializeField] private float stallSecondsBeforeWaiting = 0.8f;
-    [Tooltip("Pergerakan sekecil ini masih dianggap diam. Meredam derau tracking kamera AR.")]
-    [SerializeField] private float advanceEpsilon = 0.05f;
+    [Tooltip("Seberapa jauh titik berikutnya dipilih di depan posisi pengguna SAAT avatar " +
+             "mulai berjalan ke sana (bukan diikat ulang tiap frame seperti model lama).")]
+    [SerializeField] private float legDistance = 3.0f;
+    [Tooltip("Seberapa dekat pengguna harus sampai ke titik saat ini sebelum avatar memilih " +
+             "titik berikutnya dan jalan lagi.")]
+    [SerializeField] private float advanceTriggerDistance = 1.5f;
+    [Tooltip("Berapa lama avatar menunggu di titiknya sebelum menyerah dan balik menjemput " +
+             "pengguna (Chasing) -- supaya pengguna tidak pernah benar-benar tersesat.")]
+    [SerializeField] private float chaseStallSeconds = 6.0f;
     [Tooltip("Sisa rute sependek ini dianggap sudah tiba.")]
     [SerializeField] private float arrivalThreshold = 1.5f;
+    [Tooltip("Jarak dari tujuan sesungguhnya ke titik SAMPING tempat avatar berdiri saat " +
+             "tiba -- supaya avatar tidak nangkring persis di atas POI. Sisi tetap (kiri " +
+             "relatif arah rute terakhir), sengaja tidak dibuat adaptif ke geometri ruangan " +
+             "dulu -- keputusan sadar, lihat docs/superpowers/plans kalau ada laporan avatar " +
+             "kejeblos dinding di lorong sempit.")]
+    [SerializeField] private float sideOffsetDistance = 1.0f;
+    [Tooltip("Seberapa dekat dianggap 'sudah sampai' di suatu titik (waypoint/titik samping " +
+             "POI/posisi pengguna saat mengejar).")]
+    [SerializeField] private float waypointArrivalEpsilon = 0.15f;
 
     [Header("Gerak")]
-    [Tooltip("Kecepatan jalan santai saat avatar sudah berada di posisinya.")]
+    [Tooltip("Kecepatan jalan KONSTAN avatar menuju titiknya. Tidak pernah berubah karena " +
+             "jarak -- itulah intinya model ini.")]
     [SerializeField] private float moveSpeed = 1.4f;
-    [Tooltip("Tambahan kecepatan per meter ketinggalan dari titik bidik. Tanpa ini avatar " +
-             "tidak akan pernah menyusul pengguna yang berjalan lebih cepat dari moveSpeed.")]
-    [SerializeField] private float catchUpGain = 0.8f;
-    [Tooltip("Batas atas kecepatan mengejar. Dipatok mendekati kecepatan klip jalan " +
-             "(BlendTree Walk @1.4) supaya kaki tidak selip: di atas itu klip tetap diputar " +
-             "kecepatan normal sementara badan melesat, dan avatar terlihat mengesot.")]
-    [SerializeField] private float maxSpeed = 2.0f;
-    [Tooltip("Selisih ke titik bidik di bawah ini diabaikan. Meredam koreksi mikro yang " +
-             "membuat avatar terlihat gelisah saat pengguna bergerak sedikit saja.")]
-    [SerializeField] private float repositionDeadzone = 0.35f;
+    [Tooltip("Kecepatan KONSTAN saat menjemput pengguna (state Chasing). Sengaja tetap, " +
+             "bukan proporsional ke jarak -- itu pola yang terbukti bikin gerakan tidak wajar " +
+             "di model lama.")]
+    [SerializeField] private float chaseSpeed = 1.8f;
     [SerializeField] private float turnSpeed = 6.0f;
-    [Tooltip("Waktu meredam PERUBAHAN kecepatan (detik). Tanpa ini kecepatan target " +
-             "(moveSpeed + gap*catchUpGain) diterapkan SEKETIKA tiap frame -- begitu gap " +
-             "melompat (lumrah terjadi, titik bidik dihitung ulang tiap frame dari ShowPath, " +
-             "terutama di tikungan), avatar melompat langsung ke kecepatan tinggi tanpa " +
-             "melalui fase jalan biasa, terlihat 'tiba-tiba lari'. Dilaporkan dari uji device.")]
+    [Tooltip("Waktu meredam PERUBAHAN kecepatan (detik) tiap kali avatar mulai bergerak dari " +
+             "diam -- supaya ada fase mempercepat singkat, bukan langsung penuh seketika.")]
     [SerializeField] private float speedSmoothTime = 0.4f;
 
     [Header("Animator")]
@@ -76,12 +93,9 @@ public class AIAvatarGuideController : MonoBehaviour
              "Harus sama dengan threshold Walk di BlendTree. Dipakai untuk menyelaraskan " +
              "kecepatan putar klip dengan kecepatan gerak sesungguhnya supaya kaki tidak selip.")]
     [SerializeField] private float walkClipSpeed = 1.589f;
-    [Tooltip("Trigger sapaan saat mulai memimpin.")]
+    [Tooltip("Trigger sapaan saat mulai memimpin, DIPAKAI ULANG juga saat tiba di tujuan " +
+             "(melambai menandakan 'kita sudah sampai') -- simetris, bukan dua gestur beda.")]
     [SerializeField] private string waveParam = "Wave";
-    [Tooltip("Trigger menunjuk saat tiba di tujuan.")]
-    [SerializeField] private string pointParam = "Point";
-    [Tooltip("Arah menunjuk: -1 kiri, 0 depan, +1 kanan.")]
-    [SerializeField] private string pointDirParam = "PointDir";
 
     private Transform _user;
     private LineRenderer _line;
@@ -89,12 +103,14 @@ public class AIAvatarGuideController : MonoBehaviour
     private readonly List<Vector3> _points = new List<Vector3>();
     private GuideState _state = GuideState.IdleStand;
     private bool _leading;
-    private int _speedHash, _waveHash, _pointHash, _pointDirHash;
-    private Vector3 _lastUserPos;  // posisi pengguna terakhir (datar), acuan deteksi berhenti
-    private float _stalledFor;  // sudah berapa lama pengguna tidak maju
-    private bool _needsSnap;    // pindahkan ke posisi memimpin di frame pertama, jangan menyalip
-    private float _currentSpeed;    // kecepatan REDAM yang sungguhan dipakai gerak, lihat speedSmoothTime
-    private float _speedVelocity;   // state internal SmoothDamp untuk _currentSpeed
+    private int _speedHash, _waveHash;
+    private bool _needsWaypoint;      // belum ada titik dipilih, pilih di frame Update() berikutnya
+    private Vector3 _waypoint;        // titik yang sedang dituju/ditunggui (LeadingPath/WaitingForUser)
+    private Vector3 _arrivalTarget;   // titik SAMPING POI, dihitung sekali saat tiba terdeteksi
+    private bool _hasWavedAtArrival;  // supaya trigger Wave di tujuan cuma sekali, bukan tiap frame
+    private float _waitingElapsed;    // sudah berapa lama menunggu di waypoint saat ini
+    private float _currentSpeed;      // kecepatan REDAM yang sungguhan dipakai gerak
+    private float _speedVelocity;     // state internal SmoothDamp untuk _currentSpeed
 
     public GuideState CurrentState => _state;
     public bool IsLeading => _leading;
@@ -112,8 +128,6 @@ public class AIAvatarGuideController : MonoBehaviour
         if (visualRoot == null && animator != null) visualRoot = animator.gameObject;
         _speedHash = Animator.StringToHash(speedParam);
         _waveHash = Animator.StringToHash(waveParam);
-        _pointHash = Animator.StringToHash(pointParam);
-        _pointDirHash = Animator.StringToHash(pointDirParam);
     }
 
     /// <summary>Panggil HANYA setelah localize berhasil. Lihat catatan gate di atas.
@@ -122,22 +136,18 @@ public class AIAvatarGuideController : MonoBehaviour
     /// bicara dulu baru memimpin) memanggil ini LANGSUNG saat ucapan selesai; AvatarGuide-
     /// NavigationBridge memanggilnya REAKTIF begitu navigation.IsCurrentlyNavigating()
     /// berubah jadi true (jalur navigasi non-suara). Pada alur suara keduanya bisa
-    /// terpanggil untuk sesi memimpin yang SAMA (StartNavigationFrom di dalam callback
-    /// AvatarAudioClient membuat IsCurrentlyNavigating() jadi true, lalu bridge menangkapnya
-    /// di frame berikutnya) -- karena itu method ini WAJIB idempoten, no-op kalau sudah
-    /// _leading, supaya animasi Wave tidak terpicu dua kali dan kecepatan/snap tidak ikut
-    /// ter-reset di tengah gerakan (ditemukan lewat audit independen, bukan diasumsikan).</summary>
+    /// terpanggil untuk sesi memimpin yang SAMA -- karena itu method ini WAJIB idempoten,
+    /// no-op kalau sudah _leading, supaya animasi Wave tidak terpicu dua kali dan kecepatan
+    /// tidak ikut ter-reset di tengah gerakan (ditemukan lewat audit independen).</summary>
     public void StartLeading()
     {
         if (_leading) return;
         _leading = true;
-        var u = _user != null ? _user.position : (Camera.main != null ? Camera.main.transform.position : Vector3.zero);
-        u.y = 0f;
-        _lastUserPos = u;   // reset, kalau tidak sisa sesi lama bikin avatar langsung mengira pengguna mandek
-        _stalledFor = 0f;
+        _needsWaypoint = true;
+        _hasWavedAtArrival = false;
+        _waitingElapsed = 0f;
         _currentSpeed = 0f;   // mulai dari diam tiap sesi memimpin baru, bukan menyambung kecepatan lama
         _speedVelocity = 0f;
-        _needsSnap = true;
         SetState(GuideState.LeadingPath);
         // Menyapa dulu sebelum jalan, seperti pemandu sungguhan.
         if (animator != null && animator.isActiveAndEnabled) animator.SetTrigger(_waveHash);
@@ -164,19 +174,14 @@ public class AIAvatarGuideController : MonoBehaviour
         // posisinya TIDAK SAH (ADR-007). Avatar disembunyikan, bukan sekadar dihentikan --
         // pemandu yang mengambang di tempat lama sementara penggunanya sudah di lantai lain
         // lebih menyesatkan daripada tidak ada pemandu sama sekali.
-        //
-        // Fase ToConnector dan ToDestination TIDAK diperlakukan khusus: rute yang digambar
-        // ShowPath memang sudah segmen lantai yang sedang berlaku, jadi avatar cukup
-        // menaikinya seperti biasa.
         if (floorTransition != null &&
             floorTransition.CurrentPhase == FloorTransitionController.Phase.AwaitingRelocalize)
         {
             SetVisible(false);
             SetState(GuideState.IdleStand);
             Drive(0f);
-            // Wajib snap ulang saat muncul lagi: rute lantai baru sama sekali berbeda, dan
-            // posisi lama sudah tidak bermakna.
-            _needsSnap = true;
+            // Wajib pilih titik baru saat muncul lagi: rute lantai baru sama sekali berbeda.
+            _needsWaypoint = true;
             return;
         }
         SetVisible(true);
@@ -197,113 +202,138 @@ public class AIAvatarGuideController : MonoBehaviour
         float pathLength = PathPolyline.Length(_points);
         float userS = PathPolyline.Project(_points, _user.position);
 
-        // Tiba: sisa rute di depan pengguna sudah pendek.
+        // Tiba: sisa rute di depan pengguna sudah pendek. Jalan ke titik SAMPING POI (bukan
+        // pusatnya, ADR permintaan pemilik project 2026-09-03), lalu melambai begitu benar-
+        // benar sampai di titik itu -- bukan seketika saat kondisi "dekat tujuan" terdeteksi.
         if (pathLength - userS <= arrivalThreshold)
         {
-            // Arah menunjuk diturunkan dari ujung rute relatif arah hadap avatar, bukan
-            // dipilih manual: -1 kiri, 0 depan, +1 kanan. Memakai ketiga klip Point.
-            if (animator != null && animator.isActiveAndEnabled && _points.Count >= 2)
+            if (_state != GuideState.ArrivalPointing)
             {
-                Vector3 toEnd = _points[_points.Count - 1] - transform.position;
-                toEnd.y = 0f;
-                if (toEnd.sqrMagnitude > 1e-4f)
+                _arrivalTarget = ComputeArrivalSidePoint();
+                _hasWavedAtArrival = false;
+                SetState(GuideState.ArrivalPointing);
+            }
+
+            bool arrivedAtSide = MoveToward(_arrivalTarget, moveSpeed);
+            if (arrivedAtSide)
+            {
+                FaceTowards(_user.position);
+                Drive(0f);
+                if (!_hasWavedAtArrival)
                 {
-                    float signed = Vector3.SignedAngle(transform.forward, toEnd.normalized, Vector3.up);
-                    animator.SetFloat(_pointDirHash, Mathf.Clamp(signed / 60f, -1f, 1f));
+                    _hasWavedAtArrival = true;
+                    if (animator != null && animator.isActiveAndEnabled) animator.SetTrigger(_waveHash);
                 }
             }
-            SetState(GuideState.ArrivalPointing);
-            FaceTowards(_user.position);
-            Drive(0f);
             return;
         }
 
-        // Pengguna berhenti berjalan: tunggu dan menoleh, jangan biarkan dia bicara ke punggung.
-        //
-        // Pemicunya PERGERAKAN POSISI PENGGUNA DI DUNIA. Dua besaran lain sudah dicoba dan
-        // dua-duanya salah:
-        //
-        // 1. Jarak avatar ke pengguna (lagDistanceThreshold, warisan draft Task 6). Draft itu
-        //    mengasumsikan avatar punya NavMeshAgent sendiri sehingga bisa melesat jauh
-        //    mendahului. Di desain ini posisi avatar diikat ke userS + leadDistance, jadi
-        //    jaraknya TIDAK PERNAH melebihi leadDistance dan ambang di atas itu mustahil
-        //    tercapai. Kode mati.
-        //
-        // 2. Kemajuan pengguna di sepanjang rute (userS): ShowPath selalu menghitung ulang rute
-        //    dari posisi pengguna (tiap pathUpdateFrequency), jadi userS bergerak seperti gigi
-        //    gergaji dengan puncak terbatas oleh jarak yang ditempuh dalam satu interval
-        //    (~0,55 m pada 1,1 m/s). Terukur di Play mode: userS berkisar 0,03-0,24 sementara
-        //    nilai puncak tercatat beku di 0,306. Begitu puncak tercapai userS tidak pernah
-        //    melampauinya lagi, dan penghitung mandek menumpuk terus WALAUPUN pengguna
-        //    sedang berjalan.
-        Vector3 userFlat = _user.position; userFlat.y = 0f;
-        if ((userFlat - _lastUserPos).sqrMagnitude > advanceEpsilon * advanceEpsilon)
+        switch (_state)
         {
-            _lastUserPos = userFlat;
-            _stalledFor = 0f;
+            case GuideState.WaitingForUser:
+            {
+                FaceTowards(_user.position);
+                Drive(0f);
+
+                Vector3 userFlat = _user.position; userFlat.y = 0f;
+                Vector3 waypointFlat = _waypoint; waypointFlat.y = 0f;
+                if (Vector3.Distance(userFlat, waypointFlat) <= advanceTriggerDistance)
+                {
+                    _waypoint = NextWaypoint(userS, pathLength);
+                    _waitingElapsed = 0f;
+                    SetState(GuideState.LeadingPath);
+                    break;
+                }
+
+                _waitingElapsed += Time.deltaTime;
+                if (_waitingElapsed >= chaseStallSeconds)
+                {
+                    SetState(GuideState.Chasing);
+                }
+                break;
+            }
+
+            case GuideState.Chasing:
+            {
+                Vector3 userTarget = _user.position;
+                userTarget.y = transform.position.y;
+                bool caughtUp = MoveToward(userTarget, chaseSpeed);
+                if (caughtUp)
+                {
+                    _waypoint = NextWaypoint(userS, pathLength);
+                    _waitingElapsed = 0f;
+                    SetState(GuideState.LeadingPath);
+                }
+                break;
+            }
+
+            default: // IdleStand atau LeadingPath -- termasuk frame pertama setelah StartLeading
+            {
+                if (_needsWaypoint)
+                {
+                    _needsWaypoint = false;
+                    _waypoint = NextWaypoint(userS, pathLength);
+                }
+
+                SetState(GuideState.LeadingPath);
+                bool reachedWaypoint = MoveToward(_waypoint, moveSpeed);
+                if (reachedWaypoint)
+                {
+                    _waitingElapsed = 0f;
+                    SetState(GuideState.WaitingForUser);
+                }
+                break;
+            }
         }
-        else
-        {
-            _stalledFor += Time.deltaTime;
-        }
+    }
 
-        if (_stalledFor >= stallSecondsBeforeWaiting)
-        {
-            SetState(GuideState.WaitingForUser);
-            FaceTowards(_user.position);
-            Drive(0f);
-            return;
-        }
+    /// <summary>Titik legDistance di depan posisi pengguna SAAT INI di sepanjang rute.
+    /// Dipanggil hanya saat avatar SELESAI di titik lama (bukan tiap frame) -- itulah yang
+    /// membedakan model ini dari model lama yang mengikat ulang tiap frame.</summary>
+    private Vector3 NextWaypoint(float userS, float pathLength)
+    {
+        float s = Mathf.Min(userS + legDistance, pathLength);
+        return PathPolyline.PointAt(_points, s);
+    }
 
-        // Memimpin: bidik titik pada rute sejauh leadDistance di depan posisi pengguna.
-        // State di-set eksplisit di sini. Tanpa ini, sekali masuk ArrivalPointing atau
-        // IdleStand, labelnya menyangkut di situ walaupun perilakunya sudah kembali memimpin.
-        SetState(GuideState.LeadingPath);
+    /// <summary>Titik samping tujuan akhir, offset tetap ke satu sisi relatif arah rute
+    /// terakhir -- supaya avatar berdiri DI SAMPING POI, tidak menghalangi papan nama/pintu
+    /// POI itu sendiri.</summary>
+    private Vector3 ComputeArrivalSidePoint()
+    {
+        Vector3 dest = _points[_points.Count - 1];
+        Vector3 dir = _points.Count >= 2
+            ? dest - _points[_points.Count - 2]
+            : dest - transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 1e-6f) dir = transform.forward;
+        dir.Normalize();
 
-        Vector3 target = PathPolyline.PointAt(_points, Mathf.Min(userS + leadDistance, pathLength));
+        Vector3 side = Vector3.Cross(Vector3.up, dir).normalized;
+        return dest + side * sideOffsetDistance;
+    }
 
-        // Frame pertama setelah StartLeading: PINDAHKAN langsung ke posisi memimpin.
-        // Tanpa ini avatar mulai dari posisi pengguna dengan gap = leadDistance penuh,
-        // sehingga rumus kejar langsung mentok maxSpeed dan ia terlihat MENYALIP dari kaki
-        // pengguna dengan kecepatan lari. Pemandu memang seharusnya sudah di depan saat mulai.
-        if (_needsSnap)
-        {
-            _needsSnap = false;
-            transform.position = target;
-            Vector3 ahead = PathPolyline.PointAt(_points, Mathf.Min(userS + leadDistance + 0.5f, pathLength));
-            if ((ahead - target).sqrMagnitude > 1e-6f)
-                transform.rotation = Quaternion.LookRotation(new Vector3(ahead.x - target.x, 0f, ahead.z - target.z));
-            Drive(0f);
-            return;
-        }
-
+    /// <summary>Gerakkan avatar menuju target dengan kecepatan KONSTAN yang diredam
+    /// SmoothDamp cuma di fase mulai bergerak dari diam -- bukan fungsi jarak seperti model
+    /// lama. Dipakai jalur LeadingPath, Chasing, dan jalan ke titik samping POI: satu jalur
+    /// gerak, bukan tiga salinan logika yang bisa saling melenceng.
+    /// Mengembalikan true begitu sudah cukup dekat target (waypointArrivalEpsilon).</summary>
+    private bool MoveToward(Vector3 target, float targetSpeed)
+    {
         Vector3 before = transform.position;
-
-        // Kecepatan naik sebanding jarak ke titik bidik. Dengan kecepatan tetap, pengguna
-        // yang berjalan lebih cepat dari moveSpeed tidak akan pernah tersusul, dan avatar
-        // berubah dari pemandu menjadi pengekor.
-        float gap = Vector3.Distance(before, target);
-
-        // Zona mati: jangan mengoreksi selisih sekecil ini. Titik bidik dihitung ulang tiap
-        // frame dari userS, dan userS bergetar karena ShowPath menghitung ulang rute dari
-        // posisi pengguna. Tanpa zona mati avatar ikut bergeser untuk gerakan sekecil apa pun
-        // dan terlihat gelisah, bukan seperti orang berjalan. Dilaporkan dari uji manual.
-        if (gap < repositionDeadzone)
+        if (Vector3.Distance(before, target) <= waypointArrivalEpsilon)
         {
             Drive(0f);
-            return;
+            return true;
         }
 
-        // Kecepatan TARGET boleh melompat (wajar, gap dihitung ulang tiap frame), tapi
-        // kecepatan yang SUNGGUHAN dipakai gerak diredam -- inilah yang memberi fase jalan
-        // sebelum berlari, bukan lompat seketika ke kecepatan tinggi.
-        float targetSpeed = Mathf.Min(moveSpeed + gap * catchUpGain, maxSpeed);
         _currentSpeed = Mathf.SmoothDamp(_currentSpeed, targetSpeed, ref _speedVelocity, speedSmoothTime);
         transform.position = Vector3.MoveTowards(before, target, _currentSpeed * Time.deltaTime);
 
         Vector3 moved = transform.position - before;
         if (moved.sqrMagnitude > 1e-8f) FaceTowards(transform.position + moved);
         Drive(moved.magnitude / Mathf.Max(Time.deltaTime, 1e-5f));
+        return false;
     }
 
     /// <summary>Baca polyline dari LineRenderer dan koreksi offset tinggi garis.</summary>
@@ -350,10 +380,12 @@ public class AIAvatarGuideController : MonoBehaviour
         // clip.averageSpeed; klip lain semuanya 0 karena "in place"). Avatar digerakkan
         // AIAvatarGuideController pada kecepatan berbeda, dan selisihnya membuat telapak
         // kaki menggeser di lantai. Tanpa penyelarasan ini, selisih 1,4 vs 1,589 saja
-        // sudah terasa sebagai langkah yang "tidak pas".
+        // sudah terasa sebagai langkah yang "tidak pas". Sekarang kecepatan gerak SELALU
+        // salah satu dari dua konstanta (moveSpeed/chaseSpeed), jadi rasio ini juga jauh
+        // lebih stabil daripada model lama yang bisa berapa saja.
         //
-        // Klip diam (Idle, Wave, Point) averageSpeed-nya 0, jadi saat tidak berjalan
-        // kecepatan putar dikembalikan normal supaya sapaan dan tunjukan tidak ikut melambat.
+        // Klip diam (Idle, Wave) averageSpeed-nya 0, jadi saat tidak berjalan kecepatan
+        // putar dikembalikan normal supaya sapaan tidak ikut melambat/dipercepat.
         float ratio = (speed > 0.05f && walkClipSpeed > 0.01f) ? speed / walkClipSpeed : 1f;
         animator.speed = Mathf.Clamp(ratio, 0.4f, 1.8f);
     }
@@ -367,10 +399,6 @@ public class AIAvatarGuideController : MonoBehaviour
     {
         if (_state == s) return;
         _state = s;
-        // Dipicu saat MASUK state saja. Kalau dipanggil tiap frame, klipnya restart terus
-        // dan tangannya tidak pernah selesai mengangkat.
-        if (s == GuideState.ArrivalPointing && animator != null && animator.isActiveAndEnabled)
-            animator.SetTrigger(_pointHash);
         Debug.Log($"[AvatarGuide] state -> {s}");
     }
 }
