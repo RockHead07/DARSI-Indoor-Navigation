@@ -132,6 +132,17 @@ public class PhotonManager : MonoBehaviourPunCallbacks
     /// </summary>
     public void OnLocalizationSuccess()
     {
+        // autoConnect=false berarti dilarang gabung room, bukan cuma "jangan gabung saat
+        // Start()". Sebelum guard ini, autoConnect: 0 di scene TIDAK MENCEGAH auto-join --
+        // localize sukses tetap memicu Connect() lewat jalur ini, lepas dari flag-nya sama
+        // sekali (audit independen menemukan tambalan sebelumnya gagal mencapai tujuan).
+        if (!autoConnect)
+        {
+            Debug.Log("[PhotonManager] Localization succeeded, tapi autoConnect=false -- tidak join room.");
+            isLocalized = true;
+            return;
+        }
+
         Debug.Log("[PhotonManager] Localization succeeded.");
         isLocalized = true;
 

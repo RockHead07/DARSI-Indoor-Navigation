@@ -3,9 +3,13 @@ using UnityEngine;
 /// <summary>
 /// Menyalakan dan mematikan pemandu mengikuti sesi navigasi MultiSet.
 ///
-/// Ini satu-satunya pemanggil sah <see cref="AIAvatarGuideController.StartLeading"/> di runtime.
-/// Sebelum komponen ini ada, StartLeading() tidak punya pemanggil sama sekali, sehingga avatar
-/// hanya bisa digerakkan oleh probe di folder Editor dan tidak pernah bisa diuji manual.
+/// Pemanggil REAKTIF <see cref="AIAvatarGuideController.StartLeading"/> untuk jalur navigasi
+/// non-suara (klik POI langsung). BUKAN satu-satunya pemanggil sah -- AvatarAudioClient juga
+/// memanggilnya LANGSUNG untuk alur suara (ADR-034: avatar bicara dulu, baru memimpin).
+/// Sebelum komponen ini ada, jalur non-suara sama sekali tidak punya pemanggil, sehingga
+/// avatar di jalur itu hanya bisa digerakkan oleh probe di folder Editor. StartLeading()
+/// sendiri sengaja idempoten supaya dua pemanggil ini tidak saling tabrak kalau sama-sama
+/// terpicu untuk sesi memimpin yang sama (lihat komentar di StartLeading()).
 ///
 /// GATE LOKALISASI (ADR-034 keputusan 5, ADR-007). Avatar hanya boleh bergerak setelah posisi
 /// sah, yaitu setelah MultiSet localize berhasil. Gate-nya sengaja BUKAN flag yang di-serialize:

@@ -116,9 +116,20 @@ public class AIAvatarGuideController : MonoBehaviour
         _pointDirHash = Animator.StringToHash(pointDirParam);
     }
 
-    /// <summary>Panggil HANYA setelah localize berhasil. Lihat catatan gate di atas.</summary>
+    /// <summary>Panggil HANYA setelah localize berhasil. Lihat catatan gate di atas.
+    ///
+    /// DUA pemanggil sah, bukan satu: AvatarAudioClient (alur suara, ADR-034 -- avatar
+    /// bicara dulu baru memimpin) memanggil ini LANGSUNG saat ucapan selesai; AvatarGuide-
+    /// NavigationBridge memanggilnya REAKTIF begitu navigation.IsCurrentlyNavigating()
+    /// berubah jadi true (jalur navigasi non-suara). Pada alur suara keduanya bisa
+    /// terpanggil untuk sesi memimpin yang SAMA (StartNavigationFrom di dalam callback
+    /// AvatarAudioClient membuat IsCurrentlyNavigating() jadi true, lalu bridge menangkapnya
+    /// di frame berikutnya) -- karena itu method ini WAJIB idempoten, no-op kalau sudah
+    /// _leading, supaya animasi Wave tidak terpicu dua kali dan kecepatan/snap tidak ikut
+    /// ter-reset di tengah gerakan (ditemukan lewat audit independen, bukan diasumsikan).</summary>
     public void StartLeading()
     {
+        if (_leading) return;
         _leading = true;
         var u = _user != null ? _user.position : (Camera.main != null ? Camera.main.transform.position : Vector3.zero);
         u.y = 0f;
