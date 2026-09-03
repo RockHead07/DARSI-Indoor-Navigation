@@ -2163,7 +2163,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhotonManager
   gameVersion: 1.0
-  autoConnect: 1
+  autoConnect: 0
   buildingId: GedungA
   floorId: Lt1
   maxPlayers: 20
