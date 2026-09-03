@@ -13,7 +13,7 @@ Bangun fitur Cari Teman lintas-repo (darsi-backend, Unity, WebView terpisah) ses
 - Desain UI WebView friendlist — dapat kontrak API saja di sini, desain visualnya brainstorming terpisah setelah Unity selesai (permintaan eksplisit pemilik project).
 - Auth token sungguhan dari MyRSIy — tetap model client-trusted `user_id`, konsisten dengan `presence` yang sudah ada (ADR-017 belum menuntut lebih dari ini).
 - Body-tracking/animasi gestur avatar teman — posisi+orientasi horizontal saja (lihat `PlayerSync.cs` existing, floor-snapped). Animasi idle/walk dua-state TERMASUK scope (§3.2), ini soal gestur tangan/ekspresi/motion capture yang tetap di luar.
-- Model 3D avatar teman yang baru — gap aset dicatat, keputusan pemakaian aset sementara ada di §3.4, tapi pengadaan aset baru bukan bagian pekerjaan kode ini.
+- Model 3D bespoke yang baru untuk teman — §3.4 memutuskan pakai ulang `AvatarSample_A.vrm` (dengan tint), jadi pengadaan model baru dari nol tetap di luar scope kerja ini.
 
 ## Amandemen: `docs/FLOWS.md` §5b (dot → humanoid avatar)
 
@@ -115,11 +115,11 @@ Auth: trust `user_id` dari body, pola sama dengan endpoint `presence` yang sudah
 - Perbaikan kecil sambil menyentuh file ini: `Object.FindObjectOfType<Camera>()` → `FindAnyObjectByType<Camera>()` di `FriendListPanel.ResolveArCamera` dan `FriendListEntry.UpdateDistance` (temuan 1.2.3).
 - `FriendListEntry.GetInitials`/warna avatar: ganti `pName.GetHashCode()` dengan hash deterministik sederhana (mis. jumlah kode karakter, atau FNV-1a manual) supaya warna avatar stabil antar-run (temuan 1.2.4).
 
-### 3.4 Gap aset avatar humanoid
+### 3.4 Aset avatar humanoid — TIDAK memblokir "Unity selesai"
 
-Tidak ada model avatar khusus teman. Yang ada: `Assets/Avatar/Model/AvatarSample_A.vrm`, sudah terpasang sebagai model avatar AI guide di scene produksi `TestingHCM.unity`. Memakainya ulang untuk teman berarti teman terlihat identik dengan avatar AI guide di dalam AR — membingungkan, bukan solusi gratis.
+Tidak ada model avatar khusus teman, dan ini SENGAJA tidak dijadikan blocker: kerja aset 3D dan kerja kode ada di jalur yang berbeda, menunggu yang satu tidak menghemat apa pun di yang lain (`humanoidBody` cuma field yang di-swap `SetActive`, ongkosnya nol kapan pun aset datang). Preseden sudah ada di project ini sendiri: avatar AI guide sudah dipakai produksi berminggu-minggu (TTS, lip-sync, lead-follow) pakai `AvatarSample_A.vrm` sebagai model sementara, bukan aset jadi.
 
-**Default pragmatis:** tetap pakai `capsuleBody` (sudah berfungsi, sudah tervisualisasi) sampai aset avatar teman yang berbeda tersedia; tinggal aktifkan `humanoidBody` kapan pun aset itu datang, nol perubahan kode. Ditandai di sini supaya tidak diam-diam memblokir "Unity selesai" — kalau pemilik project mau ini jadi blocker, bilang eksplisit sebelum implementasi mulai.
+**Keputusan (bukan lagi capsule):** pakai ulang `Assets/Avatar/Model/AvatarSample_A.vrm` untuk `humanoidBody` juga, TAPI dengan material/warna berbeda dari avatar AI guide di `TestingHCM.unity` (mis. tint warna baju/kulit) supaya secara visual jelas beda "ini pemandu saya" vs "ini teman saya" di AR — tanpa itu keduanya identik dan membingungkan. Ini kerja material Unity biasa (duplikat Material asset, ganti warna, assign ke `humanoidBody`), bukan pembuatan model baru, jadi selesai bersamaan dengan kerja kode §3.1-3.3, tidak menunggu aset bespoke. `capsuleBody` tinggal jadi fallback kalau kerja tint ini sampai terlewat, bukan lagi default utama.
 
 ### 3.5 Verifikasi wajib sebelum "Unity selesai"
 
@@ -144,7 +144,7 @@ Interface yang dikunci untuk dipakai nanti: `POST /api/friends/request {identifi
 
 ## 6. Di luar scope sesi ini (dicatat, bukan dilupakan)
 
-- Aset 3D avatar teman (§3.4) — kebutuhan konten, bukan kode.
+- Model 3D bespoke khusus teman — diputuskan tidak perlu (§3.4), `AvatarSample_A.vrm` yang sudah ada dipakai ulang dengan tint warna, jadi ini bukan lagi item terbuka.
 - Desain UI WebView friendlist.
 - Auth token sungguhan dari MyRSIy (tetap client-trusted `user_id`).
 - Uji lapangan dua-device Photon sungguhan (§3.5) — dijadwalkan setelah implementasi, bukan bagian dari spec ini.
