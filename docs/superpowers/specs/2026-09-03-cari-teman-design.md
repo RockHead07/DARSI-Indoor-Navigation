@@ -6,12 +6,14 @@
 
 Bangun fitur Cari Teman lintas-repo (darsi-backend, Unity, WebView terpisah) sesuai `docs/FLOWS.md` §5 dan ADR-010/011/013/017, dengan urutan kerja **Unity lebih dulu** supaya mekanisme render+navigasi teman "matang" sebelum WebView friendlist (yang UI-nya belum dirancang di sini) dibangun di atasnya.
 
+**Unity tidak menunggu backend.** §2 ditulis lebih dulu di dokumen ini karena Unity butuh definisi `connectionId`/kontrak API untuk tahu apa yang disambungkan nanti, tapi itu urutan DOKUMEN, bukan urutan KERJA. `UaaLEntryPoint.cs` sudah punya pola debug harness (`[ContextMenu] Debug_SimulateNavigate`, dkk., baris ~327-343) untuk menembak payload `launchAR` palsu tanpa Flutter/WebView. Pola sama persis dipakai untuk Cari Teman: method debug yang menyuntik `connectionId` string bebas langsung ke `JoinFriendRoom()`, dua device dev bisa uji seluruh pipeline Photon/render/navigasi TANPA backend sama sekali. Itulah bentuk paling literal dari "Unity selesai dulu" — backend jadi pekerjaan yang melengkapi alur sungguhan, bukan prasyarat untuk mulai.
+
 ## Non-goals (sengaja di luar spec ini)
 
 - Desain UI WebView friendlist — dapat kontrak API saja di sini, desain visualnya brainstorming terpisah setelah Unity selesai (permintaan eksplisit pemilik project).
 - Auth token sungguhan dari MyRSIy — tetap model client-trusted `user_id`, konsisten dengan `presence` yang sudah ada (ADR-017 belum menuntut lebih dari ini).
-- Body-tracking/animasi gestur avatar teman — posisi+orientasi horizontal saja (lihat `PlayerSync.cs` existing, floor-snapped).
-- Model 3D avatar teman yang baru — gap aset dicatat, keputusan pemakaian aset sementara ada di §4.4, tapi pengadaan aset baru bukan bagian pekerjaan kode ini.
+- Body-tracking/animasi gestur avatar teman — posisi+orientasi horizontal saja (lihat `PlayerSync.cs` existing, floor-snapped). Animasi idle/walk dua-state TERMASUK scope (§3.2), ini soal gestur tangan/ekspresi/motion capture yang tetap di luar.
+- Model 3D avatar teman yang baru — gap aset dicatat, keputusan pemakaian aset sementara ada di §3.4, tapi pengadaan aset baru bukan bagian pekerjaan kode ini.
 
 ## Amandemen: `docs/FLOWS.md` §5b (dot → humanoid avatar)
 
@@ -103,8 +105,9 @@ Auth: trust `user_id` dari body, pola sama dengan endpoint `presence` yang sudah
 
 ### 3.2 `PlayerSync.cs`
 
-- `ApplyOwnershipVisuals()`: ganti `capsuleBody.SetActive(true)` / `humanoidBody.SetActive(false)` untuk kasus remote-player jadi sebaliknya, begitu prefab humanoid terisi (lihat §4.4 untuk keputusan aset). Field `humanoidBody` sudah ada, tidak perlu field baru.
+- `ApplyOwnershipVisuals()`: ganti `capsuleBody.SetActive(true)` / `humanoidBody.SetActive(false)` untuk kasus remote-player jadi sebaliknya, begitu prefab humanoid terisi (lihat §3.4 untuk keputusan aset). Field `humanoidBody` sudah ada, tidak perlu field baru.
 - Sisanya (position/rotation sync, floor-snap, name-tag billboard) tidak berubah.
+- **Animasi Idle/Walk pada `humanoidBody` (disetujui pemilik project, sengaja disederhanakan):** dua klip sudah ada di repo tapi belum dipakai — `Assets/Photon/PhotonUnityNetworking/Demos/Shared Assets/Animations/HumanoidIdle.fbx` dan `HumanoidWalk.fbx`. Animator Controller baru dengan DUA state saja (Idle, Walk) dan SATU parameter float `Speed`, transisi dua arah pada ambang mis. `Speed > 0.1`. `Speed` dihitung di `Update()` remote-player dari `(targetLocalPos - transform.localPosition).magnitude / Time.deltaTime` per frame — tidak perlu field sync baru lewat `OnPhotonSerializeView`, kecepatan gerak sudah cukup diturunkan dari posisi yang sudah disinkron. Sengaja TIDAK ada state Run/blend tree/root motion — `HumanoidRun.fbx` dkk. ada di folder yang sama tapi tidak dipakai untuk sekarang, sesuai permintaan eksplisit ("keep it simple — idle and walk only for now").
 
 ### 3.3 `FriendListPanel.cs` / `FriendListEntry.cs` / `PlayerInfoPopup.cs` / `PlayerNavigationController.cs`
 
