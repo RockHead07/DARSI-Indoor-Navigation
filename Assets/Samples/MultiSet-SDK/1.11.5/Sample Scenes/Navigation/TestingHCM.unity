@@ -4072,14 +4072,14 @@ MonoBehaviour:
   stallSecondsBeforeWaiting: 1.5
   advanceEpsilon: 0.05
   arrivalThreshold: 1.5
-  moveSpeed: 1.4
+  moveSpeed: 1.1
   catchUpGain: 1
   maxSpeed: 3
   repositionDeadzone: 0.35
   turnSpeed: 6
   animator: {fileID: 1458944694}
   speedParam: Speed
-  walkClipSpeed: 1.589
+  walkClipSpeed: 1.4
   waveParam: Wave
   pointParam: Point
   pointDirParam: PointDir

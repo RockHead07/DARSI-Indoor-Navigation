@@ -33,6 +33,11 @@ using UnityEngine;
 /// tidak kunjung mendekat (chaseStallSeconds), avatar balik menjemput (Chasing) dengan
 /// kecepatan tetap juga (chaseSpeed) -- bukan proporsional. Tidak ada lagi rumus kecepatan
 /// yang bergantung jarak di mana pun dalam file ini.
+///
+/// CHASING TIBA BUKAN LANGSUNG JALAN LAGI (2026-09-04): begitu Chasing berhasil menyusul
+/// pengguna (chaseArrivalDistance), avatar BERHENTI dan melambai dulu (menarik perhatian,
+/// bukan diam-diam lanjut seolah tidak terjadi apa-apa) sebelum memilih waypoint berikutnya
+/// -- pakai gerbang hold yang sama dengan sapaan awal StartLeading(), lihat greetingHoldSeconds.
 /// </summary>
 [DisallowMultipleComponent]
 public class AIAvatarGuideController : MonoBehaviour
@@ -59,8 +64,21 @@ public class AIAvatarGuideController : MonoBehaviour
              "titik berikutnya dan jalan lagi.")]
     [SerializeField] private float advanceTriggerDistance = 1.5f;
     [Tooltip("Berapa lama avatar menunggu di titiknya sebelum menyerah dan balik menjemput " +
-             "pengguna (Chasing) -- supaya pengguna tidak pernah benar-benar tersesat.")]
-    [SerializeField] private float chaseStallSeconds = 6.0f;
+             "pengguna (Chasing) -- supaya pengguna tidak pernah benar-benar tersesat. " +
+             "Dinaikkan dari 6 ke 8 detik (2026-09-04) supaya pasien yang berhenti sejenak " +
+             "membaca papan nama tidak langsung memicu Chasing.")]
+    [SerializeField] private float chaseStallSeconds = 8.0f;
+    [Tooltip("Jarak henti KHUSUS saat menjemput (Chasing) -- SENGAJA terpisah dari " +
+             "waypointArrivalEpsilon, bukan berbagi nilai yang sama. waypointArrivalEpsilon " +
+             "(0,15 m) pas untuk berhenti di titik rute kosong, tapi kalau dipakai juga untuk " +
+             "berhenti tepat di depan PENGGUNA, avatar wajib menembus fadeStartDistance " +
+             "(0,9 m) lalu fadeEndDistance (0,5 m) milik AvatarSafetyFade dulu -- itu " +
+             "penyebab avatar 'hilang mendadak lalu muncul lagi entah di mana' yang " +
+             "dilaporkan pengguna, dikonfirmasi lewat telemetri Play Mode 2026-09-04 (avatar " +
+             "tetap bergerak SELAMA renderer padam, jadi terlihat teleport begitu muncul " +
+             "lagi). Nilai ini WAJIB lebih besar dari AvatarSafetyFade.fadeStartDistance " +
+             "supaya Chasing tidak pernah masuk zona itu.")]
+    [SerializeField] private float chaseArrivalDistance = 1.5f;
     [Tooltip("Sisa rute sependek ini dianggap sudah tiba.")]
     [SerializeField] private float arrivalThreshold = 1.5f;
     [Tooltip("Jarak dari tujuan sesungguhnya ke titik SAMPING tempat avatar berdiri saat " +
@@ -69,18 +87,28 @@ public class AIAvatarGuideController : MonoBehaviour
              "dulu -- keputusan sadar, lihat docs/superpowers/plans kalau ada laporan avatar " +
              "kejeblos dinding di lorong sempit.")]
     [SerializeField] private float sideOffsetDistance = 1.0f;
-    [Tooltip("Seberapa dekat dianggap 'sudah sampai' di suatu titik (waypoint/titik samping " +
-             "POI/posisi pengguna saat mengejar).")]
+    [Tooltip("Seberapa dekat dianggap 'sudah sampai' di suatu titik RUTE (waypoint/titik " +
+             "samping POI). BUKAN dipakai untuk Chasing lagi (2026-09-04) -- itu sekarang " +
+             "pakai chaseArrivalDistance sendiri, lihat tooltip-nya kenapa dipisah.")]
     [SerializeField] private float waypointArrivalEpsilon = 0.15f;
 
     [Header("Gerak")]
     [Tooltip("Kecepatan jalan KONSTAN avatar menuju titiknya. Tidak pernah berubah karena " +
-             "jarak -- itulah intinya model ini.")]
-    [SerializeField] private float moveSpeed = 1.4f;
+             "jarak -- itulah intinya model ini. Diturunkan dari 1,4 ke 1,1 (2026-09-04, " +
+             "permintaan pemilik project) supaya jalan normal terasa lebih santai, tidak " +
+             "buru-buru -- animasi Walk TETAP main di walkAnimSpeed (lihat field itu), " +
+             "keduanya sekarang SENGAJA lepas satu sama lain, bukan diikat rasio seperti " +
+             "sebelumnya.")]
+    [SerializeField] private float moveSpeed = 1.1f;
     [Tooltip("Kecepatan KONSTAN saat menjemput pengguna (state Chasing). Sengaja tetap, " +
              "bukan proporsional ke jarak -- itu pola yang terbukti bikin gerakan tidak wajar " +
-             "di model lama.")]
-    [SerializeField] private float chaseSpeed = 1.8f;
+             "di model lama. Dinaikkan ke 2,8 (2026-09-04, permintaan pemilik project) supaya " +
+             "menjemput terasa sungguhan berlari -- dipasangkan dengan klip MediumRun di " +
+             "BlendTree Locomotion (threshold-nya harus sama persis dengan angka ini, itu " +
+             "murni menentukan pose mana yang di-blend, BUKAN kecepatan putar animasi). " +
+             "Kecepatan putar animasi saat berlari main di runAnimSpeed sendiri, lepas dari " +
+             "angka ini -- lihat field itu.")]
+    [SerializeField] private float chaseSpeed = 2.8f;
     [SerializeField] private float turnSpeed = 6.0f;
     [Tooltip("Waktu meredam PERUBAHAN kecepatan (detik) tiap kali avatar mulai bergerak dari " +
              "diam -- supaya ada fase mempercepat singkat, bukan langsung penuh seketika.")]
@@ -89,13 +117,35 @@ public class AIAvatarGuideController : MonoBehaviour
     [Header("Animator")]
     [SerializeField] private Animator animator;
     [SerializeField] private string speedParam = "Speed";
-    [Tooltip("Kecepatan yang DIPROGRAM di klip Walk (m/s), diukur dari clip.averageSpeed. " +
-             "Harus sama dengan threshold Walk di BlendTree. Dipakai untuk menyelaraskan " +
-             "kecepatan putar klip dengan kecepatan gerak sesungguhnya supaya kaki tidak selip.")]
-    [SerializeField] private float walkClipSpeed = 1.589f;
-    [Tooltip("Trigger sapaan saat mulai memimpin, DIPAKAI ULANG juga saat tiba di tujuan " +
-             "(melambai menandakan 'kita sudah sampai') -- simetris, bukan dua gestur beda.")]
+    [Tooltip("Kecepatan PUTAR (animator.speed) klip Walk saat berjalan normal -- LEPAS dari " +
+             "moveSpeed (2026-09-04, permintaan pemilik project). Sebelumnya dua-duanya " +
+             "diikat lewat rasio speed/walkClipSpeed supaya kaki tidak selip; itu sekarang " +
+             "SENGAJA dilepas -- klip Walk Mixamo yang dipakai IN-PLACE (root motion nol, " +
+             "dikonfirmasi lewat AnimationUtility ke curve RootT.x/y/z) jadi tidak ada " +
+             "kecepatan 'sungguhan' untuk diselaraskan sejak awal. 1.0 = kecepatan alami " +
+             "hasil mocap, kurangi sedikit (mis. 0,9) kalau ingin terlihat sedikit lebih " +
+             "lambat/tenang.")]
+    [SerializeField] private float walkAnimSpeed = 1.0f;
+    [Tooltip("Kecepatan PUTAR (animator.speed) klip MediumRun saat menjemput (Chasing) -- " +
+             "LEPAS dari chaseSpeed, alasan sama dengan walkAnimSpeed. Default 1.0 = klip " +
+             "main di kecepatan alami mocap-nya.")]
+    [SerializeField] private float runAnimSpeed = 1.0f;
+    [Tooltip("Trigger sapaan. DIPAKAI ULANG di TIGA tempat, bukan tiga gestur beda: (1) awal " +
+             "StartLeading(), (2) begitu Chasing berhasil menyusul pengguna -- menarik " +
+             "perhatian sebelum jalan lagi (2026-09-04), (3) begitu tiba di tujuan akhir " +
+             "(ArrivalPointing) -- 'kita sudah sampai'. Semuanya melambai, bukan gestur " +
+             "berbeda per konteks.")]
     [SerializeField] private string waveParam = "Wave";
+    [Tooltip("Berapa lama avatar WAJIB diam (Drive(0), tidak jalan) begitu Wave dipicu -- " +
+             "dipakai gerbang yang sama untuk sapaan awal StartLeading() MAUPUN begitu " +
+             "Chasing berhasil menyusul pengguna (2026-09-04) -- supaya tidak terlihat mulai " +
+             "jalan sambil masih melambai di kedua kasus. Diambil dari klip Wave sungguhan: " +
+             "length 3,0 s, transisi Wave -> Locomotion exitTime 0,95 (AvatarGuide.controller) " +
+             "= 2,85 s -- dibulatkan sedikit ke atas jadi 2,9 s supaya jalan baru mulai TEPAT " +
+             "setelah gestur benar-benar selesai blending, bukan di tengah crossfade. Wave di " +
+             "tujuan (arrival) TIDAK butuh field ini -- di sana avatar sudah berhenti permanen " +
+             "sebelum melambai, tidak akan jalan lagi sampai StartLeading() berikutnya.")]
+    [SerializeField] private float greetingHoldSeconds = 2.9f;
 
     private Transform _user;
     private LineRenderer _line;
@@ -104,6 +154,8 @@ public class AIAvatarGuideController : MonoBehaviour
     private GuideState _state = GuideState.IdleStand;
     private bool _leading;
     private int _speedHash, _waveHash;
+    private bool _holdingForGreeting; // diam wajib selama Wave awal masih diputar (greetingHoldSeconds)
+    private float _greetingElapsed;   // sudah berapa lama menahan diam untuk Wave awal
     private bool _needsWaypoint;      // belum ada titik dipilih, pilih di frame Update() berikutnya
     private Vector3 _waypoint;        // titik yang sedang dituju/ditunggui (LeadingPath/WaitingForUser)
     private Vector3 _arrivalTarget;   // titik SAMPING POI, dihitung sekali saat tiba terdeteksi
@@ -114,6 +166,11 @@ public class AIAvatarGuideController : MonoBehaviour
 
     public GuideState CurrentState => _state;
     public bool IsLeading => _leading;
+
+    // Diagnostik, dibaca HUD pengujian. Bukan untuk dipakai logika.
+    public float DiagCurrentSpeed => _currentSpeed;
+    public Vector3 DiagWaypoint => _waypoint;
+    public bool DiagHoldingForGreeting => _holdingForGreeting;
 
     private void Awake()
     {
@@ -148,6 +205,11 @@ public class AIAvatarGuideController : MonoBehaviour
         _waitingElapsed = 0f;
         _currentSpeed = 0f;   // mulai dari diam tiap sesi memimpin baru, bukan menyambung kecepatan lama
         _speedVelocity = 0f;
+        // Diam WAJIB selama Wave diputar (lihat tooltip greetingHoldSeconds) -- avatar TIDAK
+        // boleh mulai jalan sambil masih melambai. _needsWaypoint tetap true, waypoint baru
+        // dipilih begitu hold ini berakhir (lihat gerbang di Update()).
+        _holdingForGreeting = true;
+        _greetingElapsed = 0f;
         SetState(GuideState.LeadingPath);
         // Menyapa dulu sebelum jalan, seperti pemandu sungguhan.
         if (animator != null && animator.isActiveAndEnabled) animator.SetTrigger(_waveHash);
@@ -186,6 +248,19 @@ public class AIAvatarGuideController : MonoBehaviour
         }
         SetVisible(true);
 
+        // Diam wajib selama Wave awal masih diputar -- lihat tooltip greetingHoldSeconds dan
+        // StartLeading(). Gerbang ini WAJIB sebelum pembacaan rute, supaya _needsWaypoint
+        // (masih true dari StartLeading()) tidak sempat dipakai memilih waypoint dan jalan
+        // sebelum gestur sapaan selesai.
+        if (_holdingForGreeting)
+        {
+            FaceTowards(_user.position);
+            Drive(0f);
+            _greetingElapsed += Time.deltaTime;
+            if (_greetingElapsed >= greetingHoldSeconds) _holdingForGreeting = false;
+            return;
+        }
+
         // LineRenderer menyimpan garis TERAKHIR yang digambar, termasuk sisa dari sesi
         // sebelumnya, sampai ShowPath sempat menghitung ulang (pathUpdateFrequency 0.5s).
         // Tanpa gerbang ini, frame-frame pertama membaca garis basi sepanjang ~1 m dan
@@ -214,7 +289,7 @@ public class AIAvatarGuideController : MonoBehaviour
                 SetState(GuideState.ArrivalPointing);
             }
 
-            bool arrivedAtSide = MoveToward(_arrivalTarget, moveSpeed);
+            bool arrivedAtSide = MoveToward(_arrivalTarget, moveSpeed, waypointArrivalEpsilon, walkAnimSpeed);
             if (arrivedAtSide)
             {
                 FaceTowards(_user.position);
@@ -257,10 +332,24 @@ public class AIAvatarGuideController : MonoBehaviour
             {
                 Vector3 userTarget = _user.position;
                 userTarget.y = transform.position.y;
-                bool caughtUp = MoveToward(userTarget, chaseSpeed);
+                bool caughtUp = MoveToward(userTarget, chaseSpeed, chaseArrivalDistance, runAnimSpeed);
                 if (caughtUp)
                 {
-                    _waypoint = NextWaypoint(userS, pathLength);
+                    // Sungguhan sudah di depan pengguna (chaseArrivalDistance) -- BERHENTI
+                    // dan lambai dulu untuk menarik perhatian (permintaan pemilik project
+                    // 2026-09-04), jangan langsung jalan lagi seolah tidak terjadi apa-apa.
+                    // Pakai gerbang hold yang SAMA dengan sapaan awal StartLeading() --
+                    // Wave yang dipicu literally sama, jadi durasi tahannya juga harus sama
+                    // (greetingHoldSeconds, sudah diselaraskan ke transisi Wave->Locomotion
+                    // sungguhan). _needsWaypoint dipasang true supaya waypoint BARU dipilih
+                    // begitu hold berakhir, bukan dihitung sekarang pakai userS yang mungkin
+                    // sudah basi begitu pengguna akhirnya mulai jalan lagi.
+                    FaceTowards(_user.position);
+                    Drive(0f);
+                    if (animator != null && animator.isActiveAndEnabled) animator.SetTrigger(_waveHash);
+                    _holdingForGreeting = true;
+                    _greetingElapsed = 0f;
+                    _needsWaypoint = true;
                     _waitingElapsed = 0f;
                     SetState(GuideState.LeadingPath);
                 }
@@ -276,7 +365,7 @@ public class AIAvatarGuideController : MonoBehaviour
                 }
 
                 SetState(GuideState.LeadingPath);
-                bool reachedWaypoint = MoveToward(_waypoint, moveSpeed);
+                bool reachedWaypoint = MoveToward(_waypoint, moveSpeed, waypointArrivalEpsilon, walkAnimSpeed);
                 if (reachedWaypoint)
                 {
                     _waitingElapsed = 0f;
@@ -316,12 +405,16 @@ public class AIAvatarGuideController : MonoBehaviour
     /// <summary>Gerakkan avatar menuju target dengan kecepatan KONSTAN yang diredam
     /// SmoothDamp cuma di fase mulai bergerak dari diam -- bukan fungsi jarak seperti model
     /// lama. Dipakai jalur LeadingPath, Chasing, dan jalan ke titik samping POI: satu jalur
-    /// gerak, bukan tiga salinan logika yang bisa saling melenceng.
-    /// Mengembalikan true begitu sudah cukup dekat target (waypointArrivalEpsilon).</summary>
-    private bool MoveToward(Vector3 target, float targetSpeed)
+    /// gerak, bukan tiga salinan logika yang bisa saling melenceng. Jarak henti (arrivalEpsilon)
+    /// diberikan pemanggil, BUKAN satu nilai tetap milik method ini -- Chasing butuh jarak
+    /// henti lebih jauh daripada berhenti di waypoint kosong (lihat chaseArrivalDistance).
+    /// animSpeed juga diberikan pemanggil -- kecepatan gerak (targetSpeed) dan kecepatan
+    /// putar animasi (animSpeed) SENGAJA lepas satu sama lain (2026-09-04).
+    /// Mengembalikan true begitu jarak ke target &lt;= arrivalEpsilon.</summary>
+    private bool MoveToward(Vector3 target, float targetSpeed, float arrivalEpsilon, float animSpeed)
     {
         Vector3 before = transform.position;
-        if (Vector3.Distance(before, target) <= waypointArrivalEpsilon)
+        if (Vector3.Distance(before, target) <= arrivalEpsilon)
         {
             Drive(0f);
             return true;
@@ -332,7 +425,7 @@ public class AIAvatarGuideController : MonoBehaviour
 
         Vector3 moved = transform.position - before;
         if (moved.sqrMagnitude > 1e-8f) FaceTowards(transform.position + moved);
-        Drive(moved.magnitude / Mathf.Max(Time.deltaTime, 1e-5f));
+        Drive(moved.magnitude / Mathf.Max(Time.deltaTime, 1e-5f), animSpeed);
         return false;
     }
 
@@ -369,25 +462,23 @@ public class AIAvatarGuideController : MonoBehaviour
         transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), t);
     }
 
-    private void Drive(float speed)
+    /// <summary>animSpeed default 1f supaya semua pemanggil lama (Drive(0f) saat diam/
+    /// menunggu) tidak perlu diubah -- animator.speed cuma relevan saat sungguhan bergerak.
+    ///
+    /// KEPUTUSAN 2026-09-04 (permintaan pemilik project): kecepatan gerak (speed, m/s,
+    /// dipakai untuk BlendTree Speed parameter + menentukan pose mana yang di-blend) dan
+    /// kecepatan putar animasi (animSpeed, dipakai untuk animator.speed) SENGAJA dilepas
+    /// satu sama lain di sini -- sebelumnya diikat lewat rasio speed/walkClipSpeed supaya
+    /// kaki tidak selip, tapi klip Walk/MediumRun Mixamo yang dipakai IN-PLACE (root motion
+    /// nol) sejak awal tidak punya kecepatan "sungguhan" untuk diselaraskan itu. Sekarang
+    /// tiap pemanggil MoveToward() memberi animSpeed-nya sendiri (walkAnimSpeed/
+    /// runAnimSpeed) -- biasanya 1.0 (klip main di kecepatan alami mocap-nya) lepas dari
+    /// seberapa cepat moveSpeed/chaseSpeed sungguhan.</summary>
+    private void Drive(float speed, float animSpeed = 1f)
     {
         if (animator == null || !animator.isActiveAndEnabled) return;
         animator.SetFloat(_speedHash, speed, 0.1f, Time.deltaTime);
-
-        // Selaraskan kecepatan PUTAR klip dengan kecepatan gerak sesungguhnya.
-        //
-        // Klip Walk dari Mixamo membawa root motion maju 1,589 m/s (terukur lewat
-        // clip.averageSpeed; klip lain semuanya 0 karena "in place"). Avatar digerakkan
-        // AIAvatarGuideController pada kecepatan berbeda, dan selisihnya membuat telapak
-        // kaki menggeser di lantai. Tanpa penyelarasan ini, selisih 1,4 vs 1,589 saja
-        // sudah terasa sebagai langkah yang "tidak pas". Sekarang kecepatan gerak SELALU
-        // salah satu dari dua konstanta (moveSpeed/chaseSpeed), jadi rasio ini juga jauh
-        // lebih stabil daripada model lama yang bisa berapa saja.
-        //
-        // Klip diam (Idle, Wave) averageSpeed-nya 0, jadi saat tidak berjalan kecepatan
-        // putar dikembalikan normal supaya sapaan tidak ikut melambat/dipercepat.
-        float ratio = (speed > 0.05f && walkClipSpeed > 0.01f) ? speed / walkClipSpeed : 1f;
-        animator.speed = Mathf.Clamp(ratio, 0.4f, 1.8f);
+        animator.speed = speed > 0.05f ? animSpeed : 1f;
     }
 
     private void SetVisible(bool v)

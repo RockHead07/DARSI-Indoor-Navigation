@@ -13,7 +13,7 @@ using UnityEngine.InputSystem;
 public class SimpleSandboxFreeCam : MonoBehaviour
 {
     [Header("Movement Settings")]
-    [SerializeField] private float moveSpeed = 3.5f;
+    [SerializeField] private float moveSpeed = 1.3f;
     [SerializeField] private float sprintMultiplier = 2.0f;
     [SerializeField] private float lookSensitivity = 0.15f;
 

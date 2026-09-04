@@ -22,7 +22,7 @@ public class AvatarAudioClient : MonoBehaviour
 {
     [Header("Backend TTS Endpoint")]
     [Tooltip("Base URL backend. Kosongkan trailing slash.")]
-    [SerializeField] private string baseUrl = "http://127.0.0.1:8000";
+    [SerializeField] private string baseUrl = "https://api-darsi.rockhead07.tech";
 
     [Tooltip("Timeout permintaan sintesis TTS (detik).")]
     [SerializeField] private int timeoutSeconds = 15;

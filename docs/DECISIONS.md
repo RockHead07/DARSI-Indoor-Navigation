@@ -1282,6 +1282,190 @@ nyata — ini keputusan yang sengaja ditunda, bukan yang dilupakan.
 **Yang TIDAK berubah:** kewajiban bukti eksekusi di keputusan 4 tetap berlaku penuh untuk
 perubahan apa pun pada mekanisme ini di masa depan.
 
+#### Amandemen 034-B (2026-09-03/04) — Model gerak diganti total ke "lompat-tunggu"; avatar ternyata tidak pernah benar-benar berdiri di lantai nyata; TERVERIFIKASI Play Mode 2026-09-04
+
+**Status per 2026-09-04: model gerak baru SUDAH dijalankan lewat Play Mode sungguhan di
+`Sandbox_AvatarCompanion.unity` dan TERBUKTI BEKERJA** — lihat poin 6 dan bagian "Hasil
+verifikasi Play Mode" di bawah. Sebelum tanggal ini, bagian ini hanya lolos compile check dan
+tinjauan baris-per-baris manual; itu sudah tidak berlaku lagi. Yang MASIH belum diverifikasi:
+uji device fisik untuk model baru ini (poin 4-6 lama), dan angka `walkClipSpeed` sungguhan
+(lihat gap di bawah) — Play Mode di Editor sudah cukup untuk membuktikan mekanismenya benar,
+tapi belum membuktikan perasaan geraknya wajar di device sungguhan.
+
+**Rangkaian temuan yang memicu amandemen ini, urut kejadian:**
+
+1. Uji device fisik pertama kali (setelah sekian lama tertunda) menunjukkan avatar pemandu
+   tampil kecil melayang di dinding, bukan berdiri di lantai. **Root cause**: `Avatar_Guide`
+   di `TestingHCM.unity` adalah objek root-level (`m_Father: 0`), BUKAN anak `Map Space`.
+   MultiSet menggeser/memutar `Map Space` setelah localize sukses untuk menyelaraskan konten
+   dengan ruangan asli — pola yang sama sudah dipakai `PlayerSync.cs` untuk pemain jaringan,
+   tapi tidak pernah diterapkan ke avatar pemandu tunggal ini. **Diperbaiki**: reparent ke
+   `Map Space`. **TERKONFIRMASI device** lewat screenshot langsung — avatar sekarang berdiri
+   tepat di lantai mesh sungguhan.
+2. Setelah diperbaiki, avatar berdiri diam di anchor, tidak pernah mengikuti pengguna.
+   **Root cause**: `AvatarGuideNavigationBridge.OnLocalizationSuccess` (satu dari DUA
+   pemanggil sah `StartLeading()` untuk jalur navigasi non-suara) tidak pernah terpasang
+   sebagai persistent listener di UnityEvent `LocalizationSuccess` milik
+   `SingleFrameLocalizationManager` — cuma 4 dari 6 slot array yang terisi (PhotonManager,
+   UaaLEntryPoint, FloorVisibilityManager, FloorTransitionController), bridge ini tidak
+   termasuk. **Diperbaiki**: didaftarkan sebagai listener ke-7. **TERKONFIRMASI device** —
+   avatar benar-benar memimpin, bukan diam.
+3. Setelah avatar bisa mengikuti, dilaporkan bergerak "tiba-tiba lari, tidak ada fase jalan".
+   **Root cause pertama (dangkal)**: kecepatan gerak (`moveSpeed + gap*catchUpGain`, dibatasi
+   `maxSpeed`) dihitung ulang & diterapkan SEKETIKA tiap frame tanpa peredaman — gap melompat
+   wajar (titik bidik dihitung ulang tiap frame dari `ShowPath`, terutama di tikungan) bikin
+   avatar melompat langsung ke kecepatan tinggi. Tambalan pertama: `Mathf.SmoothDamp` antara
+   kecepatan target dan kecepatan sungguhan (`speedSmoothTime`).
+4. Audit independen lewat Antigravity CLI (`agy`, dua putaran, prompt CO-STAR, verifikasi
+   manual sebelum dipercaya — lihat memory `antigravity-cli-verification-pattern`) menemukan
+   DUA cacat nyata yang lolos dari tambalan-tambalan di atas:
+   - Tambalan darurat `autoConnect: false` di `PhotonManager` (mencegah auto-join ke room
+     Photon terbuka `GedungA_Lt1`, pola auto-discovery yang dilarang ADR-010/013) TIDAK
+     benar-benar menutup kebocoran — `OnLocalizationSuccess()` memanggil `Connect()`
+     independen dari flag itu. **Diperbaiki**: guard `autoConnect` dipindah ke awal
+     `OnLocalizationSuccess()` juga.
+   - `AIAvatarGuideController.StartLeading()` punya DUA pemanggil sah (`AvatarAudioClient`
+     langsung untuk alur suara ADR-034 asli, `AvatarGuideNavigationBridge` reaktif untuk
+     alur navigasi) yang bisa dua-duanya terpanggil untuk sesi memimpin yang SAMA di alur
+     suara — mereset `_needsSnap`/kecepatan dan memicu ulang animasi Wave di tengah gerakan.
+     **Diperbaiki**: `StartLeading()` dibuat idempoten (`if (_leading) return;`).
+5. **Keputusan akhir, bukan tambalan lagi**: root cause SEBENARNYA dari "tiba-tiba lari"
+   bukan soal peredaman, tapi soal MODEL-nya sendiri. Model lama ("tali kekang") mengikat
+   avatar SELALU tepat `leadDistance` di depan pengguna, dihitung ulang tiap frame — ini
+   MEMAKSA kecepatan gerak jadi fungsi proporsional dari jarak yang terus berubah
+   (`catchUpGain`/`maxSpeed`), dan itulah yang secara struktural rawan melompat, seberapa
+   pun diredam gejalanya.
+6. **Verifikasi Play Mode sungguhan (2026-09-04)** — lihat "Hasil verifikasi Play Mode" di
+   bawah untuk detail lengkap. Ringkas: model baru TERBUKTI jalan sungguhan (bukan cuma
+   compile-clean), dan satu bug baru ditemukan di kode vendor MultiSet SDK (`ShowPath.cs`),
+   BUKAN di kode kami.
+
+**Hasil verifikasi Play Mode (2026-09-04):**
+
+Dipicu oleh keraguan pemilik project ("id believe it still won't work properly") setelah rig
+uji `agy` selesai. Diverifikasi langsung, bukan lewat laporan `agy` — Coplay MCP tersambung
+penuh ke Editor (`Window > MCP for Unity` sudah dibuka), sehingga bisa masuk Play Mode dan
+membaca state komponen secara langsung.
+
+- **Prasyarat dicek dulu, bukan diasumsikan**: compile bersih, NavMesh benar-benar ter-bake
+  (`NavMesh.CalculateTriangulation()` → 16 vertex, bounds ±24,33 m), posisi `RouteStart`/
+  `RouteEnd` persis (0,0,2) dan (0,0,8) sesuai spec, `GuideStateHUD.TriggerRoute()` memanggil
+  urutan API yang benar (`ShowPath.SetPositionFrom/SetPositionTo` lalu `guide.StartLeading()`)
+  tanpa menyentuh `AIAvatarGuideController.cs`.
+- **Masuk Play Mode dan memicu rute langsung lewat skrip** (memanggil `TriggerRoute()`,
+  bukan simulasi tombol `R`) sambil mengambil sampel `Transform.position` avatar dengan jeda
+  waktu nyata di antaranya — posisi BENAR-BENAR berubah (z≈1,8 → z≈4,85 dalam satu leg,
+  berhenti tepat di waypoint dalam `waypointArrivalEpsilon`). Log konsol independen
+  mengonfirmasi siklus state lengkap terjadi berulang kali selama ~50 detik:
+  `IdleStand → LeadingPath → WaitingForUser → Chasing → LeadingPath → ArrivalPointing`.
+  Ini bukti eksekusi sungguhan, bukan lagi pembacaan kode.
+- **Bug baru ditemukan, di kode VENDOR bukan kode kami**: `ShowPath.cs:112` (paket
+  `com.multiset.sdk`, bukan skrip project) memanggil
+  `NavigationController.instance.IsCurrentlyNavigating()` tanpa null-check di dalam cabang
+  "path tidak valid selama `invalidPathTimeout` (15 detik)". Sandbox sengaja tidak punya
+  `NavigationController` (rig test murni, lihat prompt `agy` di
+  `docs/superpowers/plans/2026-09-03-fake-route-rig-prompt.md`), jadi begitu timer itu
+  terpicu sekali, `NullReferenceException` dilempar ULANG setiap ~0,5 detik SELAMANYA sampai
+  Play Mode berhenti — dikonfirmasi lewat `get_unity_logs`, puluhan entri error berturut-turut
+  dengan stack trace identik. **Dicek dan dikonfirmasi ini TIDAK berdampak produksi**:
+  `TestingHCM.unity` (scene sungguhan) memang punya `NavigationController` (`grep` langsung
+  ke file scene), jadi kondisi null ini murni artefak rig sandbox yang sengaja minimal.
+  Tidak mendesak diperbaiki, tapi kalau sandbox dipakai lagi untuk sesi pengujian panjang,
+  console akan penuh spam error ini begitu satu route sempat invalid 15 detik — pertimbangkan
+  menambah `NavigationController` dummy ke scene sandbox kalau ini mengganggu.
+- **Catatan metodologi, bukan temuan bug**: log menunjukkan 5 event "Route dipasang" padahal
+  hanya satu yang dipicu lewat skrip verifikasi ini — indikasi kuat ada proses lain (sesi
+  paralel dengan Editor Unity yang sama, gotcha yang sudah tercatat di memory
+  `unity-repo-shared-branch-gotcha`) yang juga menekan tombol `R` di Play Mode yang sama
+  secara bersamaan. Play Mode juga berhenti sendiri di akhir sesi tanpa dihentikan lewat
+  Coplay — penyebab pasti tidak dipastikan (kandidat: aktor bersamaan yang sama, atau Error
+  Pause Unity bereaksi ke spam NRE di atas). Ini TIDAK mengubah kesimpulan di atas karena
+  siklus state dan pergerakan posisi diverifikasi lewat sampel langsung milik sesi ini
+  sendiri, bukan cuma dari log yang berpotensi tercampur.
+
+**Model baru ("lompat-tunggu"), menggantikan seluruh mekanisme lama:**
+
+Avatar berjalan ke SATU titik tetap (`legDistance` di depan posisi pengguna, dipilih SEKALI
+saat mulai bergerak — bukan diikat ulang tiap frame) dengan kecepatan KONSTAN (`moveSpeed`),
+lalu berhenti dan menunggu (state `WaitingForUser`). Begitu pengguna cukup dekat
+(`advanceTriggerDistance`), titik berikutnya dipilih dan avatar jalan lagi. Kalau pengguna
+tidak kunjung mendekat (`chaseStallSeconds`), avatar balik menjemput (state `Chasing` baru)
+juga dengan kecepatan tetap (`chaseSpeed`) — bukan proporsional. **Tidak ada lagi rumus
+kecepatan yang bergantung jarak di mana pun** — inilah yang membuat model ini secara
+struktural tidak bisa melompat, bukan cuma diredam supaya jarang kelihatan.
+
+Saat tiba: avatar jalan ke titik SAMPING tujuan (bukan pusatnya — offset tetap satu sisi,
+sengaja belum adaptif ke geometri ruangan, lihat catatan risiko di bawah), lalu melambai
+(`Wave`, dipakai ulang dari sapaan awal — simetris, bukan gestur "Point" yang lama) begitu
+BENAR-BENAR sampai di titik itu, bukan seketika saat "dekat tujuan" terdeteksi.
+
+Field yang DIHAPUS (hanya melayani model lama): `catchUpGain`, `maxSpeed`,
+`repositionDeadzone`, `advanceEpsilon`, `stallSecondsBeforeWaiting`, `pointParam`,
+`pointDirParam`. State `Point` + BlendTree `PointBlend` + 3 klip Pointing di
+`AvatarGuide.controller` sekarang YATIM (tidak ada kode yang memicunya) — belum dihapus dari
+asset, keputusan sadar ditunda.
+
+**Risiko yang diterima, bukan diabaikan:**
+- Titik-samping-POI offset tetap (bukan adaptif) bisa membuat avatar kejeblos dinding di
+  lorong sempit. Belum ada mitigasi geometri.
+- Waypoint-hop yang terlalu jauh bisa membuat avatar menghilang sesaat di balik tikungan
+  sebelum pengguna menyusul — trade-off sadar demi menghindari model tali-kekang yang
+  bermasalah, bukan diabaikan begitu saja. `legDistance` default (3 m) sengaja konservatif.
+
+**Bagian yang berhubungan tapi terpisah — animasi diganti sumbernya:**
+
+Bersamaan dengan redesign ini, 4 klip Mixamo baru (`femaleIdle`, `femaleWalking`,
+`femaleSlowRun`, `femaleMediumRun`, format FBX for Unity) dipasang menggantikan klip lama
+(`Idle.fbx`, `Walk.fbx`, keduanya juga FBX — BUKAN perbandingan format FBX vs glTF seperti
+sempat dikira, avatar tetap VRM/glTF, cuma sumber mocap animasinya yang beda). Rig humanoid
+disalin ("Copy From Other Avatar") dari `IdleAvatar` yang sudah terverifikasi, BUKAN
+auto-detect independen — ini yang memperbaiki `hasExtraRoot` mismatch yang sempat muncul.
+`AvatarGuide.controller`'s BlendTree `Locomotion` sekarang 3-node: `Idle (0) → Walk (1.589,
+angka LAMA belum diperbarui) → SlowRun (1.8)` — penambahan node Run TIDAK butuh kode C# baru
+sama sekali, `Drive()` sudah menulis parameter `Speed` yang sama.
+
+**Gap yang jujur belum terpecahkan**: `averageSpeed` klip `Walk` baru terbaca ~0 lewat
+refleksi (klip lama: `1,59`, itulah asal angka `walkClipSpeed` di kode). Sudah dicoba flag
+`keepOriginalPositionXZ`, tidak berpengaruh — penyebab pastinya belum diketahui, dugaan
+artefak retargeting "Copy From Other Avatar". Karena root motion TIDAK diterapkan ke
+transform (kontroler menggerakkan posisi lewat skrip, bukan Animator root motion), ini cuma
+memengaruhi rasio penyelarasan kecepatan putar klip di `Drive()` (`speed / walkClipSpeed`,
+kosmetik, bukan fungsional) — tapi threshold BlendTree Walk dan `walkClipSpeed` di C# MASIH
+memakai angka lama, dan keduanya harus diubah BERSAMAAN begitu angka sungguhan didapat
+lewat rig uji di bawah.
+
+**Cara melanjutkan (untuk sesi berikutnya):**
+
+1. ~~Pastikan Coplay MCP benar-benar terhubung~~ — **selesai berulang kali, tetap berlaku
+   sebagai langkah pertama tiap sesi baru**: `Window > MCP for Unity` WAJIB dibuka di Editor
+   lebih dulu, bridge ini tidak bertahan lintas restart Editor (lihat memory
+   `coplay-needs-mcp-for-unity-bridge`).
+2. ~~Rig uji sudah dipasang~~ — **SELESAI dan TERVERIFIKASI Play Mode 2026-09-04**, bukan
+   cuma pembacaan file statis lagi. Lihat "Hasil verifikasi Play Mode" di atas.
+3. ~~WAJIB dilakukan sebelum mempercayai apa pun di atas: Play Mode, tekan R, amati HUD~~ —
+   **SELESAI 2026-09-04**, lewat pemicu langsung via skrip (setara dengan tombol `R`) plus
+   sampel posisi/state independen. Hasilnya lolos: state berpindah dari `IdleStand`, posisi
+   avatar benar-benar berubah, siklus penuh sampai `ArrivalPointing` teramati berulang kali.
+4. **Masih terbuka**: ambil angka `Average Speed` sungguhan klip `Walk` baru dari panel
+   Preview Inspector, perbarui threshold BlendTree dan `walkClipSpeed` bersamaan (keduanya
+   masih memakai angka lama, `1,589`).
+5. **Masih terbuka**: uji ulang di DEVICE FISIK (bukan cuma Play Mode Editor) untuk model
+   gerak baru ini — Play Mode membuktikan mekanismenya benar (state machine, pergerakan
+   posisi), tapi belum membuktikan perasaan geraknya wajar di AR sungguhan seperti poin 1-2
+   di atas yang sudah device-confirmed.
+6. **Masih terbuka, prioritas rendah**: bug `ShowPath.cs` NRE (lihat "Hasil verifikasi Play
+   Mode" di atas) murni artefak sandbox, tidak berdampak `TestingHCM.unity` — tidak mendesak,
+   tapi pertimbangkan `NavigationController` dummy di scene sandbox kalau spam error
+   mengganggu sesi pengujian berikutnya.
+
+**Metodologi pengujian yang disepakati untuk ke depan** (dicatat di
+`docs/superpowers/plans/2026-09-03-avatar-animation-test-harness.md`): uji manual WASD/HUD
+itu tier OBSERVASI, bukan tier KEPUTUSAN — tidak reproducible, jadi tidak bisa membuktikan
+satu parameter benar-benar memperbaiki sesuatu vs kebetulan cara jalan beda. Tier keputusan
+yang sesungguhnya (replay deterministik, idealnya dari trace pose device sungguhan, plus
+metrik terukur seperti foot-slide dan speed-jerk) BELUM dibangun — jangan mengunci angka
+tuning final hanya dari kesan WASD.
+
 ### ADR-035 — Tidak Membangun Dashboard Admin Custom; Supabase Dashboard Cukup (2026-08-24)
 
 **Konteks.**

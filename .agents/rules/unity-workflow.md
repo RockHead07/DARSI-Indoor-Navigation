@@ -31,7 +31,9 @@ trigger: always_on
 
 ## 4. Coplay MCP & Automasi Unity
 - **Project Root Setup:** Saat berinteraksi dengan Unity Editor via Coplay MCP, selalu verifikasi dan set project root (`set_unity_project_root`) ke path workspace saat ini.
-- **Automasi Scene & Eksekusi Skrip:** Utamakan penggunaan `execute_script` untuk menjalankan method setup otomatis (seperti `SceneBuilder`) dan `save_scene` daripada meminta user menyusun hierarki scene secara manual.
+- **Penyimpanan Scene di Subdirektori:** Tool `save_scene` Coplay menyimpan ke root `Assets/<scene_name>.unity` dan TIDAK mengenali subdirektori secara otomatis. Untuk scene di dalam subfolder (seperti `Assets/Scenes/...` atau `Assets/Samples/...`), SELALU gunakan `execute_script` yang memanggil `EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene())` guna mencegah terciptanya file scene duplikat di root `Assets/`.
+- **Parameter Tool Coplay:** Perhatikan penamaan argumen camelCase sesuai skema tool (contoh: `gameObjectPath` pada `get_game_object_info`, bukan `game_object_path`; `limit` pada `get_unity_logs`, bukan `count`).
+- **Automasi Scene & Eksekusi Skrip:** Utamakan penggunaan `execute_script` untuk menjalankan method setup otomatis (seperti `SceneBuilder`) daripada meminta user menyusun hierarki scene secara manual.
 - **Konvensi MenuItem:** Daftarkan menu toolbar dengan prefiks standar proyek (`DARSI/...` dan `Tools/...`) agar mudah ditemukan di menu toolbar atas Unity Editor.
 
 ## 5. AR Overlay & Voice UI Standards
@@ -47,3 +49,9 @@ trigger: always_on
 - **Fault Isolation:** Endpoint TTS (`POST /api/assistant/tts`) berdiri terpisah dari endpoint RAG (`/query`). Kegagalan sintesis suara tidak boleh menggagalkan respon teks atau data navigasi (`poi_id`).
 - **Hybrid 2-Tier TTS:** Tier 1 `edge-tts` (`id-ID-GadisNeural`) sebagai cloud primer dan Tier 2 Sherpa-ONNX / Piper (`id_ID`) sebagai fallback otomatis saat koneksi offline.
 - **Mobile Frame Budget:** Lip-sync driver dan modul audio tidak boleh membebani alokasi GC per frame agar FPS AR tetap stabil di 60 FPS pada perangkat target Android.
+
+## 8. Serialisasi Inspector & Pola Diagnostik Pengujian
+- **Dual-Update Nilai Serialized:** Mengubah nilai bawaan field `[SerializeField]` pada skrip C# (misal `moveSpeed = 1.3f`) TIDAK otomatis memperbarui instance yang sudah tersimpan di file scene atau prefab YAML. Nilai WAJIB diperbarui di kedua tempat (skrip default DAN properti GameObject via `set_property`), lalu diverifikasi ulang dengan membaca nilainya via `get_game_object_info`.
+- **Pola Properti Diagnostik:** Jika HUD atau probe pengujian membutuhkan data dari state privat/internal controller (misalnya kecepatan aktual atau posisi waypoint), jangan mengubah visibilitas field menjadi public atau mengubah logika inti. Buat properti *read-only getter* (`Diag...` atau nama deskriptif) dengan komentar penanda standar:
+  `// Diagnostik, dibaca HUD pengujian. Bukan untuk dipakai logika.`
+
