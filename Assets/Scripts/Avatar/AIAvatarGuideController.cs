@@ -38,6 +38,11 @@ using UnityEngine;
 /// pengguna (chaseArrivalDistance), avatar BERHENTI dan melambai dulu (menarik perhatian,
 /// bukan diam-diam lanjut seolah tidak terjadi apa-apa) sebelum memilih waypoint berikutnya
 /// -- pakai gerbang hold yang sama dengan sapaan awal StartLeading(), lihat greetingHoldSeconds.
+///
+/// DUA JALUR MASUK CHASING, BUKAN SATU (2026-09-04): chaseStallSeconds (timer) HANYA jalan
+/// selama WaitingForUser -- LeadingPath sebelumnya tidak punya pengaman jarak sama sekali.
+/// chaseDistanceTrigger menutup celah itu: dari state APA PUN, begitu pengguna sungguhan
+/// jauh dari avatar, langsung Chasing seketika tanpa menunggu timer.
 /// </summary>
 [DisallowMultipleComponent]
 public class AIAvatarGuideController : MonoBehaviour
@@ -60,14 +65,38 @@ public class AIAvatarGuideController : MonoBehaviour
     [Tooltip("Seberapa jauh titik berikutnya dipilih di depan posisi pengguna SAAT avatar " +
              "mulai berjalan ke sana (bukan diikat ulang tiap frame seperti model lama).")]
     [SerializeField] private float legDistance = 3.0f;
+    [Tooltip("Tambahan jarak leg (meter) tiap kali pengguna BERHASIL mendekat sendiri " +
+             "(advanceTriggerDistance) -- avatar jalan makin jauh tiap etape, bukan selalu " +
+             "legDistance yang sama (permintaan pemilik project 2026-09-04). SENGAJA hanya " +
+             "aktif saat navigation != null, yaitu sesi pathfinding POI sungguhan (MultiSet " +
+             "NavigationController) -- rig uji sandbox (tanpa NavigationController) TIDAK " +
+             "ikut tumbuh, supaya perilaku uji tetap dapat diprediksi. Reset ke 0 tiap sesi " +
+             "baru (StartLeading()) dan tiap kali Chasing terpaksa menjemput -- pengguna yang " +
+             "harus dijemput bukan 'berhasil mendekat sendiri', jadi tidak layak dapat bonus.")]
+    [SerializeField] private float legDistanceGrowth = 1.0f;
+    [Tooltip("Batas atas legDistance + legDistanceGrowth terakumulasi, supaya avatar tidak " +
+             "akhirnya menghilang jauh di depan di rute yang sangat panjang. Sekitar 2x " +
+             "legDistance dasar adalah titik awal yang wajar.")]
+    [SerializeField] private float maxLegDistance = 6.0f;
     [Tooltip("Seberapa dekat pengguna harus sampai ke titik saat ini sebelum avatar memilih " +
              "titik berikutnya dan jalan lagi.")]
     [SerializeField] private float advanceTriggerDistance = 1.5f;
     [Tooltip("Berapa lama avatar menunggu di titiknya sebelum menyerah dan balik menjemput " +
              "pengguna (Chasing) -- supaya pengguna tidak pernah benar-benar tersesat. " +
              "Dinaikkan dari 6 ke 8 detik (2026-09-04) supaya pasien yang berhenti sejenak " +
-             "membaca papan nama tidak langsung memicu Chasing.")]
+             "membaca papan nama tidak langsung memicu Chasing. HANYA berlaku selama " +
+             "WaitingForUser -- lihat chaseDistanceTrigger untuk celah yang timer ini " +
+             "TIDAK tutup (pengguna jauh SELAGI avatar masih LeadingPath).")]
     [SerializeField] private float chaseStallSeconds = 8.0f;
+    [Tooltip("Jarak darurat (meter) antara pengguna dan avatar -- begitu tercapai, avatar " +
+             "LANGSUNG Chasing dari state APA PUN (LeadingPath maupun WaitingForUser), tanpa " +
+             "menunggu chaseStallSeconds. Menutup celah nyata (2026-09-04, dilaporkan pemilik " +
+             "project): sebelumnya avatar SAMA SEKALI tidak memantau jarak pengguna selama " +
+             "LeadingPath -- hanya WaitingForUser yang punya pengaman waktu. Kalau pengguna " +
+             "jauh tertinggal atau salah arah SELAGI avatar masih jalan ke waypoint-nya " +
+             "sendiri, sebelumnya tidak ada reaksi sampai avatar sempat tiba dan mulai " +
+             "menunggu -- bisa terlambat kalau pengguna sungguhan tersesat.")]
+    [SerializeField] private float chaseDistanceTrigger = 15.0f;
     [Tooltip("Jarak henti KHUSUS saat menjemput (Chasing) -- SENGAJA terpisah dari " +
              "waypointArrivalEpsilon, bukan berbagi nilai yang sama. waypointArrivalEpsilon " +
              "(0,15 m) pas untuk berhenti di titik rute kosong, tapi kalau dipakai juga untuk " +
@@ -157,6 +186,7 @@ public class AIAvatarGuideController : MonoBehaviour
     private bool _holdingForGreeting; // diam wajib selama Wave awal masih diputar (greetingHoldSeconds)
     private float _greetingElapsed;   // sudah berapa lama menahan diam untuk Wave awal
     private bool _needsWaypoint;      // belum ada titik dipilih, pilih di frame Update() berikutnya
+    private float _legDistanceBonus;  // akumulasi legDistanceGrowth, direset per sesi/Chasing
     private Vector3 _waypoint;        // titik yang sedang dituju/ditunggui (LeadingPath/WaitingForUser)
     private Vector3 _arrivalTarget;   // titik SAMPING POI, dihitung sekali saat tiba terdeteksi
     private bool _hasWavedAtArrival;  // supaya trigger Wave di tujuan cuma sekali, bukan tiap frame
@@ -203,6 +233,7 @@ public class AIAvatarGuideController : MonoBehaviour
         _needsWaypoint = true;
         _hasWavedAtArrival = false;
         _waitingElapsed = 0f;
+        _legDistanceBonus = 0f;   // sesi baru mulai dari legDistance dasar, bukan menyambung sesi lama
         _currentSpeed = 0f;   // mulai dari diam tiap sesi memimpin baru, bukan menyambung kecepatan lama
         _speedVelocity = 0f;
         // Diam WAJIB selama Wave diputar (lihat tooltip greetingHoldSeconds) -- avatar TIDAK
@@ -303,6 +334,23 @@ public class AIAvatarGuideController : MonoBehaviour
             return;
         }
 
+        // JEMPUT DARURAT berbasis jarak (2026-09-04, celah dilaporkan pemilik project): timer
+        // chaseStallSeconds HANYA jalan selama WaitingForUser -- selama LeadingPath (avatar
+        // masih jalan ke waypoint-nya sendiri), sebelumnya TIDAK ADA pengaman sama sekali
+        // kalau pengguna jauh tertinggal atau salah arah. Cek ini jalan dari state APA PUN
+        // sebelum switch, supaya Chasing bisa terpicu seketika begitu jaraknya sungguhan
+        // jauh (chaseDistanceTrigger), bukan cuma lewat timer WaitingForUser.
+        if (_state != GuideState.Chasing)
+        {
+            Vector3 userFlatEmergency = _user.position; userFlatEmergency.y = 0f;
+            Vector3 avatarFlatEmergency = transform.position; avatarFlatEmergency.y = 0f;
+            if (Vector3.Distance(userFlatEmergency, avatarFlatEmergency) >= chaseDistanceTrigger)
+            {
+                _waitingElapsed = 0f;
+                SetState(GuideState.Chasing);
+            }
+        }
+
         switch (_state)
         {
             case GuideState.WaitingForUser:
@@ -314,6 +362,11 @@ public class AIAvatarGuideController : MonoBehaviour
                 Vector3 waypointFlat = _waypoint; waypointFlat.y = 0f;
                 if (Vector3.Distance(userFlat, waypointFlat) <= advanceTriggerDistance)
                 {
+                    // Pengguna BERHASIL mendekat sendiri -- hanya dalam sesi pathfinding POI
+                    // sungguhan (navigation != null) leg berikutnya jadi sedikit lebih jauh
+                    // (legDistanceGrowth), lihat tooltip-nya. Rig uji sandbox tidak punya
+                    // NavigationController jadi tidak pernah tumbuh, sengaja.
+                    if (navigation != null) _legDistanceBonus += legDistanceGrowth;
                     _waypoint = NextWaypoint(userS, pathLength);
                     _waitingElapsed = 0f;
                     SetState(GuideState.LeadingPath);
@@ -351,6 +404,9 @@ public class AIAvatarGuideController : MonoBehaviour
                     _greetingElapsed = 0f;
                     _needsWaypoint = true;
                     _waitingElapsed = 0f;
+                    // Pengguna harus DIJEMPUT, bukan mendekat sendiri -- bukan pertumbuhan yang
+                    // layak dipertahankan, reset supaya leg berikutnya kembali ke legDistance dasar.
+                    _legDistanceBonus = 0f;
                     SetState(GuideState.LeadingPath);
                 }
                 break;
@@ -376,12 +432,14 @@ public class AIAvatarGuideController : MonoBehaviour
         }
     }
 
-    /// <summary>Titik legDistance di depan posisi pengguna SAAT INI di sepanjang rute.
-    /// Dipanggil hanya saat avatar SELESAI di titik lama (bukan tiap frame) -- itulah yang
-    /// membedakan model ini dari model lama yang mengikat ulang tiap frame.</summary>
+    /// <summary>Titik legDistance (+ _legDistanceBonus terakumulasi, di sesi POI sungguhan)
+    /// di depan posisi pengguna SAAT INI di sepanjang rute. Dipanggil hanya saat avatar
+    /// SELESAI di titik lama (bukan tiap frame) -- itulah yang membedakan model ini dari
+    /// model lama yang mengikat ulang tiap frame.</summary>
     private Vector3 NextWaypoint(float userS, float pathLength)
     {
-        float s = Mathf.Min(userS + legDistance, pathLength);
+        float effectiveLeg = Mathf.Min(legDistance + _legDistanceBonus, maxLegDistance);
+        float s = Mathf.Min(userS + effectiveLeg, pathLength);
         return PathPolyline.PointAt(_points, s);
     }
 

@@ -1747,8 +1747,11 @@ MonoBehaviour:
   floorTransition: {fileID: 0}
   visualRoot: {fileID: 0}
   legDistance: 3
+  legDistanceGrowth: 1
+  maxLegDistance: 6
   advanceTriggerDistance: 1.5
   chaseStallSeconds: 8
+  chaseDistanceTrigger: 15
   chaseArrivalDistance: 1.5
   arrivalThreshold: 1.5
   sideOffsetDistance: 1
